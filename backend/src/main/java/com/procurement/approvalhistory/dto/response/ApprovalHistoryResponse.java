@@ -1,0 +1,1 @@
+package com.procurement.approvalhistory.dto.response;import com.procurement.approvalhistory.entity.ApprovalAction;import java.time.LocalDateTime;public record ApprovalHistoryResponse(Long id,Long purchaseRequestId,String requestNumber,Long approvalTaskId,ApprovalAction action,Long performedById,String performedByName,String comments,LocalDateTime performedAt){}

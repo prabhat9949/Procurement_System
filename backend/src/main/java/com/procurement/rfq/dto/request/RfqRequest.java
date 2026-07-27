@@ -1,0 +1,1 @@
+package com.procurement.rfq.dto.request; import jakarta.validation.constraints.*; import java.time.LocalDate; public record RfqRequest(@NotNull Long purchaseRequestId,@NotNull LocalDate closingDate,@NotNull LocalDate quotationOpeningDate,@NotBlank @Size(min=3,max=3) String currency,@Size(max=1000) String remarks){}

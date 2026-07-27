@@ -1,0 +1,1 @@
+package com.procurement.approvalstage.dto.response; import java.time.LocalDateTime; public record ApprovalStageResponse(Long id,Long approvalRuleId,String ruleCode,Integer stageNumber,String stageName,Long approverRoleId,String approverRoleName,Integer minimumApprovers,Boolean mandatoryApproval,Integer sequence,Boolean active,LocalDateTime createdAt,LocalDateTime updatedAt){}

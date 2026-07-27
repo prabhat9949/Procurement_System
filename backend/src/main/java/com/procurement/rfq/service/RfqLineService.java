@@ -1,0 +1,1 @@
+package com.procurement.rfq.service;import com.procurement.common.response.*;import com.procurement.rfq.dto.response.*;import org.springframework.data.domain.Pageable;public interface RfqLineService{PageResponse<RfqLineResponse> search(Long rfqId,Long productId,Pageable p);RfqLineResponse get(Long id);}

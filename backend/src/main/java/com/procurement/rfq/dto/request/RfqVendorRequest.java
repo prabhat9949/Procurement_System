@@ -1,0 +1,1 @@
+package com.procurement.rfq.dto.request; import jakarta.validation.constraints.NotNull; import jakarta.validation.constraints.Size; public record RfqVendorRequest(@NotNull Long vendorId,@Size(max=500) String remarks){}

@@ -1,0 +1,1 @@
+package com.procurement.goodsreceipt.entity;public enum GrnStatus{DRAFT,RECEIVING,PARTIALLY_RECEIVED,RECEIVED,UNDER_INSPECTION,COMPLETED,REJECTED,CANCELLED}

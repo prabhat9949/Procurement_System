@@ -1,0 +1,1 @@
+package com.procurement.vendorquotation.dto.request;import jakarta.validation.constraints.*;public record QuotationAttachmentRequest(@NotNull Long vendorQuotationId,@NotBlank String fileName,@NotBlank String filePath,@NotBlank String fileType){}

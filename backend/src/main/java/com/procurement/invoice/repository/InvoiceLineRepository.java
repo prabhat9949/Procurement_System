@@ -1,0 +1,1 @@
+package com.procurement.invoice.repository;import com.procurement.invoice.entity.*;import org.springframework.data.jpa.repository.*;import org.springframework.stereotype.Repository;import java.util.*;@Repository public interface InvoiceLineRepository extends JpaRepository<InvoiceLine,Long>{List<InvoiceLine>findByInvoiceId(Long id);}

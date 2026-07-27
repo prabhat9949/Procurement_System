@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.dto.response;import com.procurement.purchaseorder.entity.PurchaseOrderStatus;import java.time.*;public record PurchaseOrderHistoryResponse(Long id,Long purchaseOrderId,String action,PurchaseOrderStatus oldStatus,PurchaseOrderStatus newStatus,String remarks,LocalDateTime performedAt){}

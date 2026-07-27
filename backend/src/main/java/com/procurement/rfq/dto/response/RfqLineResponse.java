@@ -1,0 +1,1 @@
+package com.procurement.rfq.dto.response; import java.math.BigDecimal; import java.time.LocalDate; public record RfqLineResponse(Long id,Long rfqId,Long productId,String productCode,String productName,BigDecimal quantity,LocalDate requiredDate,BigDecimal estimatedUnitPrice,String remarks){}

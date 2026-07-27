@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.dto.response;import java.time.*;public record PurchaseOrderAttachmentResponse(Long id,Long purchaseOrderId,String fileName,String filePath,String fileType,LocalDateTime uploadedAt){}

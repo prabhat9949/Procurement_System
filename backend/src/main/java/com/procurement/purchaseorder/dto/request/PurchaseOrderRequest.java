@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.dto.request;import jakarta.validation.constraints.*;import java.time.LocalDate;public record PurchaseOrderRequest(@NotNull Long quotationComparisonId,@NotNull@FutureOrPresent LocalDate expectedDeliveryDate,@Size(max=500)String deliveryAddress,@Size(max=500)String billingAddress,@Size(max=1000)String remarks){}
