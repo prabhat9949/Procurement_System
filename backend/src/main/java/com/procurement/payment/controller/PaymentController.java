@@ -8,10 +8,12 @@ import com.procurement.payment.service.PaymentService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.*;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payments")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','FINANCE_MANAGER')")
 public class PaymentController {
     private final PaymentService service;
     public PaymentController(PaymentService service){this.service=service;}

@@ -1,23 +1,30 @@
 package com.procurement.report.controller;
 
 import com.procurement.common.response.*;
+import com.procurement.event.BusinessEventPublisher;
+import com.procurement.event.BusinessEventType;
+import com.procurement.notification.entity.NotificationType;
 import com.procurement.report.dto.request.ReportFilter;
 import com.procurement.report.dto.response.*;
 import com.procurement.report.service.ReportService;
 import org.springframework.data.domain.*;
 import org.springframework.http.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/reports")
+@PreAuthorize("isAuthenticated()")
 public class ReportController {
     private final ReportService service;
-    public ReportController(ReportService service){this.service=service;}
+    private final BusinessEventPublisher eventPublisher;
+    public ReportController(ReportService service,BusinessEventPublisher eventPublisher){this.service=service;this.eventPublisher=eventPublisher;}
 
     @GetMapping("/dashboard")
-    public ApiResponse<DashboardResponse> dashboard(){return ApiResponse.success(service.dashboard());}
+    public ApiResponse<DashboardResponse> dashboard(Authentication authentication){eventPublisher.publish(BusinessEventType.DASHBOARD_VIEWED,"Report","Dashboard",null,"reports-dashboard","Reports dashboard viewed",actor(authentication),NotificationType.SYSTEM);return ApiResponse.success(service.dashboard());}
 
     @GetMapping("/purchase-requests")
     public ApiResponse<PageResponse<ReportRowResponse>> purchaseRequests(@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size,@RequestParam(defaultValue="requestDate")String sort,@RequestParam(defaultValue="desc")String direction){return page(service.purchaseRequests(filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId), pageable(page,size,sort,direction)));}
@@ -49,13 +56,14 @@ public class ReportController {
     public ApiResponse<PageResponse<ReportRowResponse>> auditSummary(@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size){return page(service.auditSummary(filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId), PageRequest.of(page,size)));}
 
     @GetMapping("/export/pdf")
-    public ApiResponse<ReportExportResponse> exportPdf(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId){return ApiResponse.success(service.exportPdf(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
+    public ApiResponse<ReportExportResponse> exportPdf(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId,Authentication authentication){eventPublisher.publish(BusinessEventType.REPORT_EXPORTED,"Report","ReportExport",null,reportType,"PDF report exported",actor(authentication),NotificationType.SYSTEM);return ApiResponse.success(service.exportPdf(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
     @GetMapping("/export/excel")
-    public ApiResponse<ReportExportResponse> exportExcel(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId){return ApiResponse.success(service.exportExcel(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
+    public ApiResponse<ReportExportResponse> exportExcel(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId,Authentication authentication){eventPublisher.publish(BusinessEventType.REPORT_EXPORTED,"Report","ReportExport",null,reportType,"Excel report exported",actor(authentication),NotificationType.SYSTEM);return ApiResponse.success(service.exportExcel(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
     @GetMapping("/export/csv")
-    public ApiResponse<ReportExportResponse> exportCsv(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId){return ApiResponse.success(service.exportCsv(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
+    public ApiResponse<ReportExportResponse> exportCsv(@RequestParam String reportType,@RequestParam(required=false)LocalDate startDate,@RequestParam(required=false)LocalDate endDate,@RequestParam(required=false)Long departmentId,@RequestParam(required=false)Long vendorId,@RequestParam(required=false)Long warehouseId,@RequestParam(required=false)Long categoryId,@RequestParam(required=false)Long productId,@RequestParam(required=false)String status,@RequestParam(required=false)Long employeeId,@RequestParam(required=false)Long costCenterId,Authentication authentication){eventPublisher.publish(BusinessEventType.REPORT_EXPORTED,"Report","ReportExport",null,reportType,"CSV report exported",actor(authentication),NotificationType.SYSTEM);return ApiResponse.success(service.exportCsv(reportType, filter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId)));}
 
     private ReportFilter filter(LocalDate startDate,LocalDate endDate,Long departmentId,Long vendorId,Long warehouseId,Long categoryId,Long productId,String status,Long employeeId,Long costCenterId){return new ReportFilter(startDate,endDate,departmentId,vendorId,warehouseId,categoryId,productId,status,employeeId,costCenterId);}
     private Pageable pageable(int page,int size,String sort,String direction){return PageRequest.of(page,size,"asc".equalsIgnoreCase(direction)?Sort.by(sort).ascending():Sort.by(sort).descending());}
     private ApiResponse<PageResponse<ReportRowResponse>> page(PageResponse<ReportRowResponse> page){return ApiResponse.success(page);}
+    private String actor(Authentication authentication){return authentication == null ? "system" : authentication.getName();}
 }

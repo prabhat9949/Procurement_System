@@ -10,6 +10,9 @@ import com.procurement.common.exception.ResourceNotFoundException;
 import com.procurement.common.exception.UnauthorizedException;
 import com.procurement.employee.entity.Employee;
 import com.procurement.employee.repository.EmployeeRepository;
+import com.procurement.event.BusinessEventPublisher;
+import com.procurement.event.BusinessEventType;
+import com.procurement.notification.entity.NotificationType;
 import com.procurement.role.entity.Role;
 import com.procurement.role.repository.RoleRepository;
 import com.procurement.security.jwt.JwtTokenProvider;
@@ -32,19 +35,22 @@ public class AuthService {
     private final EmployeeRepository employeeRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BusinessEventPublisher eventPublisher;
 
     public AuthService(AuthenticationManager authenticationManager,
                        JwtTokenProvider tokenProvider,
                        UserRepository userRepository,
                        EmployeeRepository employeeRepository,
                        RoleRepository roleRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       BusinessEventPublisher eventPublisher) {
         this.authenticationManager = authenticationManager;
         this.tokenProvider = tokenProvider;
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.eventPublisher = eventPublisher;
     }
 
     @Transactional
@@ -71,9 +77,20 @@ public class AuthService {
                 .accountLocked(false)
                 .build();
         user = userRepository.save(user);
+        eventPublisher.publish(
+                BusinessEventType.LOGIN,
+                "Auth",
+                "User",
+                user.getId(),
+                user.getUsername(),
+                "User account registered",
+                user.getUsername(),
+                NotificationType.SYSTEM
+        );
         return new RegisterResponse(user.getId(), user.getUsername());
     }
 
+    @Transactional
     public LoginResponse login(LoginRequest request) {
         Authentication authentication;
         try {
@@ -82,6 +99,22 @@ public class AuthService {
         } catch (BadCredentialsException exception) {
             throw new UnauthorizedException("Invalid username or password");
         }
+
+        User user = userRepository.findByUsername(authentication.getName())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        user.setLastLogin(java.time.LocalDateTime.now());
+        userRepository.save(user);
+
+        eventPublisher.publish(
+                BusinessEventType.LOGIN,
+                "Auth",
+                "User",
+                user.getId(),
+                user.getUsername(),
+                "User logged in",
+                user.getUsername(),
+                NotificationType.SYSTEM
+        );
 
         String token = tokenProvider.generateToken(authentication);
         return new LoginResponse(token, "Bearer", tokenProvider.getExpirationMs(),

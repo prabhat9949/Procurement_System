@@ -16,6 +16,9 @@ import com.procurement.common.exception.*;
 import com.procurement.common.response.PageResponse;
 import com.procurement.employee.entity.Employee;
 import com.procurement.employee.repository.EmployeeRepository;
+import com.procurement.event.BusinessEventPublisher;
+import com.procurement.event.BusinessEventType;
+import com.procurement.notification.entity.NotificationType;
 import com.procurement.purchaserequest.entity.*;
 import com.procurement.purchaserequest.repository.PurchaseRequestRepository;
 import com.procurement.user.entity.User;
@@ -36,13 +39,16 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
     private final EmployeeRepository employees;
     private final UserRepository users;
     private final ApprovalTaskMapper mapper;
+    private final BusinessEventPublisher eventPublisher;
 
     public ApprovalTaskServiceImpl(ApprovalTaskRepository tasks, ApprovalStageRepository stages,
                                    ApprovalRuleRepository rules, ApprovalHistoryRepository history,
                                    PurchaseRequestRepository requests, EmployeeRepository employees,
-                                   UserRepository users, ApprovalTaskMapper mapper) {
+                                   UserRepository users, ApprovalTaskMapper mapper,
+                                   BusinessEventPublisher eventPublisher) {
         this.tasks=tasks; this.stages=stages; this.rules=rules; this.history=history;
         this.requests=requests; this.employees=employees; this.users=users; this.mapper=mapper;
+        this.eventPublisher = eventPublisher;
     }
     private String username(){var a=SecurityContextHolder.getContext().getAuthentication();return a==null?"system":a.getName();}
     private Employee currentEmployee(){return users.findByUsername(username()).map(User::getEmployee).orElseThrow(()->new ForbiddenException("Authenticated user is not linked to an employee"));}
@@ -57,13 +63,14 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
         var stage=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(matching.get(0).getId()).stream().findFirst().orElseThrow(()->new ConflictException("Approval rule has no active stages"));
         var employee=employees.findFirstByRoleIdAndActiveTrue(stage.getApproverRole().getId()).orElseThrow(()->new ConflictException("No active approver found for role"));
         pr.setStatus(PurchaseRequestStatus.UNDER_REVIEW);pr.setApprovalStatus(ApprovalStatus.PENDING);requests.save(pr);var task=newTask(pr,stage,employee);record(pr,task,ApprovalAction.SUBMITTED,currentEmployee(),"Purchase request submitted");
+        eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_SUBMITTED,"ApprovalTask","ApprovalTask",task.getId(),task.getTaskNumber(),"Approval task created for purchase request submission",username(),NotificationType.APPROVAL);
     }
     @Transactional(readOnly=true) public PageResponse<ApprovalTaskResponse> search(Long requestId,Long employeeId,ApprovalTaskStatus status,Pageable pageable){Page<ApprovalTaskResponse>x=tasks.findAll(ApprovalTaskSpecification.search(requestId,employeeId,status),pageable).map(mapper::toResponse);return new PageResponse<>(x.getContent(),x.getNumber(),x.getSize(),x.getTotalElements(),x.getTotalPages(),x.isLast());}
     @Transactional(readOnly=true) public ApprovalTaskResponse getById(Long id){return mapper.toResponse(find(id));}
     private ApprovalTaskResponse decide(Long id,ApprovalDecisionRequest d,ApprovalTaskStatus target,ApprovalAction action){
         var task=find(id);if(task.getStatus()!=ApprovalTaskStatus.PENDING)throw new ConflictException("Completed approval tasks cannot be modified");var employee=currentEmployee();if(!task.getAssignedEmployee().getId().equals(employee.getId()))throw new ForbiddenException("Only the assigned approver can decide this task");
         task.setStatus(target);task.setComments(d==null?null:d.comments());task.setCompletedDate(LocalDateTime.now());var pr=task.getPurchaseRequest();record(pr,task,action,employee,task.getComments());
-        if(target==ApprovalTaskStatus.REJECTED){pr.setStatus(PurchaseRequestStatus.REJECTED);pr.setApprovalStatus(ApprovalStatus.REJECTED);requests.save(pr);}else if(target==ApprovalTaskStatus.RETURNED){pr.setStatus(PurchaseRequestStatus.DRAFT);pr.setApprovalStatus(ApprovalStatus.RETURNED);requests.save(pr);}else{var next=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(task.getApprovalStage().getApprovalRule().getId()).stream().filter(s->s.getSequence()>task.getApprovalStage().getSequence()).findFirst();if(next.isPresent()){var ae=employees.findFirstByRoleIdAndActiveTrue(next.get().getApproverRole().getId()).orElseThrow(()->new ConflictException("No active approver found for next stage"));newTask(pr,next.get(),ae);}else{pr.setStatus(PurchaseRequestStatus.APPROVED);pr.setApprovalStatus(ApprovalStatus.APPROVED);requests.save(pr);}}
+        if(target==ApprovalTaskStatus.REJECTED){pr.setStatus(PurchaseRequestStatus.REJECTED);pr.setApprovalStatus(ApprovalStatus.REJECTED);requests.save(pr);eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_REJECTED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Purchase request rejected",username(),NotificationType.APPROVAL);}else if(target==ApprovalTaskStatus.RETURNED){pr.setStatus(PurchaseRequestStatus.DRAFT);pr.setApprovalStatus(ApprovalStatus.RETURNED);requests.save(pr);}else{var next=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(task.getApprovalStage().getApprovalRule().getId()).stream().filter(s->s.getSequence()>task.getApprovalStage().getSequence()).findFirst();if(next.isPresent()){var ae=employees.findFirstByRoleIdAndActiveTrue(next.get().getApproverRole().getId()).orElseThrow(()->new ConflictException("No active approver found for next stage"));var nextTask=newTask(pr,next.get(),ae);eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_APPROVED,"ApprovalTask","ApprovalTask",nextTask.getId(),nextTask.getTaskNumber(),"Approval stage completed and routed to next approver",username(),NotificationType.APPROVAL);}else{pr.setStatus(PurchaseRequestStatus.APPROVED);pr.setApprovalStatus(ApprovalStatus.APPROVED);requests.save(pr);eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_APPROVED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Purchase request fully approved",username(),NotificationType.APPROVAL);}}
         return mapper.toResponse(tasks.save(task));
     }
     @Transactional public ApprovalTaskResponse approve(Long id,ApprovalDecisionRequest d){return decide(id,d,ApprovalTaskStatus.APPROVED,ApprovalAction.APPROVED);}

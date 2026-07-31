@@ -10,6 +10,9 @@ import com.procurement.department.entity.Department;
 import com.procurement.department.repository.DepartmentRepository;
 import com.procurement.employee.entity.Employee;
 import com.procurement.employee.repository.EmployeeRepository;
+import com.procurement.event.BusinessEventPublisher;
+import com.procurement.event.BusinessEventType;
+import com.procurement.notification.entity.NotificationType;
 import com.procurement.purchaserequest.dto.request.PurchaseRequestRequest;
 import com.procurement.purchaserequest.dto.response.PurchaseRequestResponse;
 import com.procurement.purchaserequest.entity.ApprovalStatus;
@@ -42,6 +45,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     private final PurchaseRequestMapper purchaseRequestMapper;
     private final PurchaseRequestValidator purchaseRequestValidator;
     private final ApprovalTaskService approvalTaskService;
+    private final BusinessEventPublisher eventPublisher;
 
     public PurchaseRequestServiceImpl(PurchaseRequestRepository purchaseRequestRepository,
                                       EmployeeRepository employeeRepository,
@@ -49,7 +53,8 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
                                       CostCenterRepository costCenterRepository,
                                       PurchaseRequestMapper purchaseRequestMapper,
                                       PurchaseRequestValidator purchaseRequestValidator,
-                                      ApprovalTaskService approvalTaskService) {
+                                      ApprovalTaskService approvalTaskService,
+                                      BusinessEventPublisher eventPublisher) {
         this.purchaseRequestRepository = purchaseRequestRepository;
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
@@ -57,6 +62,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         this.purchaseRequestMapper = purchaseRequestMapper;
         this.purchaseRequestValidator = purchaseRequestValidator;
         this.approvalTaskService = approvalTaskService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -70,7 +76,18 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         String username = currentUsername();
         entity.setCreatedBy(username);
         entity.setUpdatedBy(username);
-        return purchaseRequestMapper.toResponse(purchaseRequestRepository.save(entity));
+        PurchaseRequest saved = purchaseRequestRepository.save(entity);
+        eventPublisher.publish(
+                BusinessEventType.PURCHASE_REQUEST_CREATED,
+                "PurchaseRequest",
+                "PurchaseRequest",
+                saved.getId(),
+                saved.getRequestNumber(),
+                "Purchase request created",
+                username,
+                NotificationType.PURCHASE_REQUEST
+        );
+        return purchaseRequestMapper.toResponse(saved);
     }
 
     @Override
@@ -126,6 +143,16 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         PurchaseRequest entity = findRequest(id);
         ensureDraftAndOwner(entity);
         approvalTaskService.submit(entity);
+        eventPublisher.publish(
+                BusinessEventType.PURCHASE_REQUEST_SUBMITTED,
+                "PurchaseRequest",
+                "PurchaseRequest",
+                entity.getId(),
+                entity.getRequestNumber(),
+                "Purchase request submitted for approval",
+                currentUsername(),
+                NotificationType.APPROVAL
+        );
         return purchaseRequestMapper.toResponse(entity);
     }
 
