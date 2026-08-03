@@ -1,0 +1,3 @@
+package com.procurement.approvalrule.specification;
+import com.procurement.approvalrule.entity.ApprovalRule; import jakarta.persistence.criteria.*; import org.springframework.data.jpa.domain.Specification;
+public final class ApprovalRuleSpecification { private ApprovalRuleSpecification(){} public static Specification<ApprovalRule> search(String keyword,Long departmentId,Boolean active){return (r,q,b)->{var p=b.conjunction(); if(keyword!=null&&!keyword.isBlank()){String k="%"+keyword.toLowerCase()+"%";p=b.and(p,b.or(b.like(b.lower(r.get("ruleCode")),k),b.like(b.lower(r.get("ruleName")),k)));} if(departmentId!=null)p=b.and(p,b.equal(r.get("department").get("id"),departmentId)); if(active!=null)p=b.and(p,b.equal(r.get("active"),active)); return p;};} }

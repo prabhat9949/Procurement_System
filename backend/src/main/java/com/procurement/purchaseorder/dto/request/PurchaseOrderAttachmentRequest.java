@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.dto.request;import jakarta.validation.constraints.*;public record PurchaseOrderAttachmentRequest(@NotBlank String fileName,@NotBlank String filePath,@NotBlank String fileType){}

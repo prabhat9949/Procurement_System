@@ -1,0 +1,1 @@
+package com.procurement.rfq.exception; import com.procurement.common.exception.ResourceNotFoundException; public class RfqNotFoundException extends ResourceNotFoundException{public RfqNotFoundException(Long id){super("RFQ not found: "+id);}}

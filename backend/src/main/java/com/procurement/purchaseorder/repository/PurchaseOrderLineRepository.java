@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.repository;import com.procurement.purchaseorder.entity.*;import org.springframework.data.jpa.repository.*;import org.springframework.stereotype.Repository;import java.util.*;@Repository public interface PurchaseOrderLineRepository extends JpaRepository<PurchaseOrderLine,Long>{List<PurchaseOrderLine>findByPurchaseOrderId(Long id);}

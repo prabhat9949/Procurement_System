@@ -1,0 +1,1 @@
+package com.procurement.vendorquotation.dto.response;import java.time.LocalDateTime;public record QuotationAttachmentResponse(Long id,Long quotationId,String fileName,String filePath,String fileType,LocalDateTime uploadedAt){}
