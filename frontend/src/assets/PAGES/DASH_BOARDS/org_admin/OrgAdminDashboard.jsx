@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import "./OrgAdminDashboard.css";
 
 import {
-  LayoutDashboard,
   Building2,
   ShoppingBag,
   DollarSign,
@@ -17,12 +16,14 @@ import {
   AlertTriangle,
   FolderKanban,
   Bell,
-  UserCheck,
+  Lock,
+  FileText,
   Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
+  Server,
 } from "lucide-react";
 
 import OrgOverview from "./modules/OrgOverview";
@@ -36,10 +37,17 @@ import BusinessIntelligence from "./modules/BusinessIntelligence";
 import OrgComplianceMonitoring from "./modules/OrgComplianceMonitoring";
 import OrgRiskAnalysis from "./modules/OrgRiskAnalysis";
 import OrgReports from "./modules/OrgReports";
-import OrgNotifications from "./modules/OrgNotifications";
-import OrgProfile from "./modules/OrgProfile";
-import OrgSettings from "./modules/OrgSettings";
-import OrgMasterDataView from "./modules/OrgMasterDataView";
+import OrgMasterDataPanel from "./modules/OrgMasterDataPanel";
+import OrgSystemHealth from "./modules/OrgSystemHealth";
+
+// Real admin control modules (shared with the Super Admin portal)
+import SuperUserManagement from "../super_admin/modules/SuperUserManagement";
+import SuperRoleManagement from "../super_admin/modules/SuperRoleManagement";
+import SuperPermissionManagement from "../super_admin/modules/SuperPermissionManagement";
+import SuperVendorMonitoring from "../super_admin/modules/SuperVendorMonitoring";
+import SuperAuditLogs from "../super_admin/modules/SuperAuditLogs";
+import SuperNotificationsCenter from "../super_admin/modules/SuperNotificationsCenter";
+import SuperSettings from "../super_admin/modules/SuperSettings";
 
 const OrgAdminDashboard = () => {
   const navigate = useNavigate();
@@ -50,24 +58,35 @@ const OrgAdminDashboard = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const navMenuItems = [
-    { id: "org-overview", label: "Organization Overview", icon: Building2 },
+    { id: "org-overview", label: "Admin Dashboard", icon: Building2 },
+    { id: "system-health", label: "System Health", icon: Server },
+    { id: "user-management", label: "User Management", icon: Users },
+    { id: "role-management", label: "Role Management", icon: ShieldCheck },
+    { id: "permission-management", label: "Permission Management", icon: Lock },
+    { id: "master-data", label: "Master Data Management", icon: Database },
+    { id: "vendor-monitoring", label: "Vendors & KYC", icon: Truck },
+    { id: "audit-logs", label: "Audit Logs", icon: FileText },
+    { id: "notifications", label: "Notifications", icon: Bell },
     { id: "procurement-analytics", label: "Procurement Analytics", icon: ShoppingBag },
     { id: "financial-analytics", label: "Financial Analytics", icon: DollarSign },
     { id: "inventory-analytics", label: "Inventory Analytics", icon: Boxes },
-    { id: "vendor-analytics", label: "Vendor Analytics", icon: Truck },
-    { id: "department-analytics", label: "Department Analytics", icon: Activity },
-    { id: "user-analytics", label: "User Analytics", icon: Users },
-    { id: "business-intelligence", label: "Business Intelligence", icon: BarChart2 },
-    { id: "master-data", label: "System Data Overview", icon: Database },
+    { id: "vendor-analytics", label: "Vendor Analytics", icon: Activity },
+    { id: "department-analytics", label: "Department Analytics", icon: BarChart2 },
+    { id: "organization-reports", label: "Reports", icon: FolderKanban },
     { id: "compliance-monitoring", label: "Compliance Monitoring", icon: ShieldCheck },
     { id: "risk-analysis", label: "Risk Analysis", icon: AlertTriangle },
-    { id: "organization-reports", label: "Organization Reports", icon: FolderKanban },
+    { id: "settings", label: "Account & Security", icon: Settings },
     ];
 
   const handleLogout = () => {
-    localStorage.removeItem("eps_active_role");
+    // Clear the complete EPS session so the Back button can never look like a logout.
     localStorage.removeItem("eps_access_token");
-    navigate("/login");
+    localStorage.removeItem("eps_active_role");
+    localStorage.removeItem("eps_role_code");
+    localStorage.removeItem("eps_username");
+    localStorage.removeItem("eps_display_name");
+    localStorage.removeItem("eps_user_id");
+    navigate("/login", { replace: true });
   };
 
   const renderActiveModule = () => {
@@ -75,6 +94,22 @@ const OrgAdminDashboard = () => {
       case "dashboard":
       case "org-overview":
         return <OrgOverview onNavigate={(tab) => setActiveTab(tab)} />;
+      case "system-health":
+        return <OrgSystemHealth />;
+      case "user-management":
+        return <SuperUserManagement />;
+      case "role-management":
+        return <SuperRoleManagement />;
+      case "permission-management":
+        return <SuperPermissionManagement />;
+      case "master-data":
+        return <OrgMasterDataPanel />;
+      case "vendor-monitoring":
+        return <SuperVendorMonitoring />;
+      case "audit-logs":
+        return <SuperAuditLogs />;
+      case "notifications":
+        return <SuperNotificationsCenter />;
       case "procurement-analytics":
         return <OrgProcurementAnalytics />;
       case "financial-analytics":
@@ -89,8 +124,6 @@ const OrgAdminDashboard = () => {
         return <OrgUserAnalytics />;
       case "business-intelligence":
         return <BusinessIntelligence />;
-      case "master-data":
-        return <OrgMasterDataView />;
       case "compliance-monitoring":
         return <OrgComplianceMonitoring />;
       case "risk-analysis":
@@ -98,7 +131,8 @@ const OrgAdminDashboard = () => {
       case "organization-reports":
         return <OrgReports />;
       case "profile":
-        return <OrgProfile />;
+      case "settings":
+        return <SuperSettings />;
       default:
         return <OrgOverview onNavigate={(tab) => setActiveTab(tab)} />;
     }
@@ -119,7 +153,7 @@ const OrgAdminDashboard = () => {
             {!isSidebarCollapsed && (
               <div className="org-brand-text">
                 <span className="org-brand-title">Enterprise</span>
-                <span className="org-brand-subtitle">Org Admin & BI</span>
+                <span className="org-brand-subtitle">Admin Control Center</span>
               </div>
             )}
           </div>
@@ -164,7 +198,7 @@ const OrgAdminDashboard = () => {
                 <div className="org-user-avatar">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
                 <div className="org-user-details">
                   <span className="org-user-name">{displayName}</span>
-                  <span className="org-user-role">Organization Admin</span>
+                  <span className="org-user-role">System Administrator</span>
                 </div>
               </div>
 
@@ -215,9 +249,8 @@ const OrgAdminDashboard = () => {
             onClick={() => setIsMobileOpen(!isMobileOpen)}
           >
             <Menu size={22} />
-          </button>
-          <span style={{ fontWeight: "800", fontSize: "16px", color: "#111" }}>
-            EPS Organization Admin & BI Portal
+          </button>                  <span style={{ fontWeight: "800", fontSize: "16px", color: "#111" }}>
+            EPS Admin Control Center
           </span>
         </div>
 

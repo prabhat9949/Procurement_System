@@ -1,0 +1,14 @@
+/* Global EPS styles — loaded on every page. */
+
+.login-spin {
+  animation: eps-spin 0.9s linear infinite;
+}
+
+@keyframes eps-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

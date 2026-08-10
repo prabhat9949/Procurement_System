@@ -75,6 +75,44 @@ public class VendorServiceImpl implements VendorService {
 
     @Override
     @Transactional
+    public VendorResponse updateStatus(Long id, String status, Boolean approved) {
+        Vendor vendor = findVendor(id);
+        if (status != null && !status.isBlank()) {
+            vendor.setStatus(status.trim().toUpperCase());
+        }
+        if (approved != null) {
+            vendor.setApproved(approved);
+        }
+        vendor.setUpdatedBy(currentUsername());
+        return vendorMapper.toResponse(vendorRepository.save(vendor));
+    }
+
+    @Override
+    @Transactional
+    public VendorResponse updateKyc(Long id, String decision, String reason) {
+        Vendor vendor = findVendor(id);
+        if ("APPROVE".equalsIgnoreCase(decision)) {
+            vendor.setStatus("ACTIVE");
+            vendor.setApproved(true);
+        } else if ("REJECT".equalsIgnoreCase(decision)) {
+            vendor.setStatus("REJECTED");
+            vendor.setApproved(false);
+        } else if ("SUSPEND".equalsIgnoreCase(decision)) {
+            vendor.setStatus("SUSPENDED");
+        } else if ("BLACKLIST".equalsIgnoreCase(decision)) {
+            vendor.setStatus("BLACKLISTED");
+            vendor.setApproved(false);
+        } else if ("ACTIVATE".equalsIgnoreCase(decision)) {
+            vendor.setStatus("ACTIVE");
+            vendor.setApproved(true);
+        }
+        vendor.setUpdatedBy(currentUsername());
+        Vendor saved = vendorRepository.save(vendor);
+        return vendorMapper.toResponse(saved);
+    }
+
+    @Override
+    @Transactional
     public void delete(Long id) {
         Vendor vendor = findVendor(id);
         vendorRepository.delete(vendor);

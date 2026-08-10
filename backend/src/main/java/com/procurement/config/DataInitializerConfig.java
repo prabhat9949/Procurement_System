@@ -92,13 +92,6 @@ public class DataInitializerConfig {
     private static final String LEGACY_FINANCE = "finance";
     private static final String LEGACY_VENDOR = "vendor";
 
-    // Orphaned accounts created by older seed versions that are not part of the
-    // development login matrix. They are disabled (not deleted) so history is kept.
-    private static final List<String> ORPHAN_LEGACY_USERNAMES = List.of(
-            "warehouse.manager", "officer", "pmanager", "fmanager", "wmanager",
-            "hrmanager", "procurement.manager", "procurement.officer",
-            "finance.manager", "hr.manager", "user1", "user2");
-
     @Bean
     @org.springframework.core.annotation.Order(1)
     @Transactional
@@ -329,29 +322,6 @@ public class DataInitializerConfig {
                 if (user.getPlainPassword() == null) {
                     backfillPlainPassword(userRepository, passwordEncoder, user, null);
                 }
-            });
-
-            // ==========================
-            // 5.6 Disable orphaned legacy accounts (old seed versions).
-            // Only accounts still on a legacy default password are disabled, so an
-            // admin who changed the password or re-enabled one keeps their choice
-            // across restarts. Disabled (never deleted) so history is preserved.
-            // ==========================
-            userRepository.findAll().forEach(user -> {
-                if (user.getUsername() == null
-                        || !ORPHAN_LEGACY_USERNAMES.contains(user.getUsername().trim())
-                        || !Boolean.TRUE.equals(user.getEnabled())) {
-                    return;
-                }
-                boolean onLegacyDefault = user.getPlainPassword() == null
-                        || user.getPlainPassword().endsWith("123")
-                        || user.getPlainPassword().equals("admin123");
-                if (!onLegacyDefault) {
-                    return;
-                }
-                user.setEnabled(false);
-                userRepository.save(user);
-                log.info("Disabled orphaned legacy account '{}'.", user.getUsername());
             });
 
             // ==========================

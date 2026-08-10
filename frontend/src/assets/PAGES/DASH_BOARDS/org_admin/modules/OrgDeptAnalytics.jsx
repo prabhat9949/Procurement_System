@@ -1,60 +1,65 @@
 import React from "react";
-import { Building2, Activity } from "lucide-react";
+import { Building2, Landmark, Users, Briefcase } from "lucide-react";
+import LiveRoleOverview from "../../shared_ui/LiveRoleOverview";
 
-const deptMatrixMock = [
-  { dept: "Engineering & IT", head: "Robert Vance", users: 42, reqs: 48, spend: "$384,200", SLA: "99.1%" },
-  { dept: "DevOps & Cloud Infra", head: "Tech Operations", users: 28, reqs: 34, spend: "$312,000", SLA: "98.5%" },
-  { dept: "Product & UI/UX Design", head: "Product Lead", users: 18, reqs: 22, spend: "$168,500", SLA: "97.8%" },
-  { dept: "Marketing & Growth", head: "Marketing Lead", users: 24, reqs: 28, spend: "$224,000", SLA: "98.0%" },
-  { dept: "HR & Corporate Ops", head: "HR Lead", users: 15, reqs: 18, spend: "$144,200", SLA: "97.5%" },
-];
-
-const OrgDeptAnalytics = () => {
-  return (
-    <div className="org-dept-analytics-container">
-      {/* Header */}
-      <div className="org-page-header">
-        <div>
-          <h1 className="org-page-title">
-            <Building2 color="#f8b400" /> Departmental Performance & Cost Center Matrix
-          </h1>
-          <p className="org-page-subtitle">
-            Cross-departmental comparison of user headcount, requisition volume, commercial spend, and SLA velocity.
-          </p>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="org-card">
-        <div className="org-table-container">
-          <table className="org-table">
-            <thead>
-              <tr>
-                <th>Cost Center / Department</th>
-                <th>Department Lead</th>
-                <th>Active Users</th>
-                <th>Requisitions YTD</th>
-                <th>Consumed Spend</th>
-                <th>Department SLA %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {deptMatrixMock.map((d, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontWeight: "800", color: "#111111" }}>{d.dept}</td>
-                  <td style={{ color: "#555555" }}>{d.head}</td>
-                  <td style={{ fontWeight: "700" }}>{d.users} Members</td>
-                  <td style={{ fontWeight: "700", color: "#d97706" }}>{d.reqs}</td>
-                  <td style={{ fontWeight: "800", color: "#059669" }}>{d.spend}</td>
-                  <td style={{ fontWeight: "700", color: "#059669" }}>{d.SLA}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
+const OrgDeptAnalytics = () => (
+  <LiveRoleOverview
+    header={{
+      title: "Department Analytics",
+      subtitle: "Department structure and budget-bearing cost centers — real master data.",
+      badge: "DEPARTMENTS",
+      icon: Building2,
+      accent: "#d97706",
+    }}
+    endpoints={{
+      depts: "/api/departments?page=0&size=100",
+      ccs: "/api/cost-centers?page=0&size=100",
+      emps: "/api/employees?page=0&size=100",
+    }}
+    kpiFn={(data) => {
+      const depts = data.depts?.content || [];
+      const ccs = data.ccs?.content || [];
+      const emps = data.emps?.content || [];
+      const totalBudget = ccs.reduce((s, c) => s + (Number(c.budget) || 0), 0);
+      const usedBudget = ccs.reduce((s, c) => s + (Number(c.usedBudget) || 0), 0);
+      const inr = (n) => `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+      return [
+        { label: "Departments", value: depts.length, icon: Building2, color: "#d97706" },
+        { label: "Cost Centers", value: ccs.length, icon: Landmark, color: "#2563eb" },
+        { label: "Employees", value: emps.length, icon: Users, color: "#059669" },
+        { label: "Total Budget", value: inr(totalBudget), icon: Briefcase, color: "#7c3aed" },
+        { label: "Budget Utilized", value: inr(usedBudget), icon: Briefcase, color: "#0891b2" },
+      ];
+    }}
+    tables={[
+      {
+        key: "depts",
+        title: "Departments",
+        emptyText: "No departments found.",
+        maxRows: 8,
+        columns: [
+          { header: "Code", render: (r) => <strong style={{ color: "#d97706" }}>{r.departmentCode}</strong> },
+          { header: "Department", render: (r) => <span style={{ fontWeight: 700 }}>{r.departmentName}</span> },
+          { header: "Employees", render: (r) => <span style={{ fontWeight: 700, color: "#059669" }}>{r.employeeCount ?? 0}</span> },
+          { header: "Cost Centers", render: (r) => <span style={{ fontWeight: 700, color: "#2563eb" }}>{r.costCenterCount ?? 0}</span> },
+          { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.active ? "rgba(5,150,105,.12)" : "rgba(220,38,38,.12)", color: r.active ? "#059669" : "#dc2626" }}>{r.active ? "ACTIVE" : "INACTIVE"}</span> },
+        ],
+      },
+      {
+        key: "ccs",
+        title: "Cost Centers & Budgets",
+        emptyText: "No cost centers found.",
+        maxRows: 8,
+        columns: [
+          { header: "Code", render: (r) => <strong style={{ color: "#2563eb" }}>{r.code}</strong> },
+          { header: "Name", render: (r) => <span style={{ fontWeight: 700 }}>{r.name}</span> },
+          { header: "Department", accessor: "departmentName" },
+          { header: "Budget", render: (r) => <span style={{ fontWeight: 700 }}>{Number(r.budget || 0).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })}</span> },
+          { header: "Used", render: (r) => <span style={{ fontWeight: 600, color: "#d97706" }}>{Number(r.usedBudget || 0).toLocaleString("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 })}</span> },
+        ],
+      },
+    ]}
+  />
+);
 
 export default OrgDeptAnalytics;

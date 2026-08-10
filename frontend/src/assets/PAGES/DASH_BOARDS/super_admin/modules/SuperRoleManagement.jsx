@@ -1,68 +1,161 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ShieldCheck,
   PlusCircle,
-  Eye,
-  Settings,
   Edit,
   X,
+  Trash2,
+  RefreshCw,
+  Users,
+  KeyRound,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
-
-const initialRoles = [
-  { role: "Employees (Requesters)", users: 840, privileges: "Create Requisition, Track Request", hierarchy: "Level 1 (User)" },
-  { role: "Department Managers", users: 48, privileges: "Approve Requisition, Budget Oversight", hierarchy: "Level 2 (Manager)" },
-  { role: "Procurement Executives", users: 64, privileges: "RFQ Management, Vendor Evaluation", hierarchy: "Level 2 (Executive)" },
-  { role: "Procurement Managers", users: 24, privileges: "Issue Purchase Order, Sign PO", hierarchy: "Level 3 (Senior Manager)" },
-  { role: "Vendors (Suppliers)", users: 320, privileges: "Submit Quote, Upload Tax Invoice", hierarchy: "Level 1 (External Tenant)" },
-  { role: "Inventory Managers", users: 42, privileges: "Warehouse Intake, Stock Verification", hierarchy: "Level 2 (Manager)" },
-  { role: "Finance Managers", users: 28, privileges: "Process Payments, Authorize FedWire", hierarchy: "Level 3 (Senior Manager)" },
-  { role: "Auditors", users: 18, privileges: "Audit Ledger Verification, Issue Report", hierarchy: "Level 3 (Governance)" },
-  { role: "Contact & Support Team", users: 32, privileges: "Support Tickets, Escalation Routing", hierarchy: "Level 2 (Support)" },
-  { role: "Organization Admins (Data Analysts)", users: 14, privileges: "Business Intelligence, Org Overview", hierarchy: "Level 4 (Org Admin)" },
-  { role: "Super Admins", users: 6, privileges: "Root System Access, Master Control", hierarchy: "Level 5 (Root Admin)" },
-];
+import { apiGet, apiPost, apiPut, apiDelete } from "../../../../../services/apiClient";
 
 const SuperRoleManagement = () => {
-  const [rolesList, setRolesList] = useState(initialRoles);
-  const [activeSubTab, setActiveSubTab] = useState("view"); // view, create
-  const [selectedRole, setSelectedRole] = useState(null);
-  
-  // Create role form state
-  const [newRoleName, setNewRoleName] = useState("");
-  const [newPrivileges, setNewPrivileges] = useState("");
-  const [newHierarchy, setNewHierarchy] = useState("Level 1 (User)");
-  const [toastMsg, setToastMsg] = useState("");
+  const [rolesList, setRolesList] = useState([]);
+  const [permissions, setPermissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editingRole, setEditingRole] = useState(null); // null | role object
+  const [showDialog, setShowDialog] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [error, setError] = useState("");
 
-  const triggerToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 4000);
+  // Create/Edit form state
+  const [form, setForm] = useState({
+    roleCode: "",
+    roleName: "",
+    description: "",
+    active: true,
+    permissionIds: [],
+  });
+
+  const triggerToast = (msg, tone = "ok") => {
+    setToast({ msg, tone });
+    setTimeout(() => setToast(null), 4000);
   };
 
-  const handleCreateRole = (e) => {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [rolesPage, perms] = await Promise.all([
+        apiGet("/api/roles?size=200"),
+        apiGet("/api/permissions/all"),
+      ]);
+      setRolesList(rolesPage?.content || []);
+      setPermissions(perms || []);
+    } catch (err) {
+      setError(err.message || "Failed to load roles.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const openCreate = () => {
+    setForm({ roleCode: "", roleName: "", description: "", active: true, permissionIds: [] });
+    setEditingRole(null);
+    setError("");
+    setShowDialog(true);
+  };
+
+  const openEdit = (role) => {
+    setForm({
+      roleCode: role.roleCode || "",
+      roleName: role.roleName || "",
+      description: role.description || "",
+      active: role.active ?? true,
+      permissionIds: role.permissionIds || [],
+    });
+    setEditingRole(role);
+    setError("");
+    setShowDialog(true);
+  };
+
+  const togglePermission = (id) => {
+    setForm((f) => ({
+      ...f,
+      permissionIds: f.permissionIds.includes(id)
+        ? f.permissionIds.filter((p) => p !== id)
+        : [...f.permissionIds, id],
+    }));
+  };
+
+  const handleSave = async (e) => {
     e.preventDefault();
-    const newRole = {
-      role: newRoleName,
-      users: 0,
-      privileges: newPrivileges,
-      hierarchy: newHierarchy,
-    };
-    setRolesList([...rolesList, newRole]);
-    setNewRoleName("");
-    setNewPrivileges("");
-    setActiveSubTab("view");
-    triggerToast(`Custom role ${newRole.role} provisioned successfully!`);
+    setError("");
+    if (!form.roleCode.trim() || !form.roleName.trim()) {
+      setError("Role code and role name are required.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const payload = {
+        roleCode: form.roleCode.trim().toUpperCase().replace(/\s+/g, "_"),
+        roleName: form.roleName.trim(),
+        description: form.description || "",
+        active: form.active,
+        permissionIds: form.permissionIds,
+      };
+      if (editingRole) {
+        await apiPut(`/api/roles/${editingRole.id}`, payload);
+        triggerToast(`Role "${form.roleName}" updated and saved to the database.`);
+      } else {
+        const created = await apiPost("/api/roles", payload);
+        if (created?.id && form.permissionIds.length > 0) {
+          await apiPut(`/api/roles/${created.id}/permissions`, form.permissionIds);
+        }
+        triggerToast(`Role "${form.roleName}" created and saved to the database.`);
+      }
+      setShowDialog(false);
+      loadData();
+    } catch (err) {
+      setError(err.message || "Could not save the role.");
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setSaving(true);
+    try {
+      await apiDelete(`/api/roles/${deleteTarget.id}`);
+      triggerToast(`Role "${deleteTarget.roleName}" deleted.`);
+      setDeleteTarget(null);
+      loadData();
+    } catch (err) {
+      triggerToast(err.message || "Role could not be deleted.", "err");
+      setDeleteTarget(null);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Group permissions by module for the checklist
+  const groupedPermissions = permissions.reduce((acc, p) => {
+    const mod = p.moduleName || "General";
+    if (!acc[mod]) acc[mod] = [];
+    acc[mod].push(p);
+    return acc;
+  }, {});
 
   return (
     <div className="sadmin-role-mgmt-container" style={{ padding: "20px" }}>
-      {/* Toast Notification */}
-      {toastMsg && (
+      {toast && (
         <div
           style={{
             position: "fixed",
             bottom: "24px",
             right: "24px",
-            background: "#111111",
+            background: toast.tone === "err" ? "#dc2626" : "#111111",
             color: "#ffffff",
             padding: "12px 24px",
             borderRadius: "8px",
@@ -70,204 +163,227 @@ const SuperRoleManagement = () => {
             zIndex: 1000,
             fontWeight: "700",
             fontSize: "14px",
-            borderLeft: "4px solid #f8b400",
+            borderLeft: `4px solid ${toast.tone === "err" ? "#fff" : "#f8b400"}`,
           }}
         >
-          {toastMsg}
+          {toast.msg}
         </div>
       )}
 
       {/* Header */}
-      <div className="sadmin-page-header" style={{ marginBottom: "24px" }}>
+      <div className="sadmin-page-header" style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
         <div>
           <h1 className="sadmin-page-title" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "700", color: "#111" }}>
-            <ShieldCheck color="#f8b400" size={28} /> Enterprise System Roles Matrix
+            <ShieldCheck color="#f8b400" size={28} /> Role Management
           </h1>
           <p className="sadmin-page-subtitle" style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>
-            Audit mapped enterprise profiles, hierarchy clearances, and modify user privilege policies.
+            Roles, permission assignments and RBAC policies — all stored in the database and enforced by the backend.
           </p>
         </div>
+        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+          <button className="sadmin-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={loadData} disabled={loading}>
+            <RefreshCw size={15} /> Refresh
+          </button>
+          <button className="sadmin-btn-primary-sm" onClick={openCreate}>
+            <PlusCircle size={15} /> Create Role
+          </button>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "12px", borderBottom: "1px solid #ececec", marginBottom: "24px" }}>
-        <button
-          onClick={() => setActiveSubTab("view")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "10px 16px",
-            fontSize: "15px",
-            fontWeight: activeSubTab === "view" ? "700" : "500",
-            color: activeSubTab === "view" ? "#d97706" : "#666",
-            borderBottom: activeSubTab === "view" ? "3px solid #f8b400" : "3px solid transparent",
-            cursor: "pointer",
-          }}
-        >
-          View Roles & Permissions Map
-        </button>
-        <button
-          onClick={() => setActiveSubTab("create")}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "10px 16px",
-            fontSize: "15px",
-            fontWeight: activeSubTab === "create" ? "700" : "500",
-            color: activeSubTab === "create" ? "#d97706" : "#666",
-            borderBottom: activeSubTab === "create" ? "3px solid #f8b400" : "3px solid transparent",
-            cursor: "pointer",
-          }}
-        >
-          Create Custom Role Profile
-        </button>
-      </div>
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", color: "#dc2626", padding: "12px 16px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: "600" }}>
+          <AlertCircle size={18} /> {error}
+        </div>
+      )}
 
-      {/* 1. View Roles */}
-      {activeSubTab === "view" && (
-        <div className="sadmin-card" style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "12px", overflow: "hidden" }}>
-          <div className="sadmin-table-container">
-            <table className="sadmin-table">
-              <thead>
-                <tr>
-                  <th>Enterprise System Role</th>
-                  <th>Active Headcount</th>
-                  <th>Hierarchy Level Rank</th>
-                  <th>Privileges Scope</th>
-                  <th style={{ textAlign: "right" }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rolesList.map((r, idx) => (
-                  <tr key={idx}>
-                    <td style={{ fontWeight: "800", color: "#111" }}>{r.role}</td>
-                    <td style={{ fontWeight: "700", color: "#059669" }}>{r.users} Active Users</td>
-                    <td style={{ color: "#d97706", fontWeight: "700" }}>{r.hierarchy}</td>
-                    <td style={{ color: "#555" }}>{r.privileges}</td>
-                    <td style={{ textAlign: "right" }}>
-                      <button
-                        className="sadmin-sidebar-toggle"
-                        style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px" }}
-                        onClick={() => setSelectedRole(r)}
-                      >
-                        <Edit size={14} />
-                      </button>
-                    </td>
+      {/* View Roles */}
+      <div className="sadmin-card" style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "12px", overflow: "hidden" }}>
+          {loading ? (
+            <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "48px", gap: "10px", color: "#666" }}>
+              <Loader2 size={20} className="login-spin" /> Loading roles from the database...
+            </div>
+          ) : (
+            <div className="sadmin-table-container">
+              <table className="sadmin-table">
+                <thead>
+                  <tr>
+                    <th>Role Code</th>
+                    <th>Role Name</th>
+                    <th>Description</th>
+                    <th>Assigned Users</th>
+                    <th>Permissions</th>
+                    <th>Status</th>
+                    <th style={{ textAlign: "right" }}>Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* 2. Create Role */}
-      {activeSubTab === "create" && (
-        <div className="sadmin-card" style={{ padding: "28px", background: "#fff", border: "1px solid #ececec", borderRadius: "12px", maxWidth: "560px", margin: "0 auto" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#111", borderBottom: "1px solid #eee", paddingBottom: "8px", marginBottom: "16px" }}>
-            Provision Custom Role Definition
-          </h3>
-
-          <form onSubmit={handleCreateRole} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div className="sadmin-form-group">
-              <label className="sadmin-form-label">Role Profile Name *</label>
-              <input type="text" placeholder="e.g. Sourcing Auditor" value={newRoleName} onChange={(e) => setNewRoleName(e.target.value)} className="sadmin-form-input" required />
+                </thead>
+                <tbody>
+                  {rolesList.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: "center", color: "#888", padding: "32px" }}>
+                        No roles found in the database yet. Create one to get started.
+                      </td>
+                    </tr>
+                  )}
+                  {rolesList.map((r) => (
+                    <tr key={r.id}>
+                      <td style={{ fontWeight: "800", color: "#d97706" }}>{r.roleCode}</td>
+                      <td style={{ fontWeight: "700", color: "#111" }}>{r.roleName}</td>
+                      <td style={{ color: "#555", fontSize: "13.5px" }}>{r.description || "—"}</td>
+                      <td>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: "700", color: "#059669" }}>
+                          <Users size={14} /> {r.userCount ?? 0}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontWeight: "700", color: "#2563eb" }}>
+                          <KeyRound size={14} /> {r.permissionIds?.length ?? 0}
+                        </span>
+                      </td>
+                      <td>
+                        <span style={{ fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "12px", background: r.active ? "rgba(5, 150, 105, 0.12)" : "rgba(220, 38, 38, 0.12)", color: r.active ? "#059669" : "#dc2626" }}>
+                          {r.active ? "ACTIVE" : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td style={{ textAlign: "right" }}>
+                        <button
+                          style={{ width: "32px", height: "32px", marginRight: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px", background: "#fff", cursor: "pointer" }}
+                          onClick={() => openEdit(r)}
+                          title="Edit Role & Permissions"
+                        >
+                          <Edit size={14} />
+                        </button>
+                        {!r.systemRole && (
+                          <button
+                            style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px", background: "#fff", cursor: "pointer", color: "#dc2626" }}
+                            onClick={() => setDeleteTarget(r)}
+                            title="Delete Role"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
+          )}
+      </div>
 
-            <div className="sadmin-form-group">
-              <label className="sadmin-form-label">Hierarchy Rank Level *</label>
-              <select value={newHierarchy} onChange={(e) => setNewHierarchy(e.target.value)} className="sadmin-form-select">
-                <option value="Level 1 (User)">Level 1 (Baseline Requester)</option>
-                <option value="Level 2 (Executive)">Level 2 (Executive Desk)</option>
-                <option value="Level 3 (Senior Manager)">Level 3 (Department Sign-off)</option>
-                <option value="Level 4 (Org Admin)">Level 4 (Tenant Administrator)</option>
-              </select>
-            </div>
-
-            <div className="sadmin-form-group">
-              <label className="sadmin-form-label">Baseline Privileges Scope *</label>
-              <input type="text" placeholder="e.g. View Audit logs, export compliance PDF" value={newPrivileges} onChange={(e) => setNewPrivileges(e.target.value)} className="sadmin-form-input" required />
-            </div>
-
-            <button type="submit" className="sadmin-btn-primary-sm" style={{ width: "100%", justifyContent: "center", padding: "12px", marginTop: "8px" }}>
-              Provision Role Mapping policy
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* Role details edit modal */}
-      {selectedRole && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            backdropFilter: "blur(4px)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 999,
-            padding: "16px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "16px",
-              width: "100%",
-              maxWidth: "520px",
-              boxShadow: "0 12px 36px rgba(0,0,0,0.15)",
-              overflow: "hidden",
-            }}
-          >
+      {/* Create/Edit Dialog */}
+      {showDialog && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "16px" }}>
+          <div style={{ background: "#ffffff", borderRadius: "16px", width: "100%", maxWidth: "720px", maxHeight: "90vh", overflow: "auto", boxShadow: "0 12px 36px rgba(0,0,0,0.15)" }}>
             {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec", position: "sticky", top: 0, zIndex: 2 }}>
               <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>EDIT ROLE PRIVILEGES</span>
+                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>{editingRole ? "EDIT ROLE" : "CREATE ROLE"}</span>
                 <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111", margin: 0 }}>
-                  Role: {selectedRole.role}
+                  {editingRole ? `Role: ${editingRole.roleName}` : "Provision New Role"}
                 </h3>
               </div>
-              <button
-                onClick={() => setSelectedRole(null)}
-                style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}
-              >
+              <button onClick={() => setShowDialog(false)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}>
                 <X size={20} />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div style={{ padding: "24px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "14.5px" }}>
-                <p><strong>Hierarchy Level:</strong> {selectedRole.hierarchy}</p>
-                <p><strong>Active Headcount:</strong> {selectedRole.users} Users</p>
-                <p><strong>Current Privileges:</strong></p>
-                <input
-                  type="text"
-                  value={selectedRole.privileges}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setRolesList(rolesList.map(r => r.role === selectedRole.role ? { ...r, privileges: val } : r));
-                  }}
-                  className="sadmin-form-input"
-                />
-              </div>
-            </div>
+            <form onSubmit={handleSave} style={{ padding: "24px" }}>
+              {error && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", color: "#dc2626", padding: "10px 14px", borderRadius: "8px", marginBottom: "16px", fontSize: "13.5px", fontWeight: "600" }}>
+                  <AlertCircle size={16} /> {error}
+                </div>
+              )}
 
-            {/* Modal Footer */}
-            <div style={{ display: "flex", justifyContent: "flex-end", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
-              <button
-                className="sadmin-btn-primary-sm"
-                onClick={() => setSelectedRole(null)}
-              >
-                Save Role Config
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div className="sadmin-form-group">
+                  <label className="sadmin-form-label">Role Code *</label>
+                  <input type="text" placeholder="e.g. SOURCING_AUDITOR" value={form.roleCode} onChange={(e) => setForm({ ...form, roleCode: e.target.value })} className="sadmin-form-input" disabled={!!editingRole?.systemRole} />
+                </div>
+                <div className="sadmin-form-group">
+                  <label className="sadmin-form-label">Role Name *</label>
+                  <input type="text" placeholder="e.g. Sourcing Auditor" value={form.roleName} onChange={(e) => setForm({ ...form, roleName: e.target.value })} className="sadmin-form-input" />
+                </div>
+              </div>
+
+              <div className="sadmin-form-group" style={{ marginTop: "16px" }}>
+                <label className="sadmin-form-label">Description</label>
+                <input type="text" placeholder="What is this role responsible for?" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="sadmin-form-input" />
+              </div>
+
+              <div style={{ marginTop: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
+                <input type="checkbox" id="role-active" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} style={{ width: "17px", height: "17px", accentColor: "#f8b400" }} />
+                <label htmlFor="role-active" style={{ fontSize: "14px", fontWeight: "600", color: "#333" }}>Role is active</label>
+              </div>
+
+              {/* Permission Checklist */}
+              <div style={{ marginTop: "20px" }}>
+                <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#111", margin: "0 0 4px", display: "flex", alignItems: "center", gap: "8px" }}>
+                  <KeyRound size={16} color="#2563eb" /> Permissions
+                  <span style={{ fontSize: "12px", color: "#888", fontWeight: "500" }}>({form.permissionIds.length} selected of {permissions.length})</span>
+                </h4>
+                <p style={{ color: "#888", fontSize: "12.5px", margin: "0 0 12px" }}>
+                  These are real permission records from the database. Changes take effect on the next authorization refresh.
+                </p>
+
+                {permissions.length === 0 ? (
+                  <div style={{ padding: "16px", background: "#f8f9fb", borderRadius: "8px", color: "#666", fontSize: "13.5px" }}>
+                    No permissions found. Run the backend seed initializer to create the standard permission set.
+                  </div>
+                ) : (
+                  <div style={{ maxHeight: "320px", overflow: "auto", border: "1px solid #ececec", borderRadius: "10px", padding: "12px" }}>
+                    {Object.entries(groupedPermissions).map(([module, perms]) => (
+                      <div key={module} style={{ marginBottom: "12px" }}>
+                        <div style={{ fontSize: "12px", fontWeight: "800", color: "#d97706", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "6px" }}>
+                          {module}
+                        </div>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                          {perms.map((p) => (
+                            <label key={p.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", padding: "4px 6px", borderRadius: "6px", cursor: "pointer", background: form.permissionIds.includes(p.id) ? "rgba(37,99,235,0.07)" : "transparent" }}>
+                              <input type="checkbox" checked={form.permissionIds.includes(p.id)} onChange={() => togglePermission(p.id)} style={{ width: "15px", height: "15px", accentColor: "#2563eb" }} />
+                              <span style={{ fontWeight: "500", color: "#333" }}>{p.permissionName || p.permissionCode}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", paddingTop: "20px", marginTop: "20px", borderTop: "1px solid #ececec" }}>
+                <button type="button" className="sadmin-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setShowDialog(false)}>
+                  Cancel
+                </button>
+                <button type="submit" className="sadmin-btn-primary-sm" disabled={saving}>
+                  {saving ? <><Loader2 size={15} className="login-spin" /> Saving...</> : editingRole ? "Save Role Changes" : "Create Role"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirm */}
+      {deleteTarget && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "420px", padding: "28px", textAlign: "center", boxShadow: "0 12px 36px rgba(0,0,0,0.15)" }}>
+            <AlertCircle size={44} color="#dc2626" style={{ margin: "0 auto 14px" }} />
+            <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111", margin: 0 }}>Delete Role "{deleteTarget.roleName}"?</h3>
+            <p style={{ color: "#666", fontSize: "14px", marginTop: "8px" }}>
+              Roles with assigned users or system roles cannot be deleted. This action is audited.
+            </p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "20px" }}>
+              <button className="sadmin-btn-primary-sm" style={{ background: "#dc2626", border: "none" }} onClick={handleDelete} disabled={saving}>
+                {saving ? <><Loader2 size={15} className="login-spin" /> Deleting...</> : "Yes, Delete"}
+              </button>
+              <button className="sadmin-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setDeleteTarget(null)}>
+                Cancel
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

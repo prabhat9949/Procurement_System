@@ -1,47 +1,59 @@
 import React from "react";
-import { DollarSign, TrendingUp, Download } from "lucide-react";
+import { DollarSign, IndianRupee, Landmark, CreditCard } from "lucide-react";
+import RealReportsView from "../../shared_ui/RealReportsView";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
 
-const financialSummaryMock = [
-  { category: "Total Org Budget Allocated", amount: "$2,500,000.00", percentage: "100.0%" },
-  { category: "Total Commercial Outflow YTD", amount: "$1,240,000.00", percentage: "49.6%" },
-  { category: "Commercial Sourcing Savings", amount: "$98,400.00", percentage: "7.9% Savings" },
-];
-
-const OrgFinancialAnalytics = () => {
-  return (
-    <div className="org-fin-analytics-container">
-      {/* Header */}
-      <div className="org-page-header">
-        <div>
-          <h1 className="org-page-title">
-            <DollarSign color="#f8b400" /> Enterprise Financial & Treasury Analytics
-          </h1>
-          <p className="org-page-subtitle">
-            Organization-wide expenditure, wire disbursement analytics, cost optimization, and budget caps.
-          </p>
-        </div>
-
-        <button
-          className="org-btn-primary-sm"
-          onClick={() => alert("Exporting Financial Analytics Briefing (CSV)...")}
-        >
-          <Download size={16} /> Export Treasury Summary (CSV)
-        </button>
-      </div>
-
-      {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
-        {financialSummaryMock.map((f, idx) => (
-          <div key={idx} className="org-card org-card-gold-glow">
-            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>METRIC #{idx + 1}</span>
-            <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700", marginTop: "2px" }}>{f.category}</h3>
-            <p style={{ fontSize: "24px", color: "#059669", fontWeight: "800", marginTop: "8px" }}>{f.amount}</p>
-            <span style={{ fontSize: "13px", color: "#666666", fontWeight: "600" }}>{f.percentage} Ratio</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+const OrgFinancialAnalytics = () => (
+  <RealReportsView
+    accent="#059669"
+    header={{
+      title: "Financial Analytics",
+      subtitle: "Spend, invoices and payments — real aggregates from the financial tables.",
+      badge: "FINANCE",
+      icon: DollarSign,
+    }}
+    kpis={[
+      { label: "Total Procurement Spend", key: "totalProcurementSpend", icon: IndianRupee, color: "#059669", format: "inr" },
+      { label: "Monthly Spend", key: "monthlySpend", icon: IndianRupee, color: "#2563eb", format: "inr" },
+      { label: "Pending Invoices", key: "pendingInvoices", icon: Landmark, color: "#d97706" },
+      { label: "Pending Payments", key: "pendingPayments", icon: CreditCard, color: "#dc2626" },
+    ]}
+    charts={[
+      { label: "Monthly Spend", key: "monthlySpendChart", color: "#059669", type: "area", source: "dash" },
+      { label: "Invoice Status", key: "invoiceStatusChart", color: "#d97706", type: "pie", source: "dash" },
+      { label: "Payment Status", key: "paymentStatusChart", color: "#2563eb", type: "pie", source: "dash" },
+    ]}
+    tables={[
+      {
+        key: "invoices",
+        endpoint: "/api/reports/invoices?page=0&size=10",
+        title: "Invoices",
+        emptyText: "No invoices found.",
+        maxRows: 8,
+        columns: [
+          { header: "Invoice No.", render: (r) => <strong style={{ color: "#059669" }}>{r.referenceNumber}</strong> },
+          { header: "Vendor", accessor: "relatedOne" },
+          { header: "Amount", render: (r) => <span style={{ fontWeight: 700 }}>{formatINR(r.amount)}</span> },
+          { header: "Date", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.date)}</span> },
+          { header: "Status", accessor: "status" },
+        ],
+      },
+      {
+        key: "payments",
+        endpoint: "/api/reports/payments?page=0&size=10",
+        title: "Payments",
+        emptyText: "No payments processed yet.",
+        maxRows: 8,
+        columns: [
+          { header: "Payment No.", render: (r) => <strong style={{ color: "#2563eb" }}>{r.referenceNumber}</strong> },
+          { header: "Vendor", accessor: "relatedOne" },
+          { header: "Amount", render: (r) => <span style={{ fontWeight: 700 }}>{formatINR(r.amount)}</span> },
+          { header: "Date", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.date)}</span> },
+          { header: "Status", accessor: "status" },
+        ],
+      },
+    ]}
+  />
+);
 
 export default OrgFinancialAnalytics;

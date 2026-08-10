@@ -11,6 +11,9 @@ import {
   WifiOff,
   AlertTriangle,
   PackageCheck,
+  LayoutDashboard,
+  ClipboardList,
+  BarChart3,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -23,6 +26,7 @@ import {
 } from "recharts";
 import { apiGet } from "../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../utils/format";
+import RoleShell from "../shared_ui/RoleShell";
 
 const TEAM_META = {
   equipment: {
@@ -30,18 +34,21 @@ const TEAM_META = {
     subtitle: "Equipment and asset procurement — delivery verification, GRN and employee handover",
     icon: Boxes,
     focus: "Laptops · Desktops · Monitors · Printers · Networking & office equipment",
+    portal: "Equipment & Asset Portal",
   },
   software: {
     title: "IT Software & Digital Services Team",
     subtitle: "Software and license fulfilment — availability check, activation, assignment and expiry",
     icon: Laptop,
     focus: "Microsoft 365 · Dev tools · Cloud subscriptions · SaaS licences",
+    portal: "Software & Digital Services Portal",
   },
   facilities: {
     title: "Facilities Team",
     subtitle: "Facilities procurement and service fulfilment — suppliers, delivery and completion",
     icon: Wrench,
     focus: "Furniture · Maintenance · Facility services · Office infrastructure",
+    portal: "Facilities Portal",
   },
 };
 
@@ -49,10 +56,11 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
   const meta = TEAM_META[team] || TEAM_META.equipment;
   const Icon = meta.icon;
 
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [requests, setRequests] = useState([]);
-  const [stats, setStats] = useState({ total: 0, approved: 0, inProgress: 0 });
+  const [stats, setStats] = useState({ total: 0, approved: 0 });
   const [prChart, setPrChart] = useState([]);
 
   const loadData = useCallback(async () => {
@@ -94,15 +102,34 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
     { label: "Total Requests Routed", value: stats.total, icon: CheckCircle2, color: "#d97706" },
   ];
 
+  const navItems = [
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "queue", label: "Fulfilment Queue", icon: ClipboardList },
+    { id: "requests", label: "All Requests", icon: FileText },
+    { id: "analytics", label: "Analytics", icon: BarChart3 },
+  ];
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Inter, sans-serif", background: "#f7f8fa", minHeight: "100vh" }}>
+    <RoleShell
+      portalTitle={meta.portal}
+      roleLabel={meta.title}
+      navItems={navItems}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      userMeta={{ dept: "Procurement Fulfilment" }}
+    >
       <style>{`
         .ful-card { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:20px; }
-        .ful-kpi { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+        .ful-kpi { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px; transition: transform .18s ease, box-shadow .18s ease; }
+        .ful-kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,35,56,.08); }
         .ful-table { width:100%; border-collapse: collapse; font-size:13.5px; }
         .ful-table th { text-align:left; color:#7a8999; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; padding:10px 12px; border-bottom:1px solid #eceef1; }
         .ful-table td { padding:11px 12px; border-bottom:1px solid #f2f4f6; color:#33414f; }
         .ful-badge { font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; }
+        .ful-tabs { display:flex; gap:8px; background:#fff; border:1px solid #e7ebf0; border-radius:12px; padding:5px; margin-bottom:20px; width:fit-content; }
+        .ful-tab { border:none; background:transparent; padding:9px 18px; border-radius:9px; font-size:13px; font-weight:700; color:#555; cursor:pointer; display:flex; align-items:center; gap:7px; }
+        .ful-tab.active { background:#f8b400; color:#000; }        @keyframes fulSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+        .ful-spin { animation: fulSpin .9s linear infinite; }
       `}</style>
 
       {/* Header */}
@@ -124,6 +151,8 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
           <RefreshCw size={14} className={loading ? "ful-spin" : ""} /> Refresh
         </button>
       </div>
+
+      {/* Sidebar drives navigation — matching every other dashboard shell. */}
 
       {error && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "16px 20px", marginBottom: "18px", display: "flex", alignItems: "center", gap: "12px", color: "#991b1b" }}>
@@ -160,9 +189,8 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
             })}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "20px" }}>
-            {/* Approved queue */}
-            <div className="ful-card">
+          {(activeTab === "overview" || activeTab === "queue") && (
+            <div className="ful-card" style={{ marginBottom: "20px" }}>
               <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
                 <PackageCheck size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#059669" }} />
                 Approved Requests Awaiting Fulfilment
@@ -191,9 +219,10 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
                 </div>
               )}
             </div>
+          )}
 
-            {/* Chart */}
-            <div className="ful-card">
+          {(activeTab === "overview" || activeTab === "analytics") && (
+            <div className="ful-card" style={{ marginBottom: "20px" }}>
               <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
                 <IndianRupee size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#2563eb" }} />
                 Purchase Request Trend
@@ -201,7 +230,7 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
               {prChart.length === 0 ? (
                 <EmptyState text="No purchase request trends yet." />
               ) : (
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={280}>
                   <BarChart data={prChart}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#7a8999" }} />
@@ -212,61 +241,57 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
                 </ResponsiveContainer>
               )}
             </div>
-          </div>
+          )}
 
-          {/* Full request table */}
-          <div className="ful-card">
-            <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
-              <FileText size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#d97706" }} />
-              Routed Purchase Requests
-            </h3>
-            {requests.length === 0 ? (
-              <EmptyState text="No purchase requests have been routed to your team yet." />
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table className="ful-table">
-                  <thead>
-                    <tr>
-                      <th>Request</th>
-                      <th>Purpose</th>
-                      <th>Requester</th>
-                      <th>Department</th>
-                      <th>Amount</th>
-                      <th>Priority</th>
-                      <th>Requested By</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {requests.slice(0, 12).map((r) => (
-                      <tr key={r.id}>
-                        <td style={{ fontWeight: "700" }}>{r.requestNumber}</td>
-                        <td style={{ maxWidth: "220px" }}>{r.purpose}</td>
-                        <td>{r.requesterName}</td>
-                        <td>{r.departmentName}</td>
-                        <td style={{ fontWeight: "700" }}>{formatINR(r.estimatedAmount)}</td>
-                        <td>{r.priority}</td>
-                        <td style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.requestDate, { withTime: false })}</td>
-                        <td>
-                          <span className="ful-badge" style={{ background: r.status === "APPROVED" ? "rgba(5,150,105,.12)" : r.status === "DRAFT" ? "rgba(100,116,139,.12)" : "rgba(217,119,6,.12)", color: r.status === "APPROVED" ? "#059669" : r.status === "DRAFT" ? "#64748b" : "#d97706" }}>
-                            {r.status}
-                          </span>
-                        </td>
+          {(activeTab === "overview" || activeTab === "requests") && (
+            <div className="ful-card">
+              <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
+                <FileText size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#d97706" }} />
+                Routed Purchase Requests
+              </h3>
+              {requests.length === 0 ? (
+                <EmptyState text="No purchase requests have been routed to your team yet." />
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="ful-table">
+                    <thead>
+                      <tr>
+                        <th>Request</th>
+                        <th>Purpose</th>
+                        <th>Requester</th>
+                        <th>Department</th>
+                        <th>Amount</th>
+                        <th>Priority</th>
+                        <th>Requested By</th>
+                        <th>Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                    </thead>
+                    <tbody>
+                      {requests.slice(0, activeTab === "requests" ? 20 : 12).map((r) => (
+                        <tr key={r.id}>
+                          <td style={{ fontWeight: "700" }}>{r.requestNumber}</td>
+                          <td style={{ maxWidth: "220px" }}>{r.purpose}</td>
+                          <td>{r.requesterName}</td>
+                          <td>{r.departmentName}</td>
+                          <td style={{ fontWeight: "700" }}>{formatINR(r.estimatedAmount)}</td>
+                          <td>{r.priority}</td>
+                          <td style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.requestDate, { withTime: false })}</td>
+                          <td>
+                            <span className="ful-badge" style={{ background: r.status === "APPROVED" ? "rgba(5,150,105,.12)" : r.status === "DRAFT" ? "rgba(100,116,139,.12)" : "rgba(217,119,6,.12)", color: r.status === "APPROVED" ? "#059669" : r.status === "DRAFT" ? "#64748b" : "#d97706" }}>
+                              {r.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
-
-      <style>{`
-        @keyframes fulSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-        .ful-spin { animation: fulSpin .9s linear infinite; }
-      `}</style>
-    </div>
+    </RoleShell>
   );
 };
 

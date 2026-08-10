@@ -16,5 +16,9 @@ public interface VendorService {
 
     VendorResponse update(Long id, VendorRequest request);
 
+    VendorResponse updateStatus(Long id, String status, Boolean approved);
+
+    VendorResponse updateKyc(Long id, String decision, String reason);
+
     void delete(Long id);
 }

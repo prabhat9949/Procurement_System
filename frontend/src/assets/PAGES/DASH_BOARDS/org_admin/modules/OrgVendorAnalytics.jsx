@@ -1,55 +1,49 @@
 import React from "react";
-import { Truck, Star, ShieldCheck } from "lucide-react";
+import { Truck, CheckCircle2, AlertTriangle, Star } from "lucide-react";
+import LiveRoleOverview from "../../shared_ui/LiveRoleOverview";
 
-const vendorAnalyticsMock = [
-  { vendor: "Apple Business Direct", tier: "Tier 1 Preferred", spend: "$520,800.00", SLA: "99.2%", rating: "4.9 ⭐" },
-  { vendor: "Dell Technologies", tier: "Tier 1 Preferred", spend: "$347,200.00", SLA: "97.0%", rating: "4.8 ⭐" },
-];
-
-const OrgVendorAnalytics = () => {
-  return (
-    <div className="org-vnd-analytics-container">
-      {/* Header */}
-      <div className="org-page-header">
-        <div>
-          <h1 className="org-page-title">
-            <Truck color="#f8b400" /> Supplier & Vendor Network Analytics
-          </h1>
-          <p className="org-page-subtitle">
-            Commercial spend per supplier, vendor SLA fulfillment ratings, and preferred supplier distribution.
-          </p>
-        </div>
-      </div>
-
-      {/* Table */}
-      <div className="org-card">
-        <div className="org-table-container">
-          <table className="org-table">
-            <thead>
-              <tr>
-                <th>Supplier / Vendor</th>
-                <th>Classification Tier</th>
-                <th>Commercial Spend YTD</th>
-                <th>SLA Fulfillment %</th>
-                <th>Overall CSAT Rating</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vendorAnalyticsMock.map((v, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontWeight: "800", color: "#111111" }}>{v.vendor}</td>
-                  <td style={{ fontWeight: "700", color: "#d97706" }}>{v.tier}</td>
-                  <td style={{ fontWeight: "800", color: "#059669" }}>{v.spend}</td>
-                  <td style={{ fontWeight: "700" }}>{v.SLA}</td>
-                  <td style={{ fontWeight: "700", color: "#f8b400" }}>{v.rating}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
-};
+const OrgVendorAnalytics = () => (
+  <LiveRoleOverview
+    header={{
+      title: "Vendor Analytics",
+      subtitle: "Supplier lifecycle and spend — real vendor records from the database.",
+      badge: "VENDOR MANAGEMENT",
+      icon: Truck,
+      accent: "#7c3aed",
+    }}
+    endpoints={{
+      vendors: "/api/vendors?page=0&size=100",
+      dash: "/api/dashboard/admin",
+    }}
+    kpiFn={(data) => {
+      const vendors = data.vendors?.content || [];
+      return [
+        { label: "Registered Vendors", value: vendors.length, icon: Truck, color: "#7c3aed" },
+        { label: "Active Vendors", value: vendors.filter((v) => v.status === "ACTIVE").length, icon: CheckCircle2, color: "#059669" },
+        { label: "KYC Approved", value: vendors.filter((v) => v.approved).length, icon: Star, color: "#2563eb" },
+        { label: "Suspended / Blacklisted", value: vendors.filter((v) => /SUSPEND|BLACKLIST/i.test(v.status || "")).length, icon: AlertTriangle, color: "#dc2626" },
+      ];
+    }}
+    charts={[
+      { key: "dash", code: "VENDOR_DISTRIBUTION", label: "Vendor Spend Distribution", color: "#7c3aed", type: "area" },
+    ]}
+    tables={[
+      {
+        key: "vendors",
+        title: "Vendors",
+        emptyText: "No vendors registered yet.",
+        maxRows: 10,
+        columns: [
+          { header: "Vendor", render: (r) => <strong style={{ color: "#7c3aed" }}>{r.vendorName}</strong> },
+          { header: "Code", accessor: "vendorCode" },
+          { header: "GST", accessor: "gstNumber" },
+          { header: "City", accessor: "city" },
+          { header: "KYC", render: (r) => <span className="lro-badge" style={{ background: r.approved ? "rgba(5,150,105,.12)" : "rgba(217,119,6,.12)", color: r.approved ? "#059669" : "#d97706" }}>{r.approved ? "APPROVED" : "PENDING"}</span> },
+          { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.status === "ACTIVE" ? "rgba(5,150,105,.12)" : /SUSPEND|BLACKLIST/i.test(r.status || "") ? "rgba(220,38,38,.12)" : "rgba(217,119,6,.12)", color: r.status === "ACTIVE" ? "#059669" : /SUSPEND|BLACKLIST/i.test(r.status || "") ? "#dc2626" : "#d97706" }}>{r.status || "DRAFT"}</span> },
+        ],
+      },
+    ]}
+  />
+);
 
 export default OrgVendorAnalytics;

@@ -1,40 +1,45 @@
 import React from "react";
-import { ShieldCheck, CheckCircle2 } from "lucide-react";
+import { ShieldCheck, FileText, UserCog, AlertCircle } from "lucide-react";
+import LiveRoleOverview from "../../shared_ui/LiveRoleOverview";
+import { formatDateIN } from "../../../../../utils/format";
 
-const complianceOrgMock = [
-  { domain: "Procurement Approval Policy", score: "99.1% Compliant", status: "Optimal" },
-  { domain: "Financial Disbursement SLA", score: "99.4% Compliant", status: "Optimal" },
-  { domain: "Vendor Contract Compliance", score: "98.2% Compliant", status: "Optimal" },
-  { domain: "Warehouse Barcode Tagging", score: "97.8% Compliant", status: "Optimal" },
-];
-
-const OrgComplianceMonitoring = () => {
-  return (
-    <div className="org-compliance-mon-container">
-      {/* Header */}
-      <div className="org-page-header">
-        <div>
-          <h1 className="org-page-title">
-            <ShieldCheck color="#f8b400" /> Organization Compliance & Policy Control
-          </h1>
-          <p className="org-page-subtitle">
-            Executive compliance monitoring across procurement, financial disburser desks, and inventory docks.
-          </p>
-        </div>
-      </div>
-
-      {/* Grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
-        {complianceOrgMock.map((c, idx) => (
-          <div key={idx} className="org-card org-card-gold-glow">
-            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>GOVERNANCE PILLAR #{idx + 1}</span>
-            <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700", marginTop: "2px" }}>{c.domain}</h3>
-            <p style={{ fontSize: "24px", color: "#059669", fontWeight: "800", marginTop: "8px" }}>{c.score}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+const OrgComplianceMonitoring = () => (
+  <LiveRoleOverview
+    header={{
+      title: "Compliance Monitoring",
+      subtitle: "Append-only audit trail of every state-changing action in the organization.",
+      badge: "COMPLIANCE",
+      icon: ShieldCheck,
+      accent: "#059669",
+    }}
+    endpoints={{
+      logs: "/api/audit-logs?page=0&size=100",
+    }}
+    kpiFn={(data) => {
+      const logs = data.logs?.content || [];
+      return [
+        { label: "Audit Events", value: logs.length, icon: FileText, color: "#059669" },
+        { label: "User / Role Events", value: logs.filter((l) => l.moduleName === "User" || l.moduleName === "Role").length, icon: UserCog, color: "#2563eb" },
+        { label: "Failed Operations", value: logs.filter((l) => l.success === false).length, icon: AlertCircle, color: "#dc2626" },
+      ];
+    }}
+    tables={[
+      {
+        key: "logs",
+        title: "Audit Trail",
+        emptyText: "No audit events recorded yet.",
+        maxRows: 12,
+        columns: [
+          { header: "Module", render: (r) => <strong style={{ color: "#059669" }}>{r.moduleName}</strong> },
+          { header: "Action", render: (r) => <span style={{ fontWeight: 600 }}>{r.operation}</span> },
+          { header: "Reference", accessor: "referenceNumber" },
+          { header: "Actor", accessor: "performedBy" },
+          { header: "Time", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.performedAt)}</span> },
+          { header: "Result", render: (r) => <span className="lro-badge" style={{ background: r.success ? "rgba(5,150,105,.12)" : "rgba(220,38,38,.12)", color: r.success ? "#059669" : "#dc2626" }}>{r.success ? "SUCCESS" : "FAILED"}</span> },
+        ],
+      },
+    ]}
+  />
+);
 
 export default OrgComplianceMonitoring;

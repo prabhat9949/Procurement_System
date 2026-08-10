@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Crown,
   Users,
+  LayoutDashboard,
+  Scale,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -25,17 +27,20 @@ import {
 } from "recharts";
 import { apiGet } from "../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../utils/format";
+import RoleShell from "../shared_ui/RoleShell";
 
 const ROLE_META = {
   senior_manager: {
     title: "Senior Manager",
     subtitle: "Escalated approvals, department monitoring and budget visibility",
     icon: Users,
+    portal: "Senior Manager Portal",
   },
   head: {
     title: "Head / Executive",
     subtitle: "High-value approvals, executive spend visibility and governance",
     icon: Crown,
+    portal: "Head Executive Portal",
   },
 };
 
@@ -43,6 +48,7 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
   const meta = ROLE_META[role] || ROLE_META.senior_manager;
   const Icon = meta.icon;
 
+  const [activeTab, setActiveTab] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [approvalTasks, setApprovalTasks] = useState([]);
@@ -96,15 +102,33 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
     { label: "Monthly Spend", value: formatINR(totalSpend), icon: IndianRupee, color: "#7c3aed" },
   ];
 
+  const navItems = [
+    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "approvals", label: "Approval Tasks", icon: ClipboardCheck },
+    { id: "analytics", label: "Analytics", icon: Scale },
+  ];
+
   return (
-    <div style={{ padding: "20px", fontFamily: "Inter, sans-serif", background: "#f7f8fa", minHeight: "100vh" }}>
+    <RoleShell
+      portalTitle={meta.portal}
+      roleLabel={meta.title}
+      navItems={navItems}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      userMeta={{ dept: "Management & Governance" }}
+    >
       <style>{`
         .mgmt-card { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:20px; }
-        .mgmt-kpi { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px; }
+        .mgmt-kpi { background:#fff; border:1px solid #e7ebf0; border-radius:14px; padding:16px 18px; display:flex; align-items:center; gap:14px; transition: transform .18s ease, box-shadow .18s ease; }
+        .mgmt-kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 22px rgba(16,35,56,.08); }
         .mgmt-table { width:100%; border-collapse: collapse; font-size:13.5px; }
         .mgmt-table th { text-align:left; color:#7a8999; font-size:11.5px; text-transform:uppercase; letter-spacing:.4px; padding:10px 12px; border-bottom:1px solid #eceef1; }
         .mgmt-table td { padding:11px 12px; border-bottom:1px solid #f2f4f6; color:#33414f; }
         .mgmt-badge { font-size:11px; font-weight:800; padding:3px 10px; border-radius:999px; }
+        .mgmt-tabs { display:flex; gap:8px; background:#fff; border:1px solid #e7ebf0; border-radius:12px; padding:5px; margin-bottom:20px; width:fit-content; }
+        .mgmt-tab { border:none; background:transparent; padding:9px 18px; border-radius:9px; font-size:13px; font-weight:700; color:#555; cursor:pointer; display:flex; align-items:center; gap:7px; }
+        .mgmt-tab.active { background:#f8b400; color:#000; }        @keyframes mgmtSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+        .mgmt-spin { animation: mgmtSpin .9s linear infinite; }
       `}</style>
 
       {/* Header */}
@@ -123,6 +147,8 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
           <RefreshCw size={14} className={loading ? "mgmt-spin" : ""} /> Refresh
         </button>
       </div>
+
+      {/* Sidebar drives navigation — matching every other dashboard shell. */}
 
       {error && (
         <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px", padding: "16px 20px", marginBottom: "18px", display: "flex", alignItems: "center", gap: "12px", color: "#991b1b" }}>
@@ -159,109 +185,106 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
             })}
           </div>
 
-          {/* Charts */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "20px" }}>
-            <div className="mgmt-card">
-              <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
-                <TrendingUp size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#7c3aed" }} />
-                Procurement Spend (₹)
-              </h3>
-              {spendChart.length === 0 ? (
-                <EmptyState text="No spend data recorded yet." />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <AreaChart data={spendChart}>
-                    <defs>
-                      <linearGradient id="mgmtSpend" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#f8b400" stopOpacity={0.5} />
-                        <stop offset="100%" stopColor="#f8b400" stopOpacity={0.05} />
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#7a8999" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#7a8999" }} tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
-                    <Tooltip formatter={(v) => [formatINR(v), "Spend"]} />
-                    <Area type="monotone" dataKey="value" stroke="#f8b400" strokeWidth={2.5} fill="url(#mgmtSpend)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <div className="mgmt-card">
-              <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
-                <FileText size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#2563eb" }} />
-                Purchase Request Trend
-              </h3>
-              {prChart.length === 0 ? (
-                <EmptyState text="No purchase request trends yet." />
-              ) : (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={prChart}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
-                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#7a8999" }} />
-                    <YAxis tick={{ fontSize: 11, fill: "#7a8999" }} allowDecimals={false} />
-                    <Tooltip />
-                    <Bar dataKey="value" name="Requests" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {/* Approvals */}
-          <div className="mgmt-card">
-            <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
-              <ClipboardCheck size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#d97706" }} />
-              Approval Tasks
-            </h3>
-            {approvalTasks.length === 0 ? (
-              <EmptyState text="No approval tasks have been created yet." />
-            ) : (
-              <div style={{ overflowX: "auto" }}>
-                <table className="mgmt-table">
-                  <thead>
-                    <tr>
-                      <th>Task</th>
-                      <th>Request</th>
-                      <th>Stage</th>
-                      <th>Assigned To</th>
-                      <th>Assigned</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {approvalTasks.slice(0, 10).map((t) => (
-                      <tr key={t.id}>
-                        <td style={{ fontWeight: "700" }}>{t.taskNumber}</td>
-                        <td>{t.requestNumber}</td>
-                        <td>{t.stageName}</td>
-                        <td>{t.assignedEmployeeName}</td>
-                        <td style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(t.assignedDate)}</td>
-                        <td>
-                          <span
-                            className="mgmt-badge"
-                            style={{
-                              background: t.status === "PENDING" ? "rgba(217,119,6,.12)" : t.status === "APPROVED" ? "rgba(5,150,105,.12)" : t.status === "REJECTED" ? "rgba(220,38,38,.12)" : "rgba(100,116,139,.12)",
-                              color: t.status === "PENDING" ? "#d97706" : t.status === "APPROVED" ? "#059669" : t.status === "REJECTED" ? "#dc2626" : "#64748b",
-                            }}
-                          >
-                            {t.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {(activeTab === "overview" || activeTab === "analytics") && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "18px", marginBottom: "20px" }}>
+              <div className="mgmt-card">
+                <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
+                  <TrendingUp size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#7c3aed" }} />
+                  Procurement Spend (₹)
+                </h3>
+                {spendChart.length === 0 ? (
+                  <EmptyState text="No spend data recorded yet." />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <AreaChart data={spendChart}>
+                      <defs>
+                        <linearGradient id="mgmtSpend" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#f8b400" stopOpacity={0.5} />
+                          <stop offset="100%" stopColor="#f8b400" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#7a8999" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "#7a8999" }} tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v}`} />
+                      <Tooltip formatter={(v) => [formatINR(v), "Spend"]} />
+                      <Area type="monotone" dataKey="value" stroke="#f8b400" strokeWidth={2.5} fill="url(#mgmtSpend)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                )}
               </div>
-            )}
-          </div>
+              <div className="mgmt-card">
+                <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
+                  <FileText size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#2563eb" }} />
+                  Purchase Request Trend
+                </h3>
+                {prChart.length === 0 ? (
+                  <EmptyState text="No purchase request trends yet." />
+                ) : (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart data={prChart}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#eef1f5" />
+                      <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#7a8999" }} />
+                      <YAxis tick={{ fontSize: 11, fill: "#7a8999" }} allowDecimals={false} />
+                      <Tooltip />
+                      <Bar dataKey="value" name="Requests" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </div>
+            </div>
+          )}
+
+          {(activeTab === "overview" || activeTab === "approvals") && (
+            <div className="mgmt-card">
+              <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
+                <ClipboardCheck size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#d97706" }} />
+                Approval Tasks
+              </h3>
+              {approvalTasks.length === 0 ? (
+                <EmptyState text="No approval tasks have been created yet." />
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table className="mgmt-table">
+                    <thead>
+                      <tr>
+                        <th>Task</th>
+                        <th>Request</th>
+                        <th>Stage</th>
+                        <th>Assigned To</th>
+                        <th>Assigned</th>
+                        <th>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {approvalTasks.slice(0, activeTab === "approvals" ? 20 : 10).map((t) => (
+                        <tr key={t.id}>
+                          <td style={{ fontWeight: "700" }}>{t.taskNumber}</td>
+                          <td>{t.requestNumber}</td>
+                          <td>{t.stageName}</td>
+                          <td>{t.assignedEmployeeName}</td>
+                          <td style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(t.assignedDate)}</td>
+                          <td>
+                            <span
+                              className="mgmt-badge"
+                              style={{
+                                background: t.status === "PENDING" ? "rgba(217,119,6,.12)" : t.status === "APPROVED" ? "rgba(5,150,105,.12)" : t.status === "REJECTED" ? "rgba(220,38,38,.12)" : "rgba(100,116,139,.12)",
+                                color: t.status === "PENDING" ? "#d97706" : t.status === "APPROVED" ? "#059669" : t.status === "REJECTED" ? "#dc2626" : "#64748b",
+                              }}
+                            >
+                              {t.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
-
-      <style>{`
-        @keyframes mgmtSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
-        .mgmt-spin { animation: mgmtSpin .9s linear infinite; }
-      `}</style>
-    </div>
+    </RoleShell>
   );
 };
 

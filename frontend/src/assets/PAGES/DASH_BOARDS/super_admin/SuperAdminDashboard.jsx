@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import "./SuperAdminDashboard.css";
 
 import {
-  LayoutDashboard,
   Globe,
   Building2,
   Users,
@@ -17,14 +16,13 @@ import {
   FileText,
   Bell,
   FolderKanban,
-  Sun,
   Settings,
-  UserCheck,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Server,
 } from "lucide-react";
 
 import SuperSystemOverview from "./modules/SuperSystemOverview";
@@ -41,12 +39,9 @@ import SuperSecurityCenter from "./modules/SuperSecurityCenter";
 import SuperAuditLogs from "./modules/SuperAuditLogs";
 import SuperNotificationsCenter from "./modules/SuperNotificationsCenter";
 import SuperGlobalReports from "./modules/SuperGlobalReports";
-import SuperThemeManagement from "./modules/SuperThemeManagement";
-import SuperSystemConfigurations from "./modules/SuperSystemConfigurations";
-import SuperMasterControlCenter from "./modules/SuperMasterControlCenter";
-import OrgMasterDataView from "../org_admin/modules/OrgMasterDataView";
+import OrgMasterDataPanel from "../org_admin/modules/OrgMasterDataPanel";
+import OrgSystemHealth from "../org_admin/modules/OrgSystemHealth";
 
-import SuperProfile from "./modules/SuperProfile";
 import SuperSettings from "./modules/SuperSettings";
 
 const SuperAdminDashboard = () => {
@@ -59,6 +54,7 @@ const SuperAdminDashboard = () => {
 
   const navMenuItems = [
     { id: "system-overview", label: "System Overview", icon: Globe },
+    { id: "system-health", label: "System Health", icon: Server },
     { id: "organization-management", label: "Organization Management", icon: Building2 },
     { id: "user-management", label: "User Management", icon: Users },
     { id: "role-management", label: "Role Management", icon: ShieldCheck },
@@ -70,21 +66,29 @@ const SuperAdminDashboard = () => {
     { id: "vendor-monitoring", label: "Vendor Monitoring", icon: Truck },
     { id: "security-center", label: "Security Center", icon: ShieldCheck },
     { id: "audit-logs", label: "Audit Logs", icon: FileText },
-    { id: "master-data", label: "Master Data View", icon: Globe },
-    { id: "control-center", label: "Super Control Center", icon: ShieldCheck },
+    { id: "master-data", label: "Master Data Management", icon: Globe },
     { id: "global-reports", label: "Global Reports", icon: FolderKanban },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "settings", label: "Account & Security", icon: Settings },
     ];
 
   const handleLogout = () => {
-    localStorage.removeItem("eps_active_role");
+    // Clear the complete EPS session so the Back button can never look like a logout.
     localStorage.removeItem("eps_access_token");
-    navigate("/login");
+    localStorage.removeItem("eps_active_role");
+    localStorage.removeItem("eps_role_code");
+    localStorage.removeItem("eps_username");
+    localStorage.removeItem("eps_display_name");
+    localStorage.removeItem("eps_user_id");
+    navigate("/login", { replace: true });
   };
 
   const renderActiveModule = () => {
     switch (activeTab) {
       case "system-overview":
         return <SuperSystemOverview onNavigate={(tab) => setActiveTab(tab)} />;
+      case "system-health":
+        return <OrgSystemHealth />;
       case "organization-management":
         return <SuperOrgManagement />;
       case "user-management":
@@ -109,14 +113,13 @@ const SuperAdminDashboard = () => {
         return <SuperAuditLogs />;
       case "global-reports":
         return <SuperGlobalReports />;
-      case "system-configurations":
-        return <SuperSystemConfigurations />;
+      case "notifications":
+        return <SuperNotificationsCenter />;
       case "master-data":
-        return <OrgMasterDataView />;
-      case "control-center":
-        return <SuperMasterControlCenter />;
+        return <OrgMasterDataPanel />;
       case "profile":
-        return <SuperProfile />;
+      case "settings":
+        return <SuperSettings />;
       default:
         return <SuperSystemOverview onNavigate={(tab) => setActiveTab(tab)} />;
     }
@@ -132,12 +135,12 @@ const SuperAdminDashboard = () => {
       >
         {/* Sidebar Brand */}
         <div className="sadmin-sidebar-header">
-          <div className="sadmin-brand" onClick={() => setActiveTab("dashboard")}>
+          <div className="sadmin-brand" onClick={() => setActiveTab("system-overview")}>
             <div className="sadmin-brand-logo">EPS</div>
             {!isSidebarCollapsed && (
               <div className="sadmin-brand-text">
                 <span className="sadmin-brand-title">Enterprise</span>
-                <span className="sadmin-brand-subtitle">Super Admin Portal</span>
+                <span className="sadmin-brand-subtitle">Admin Control Center</span>
               </div>
             )}
           </div>
@@ -235,7 +238,7 @@ const SuperAdminDashboard = () => {
             <Menu size={22} />
           </button>
           <span style={{ fontWeight: "800", fontSize: "16px", color: "#111" }}>
-            EPS Super Admin Portal
+            EPS Admin Control Center
           </span>
         </div>
 

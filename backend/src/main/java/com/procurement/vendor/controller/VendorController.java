@@ -69,9 +69,28 @@ public class VendorController {
         return ApiResponse.success("Vendor updated", vendorService.update(id, request));
     }
 
+    @PutMapping("/{id}/status")
+    public ApiResponse<VendorResponse> updateStatus(@PathVariable Long id,
+                                                    @RequestBody StatusUpdateRequest request) {
+        return ApiResponse.success("Vendor status updated", vendorService.updateStatus(id, request.status(), request.approved()));
+    }
+
+    @PutMapping("/{id}/kyc")
+    public ApiResponse<VendorResponse> updateKyc(@PathVariable Long id,
+                                                 @RequestBody KycDecisionRequest request) {
+        return ApiResponse.success("Vendor KYC decision recorded",
+                vendorService.updateKyc(id, request.decision(), request.reason()));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         vendorService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    public record StatusUpdateRequest(String status, Boolean approved) {
+    }
+
+    public record KycDecisionRequest(String decision, String reason) {
     }
 }
