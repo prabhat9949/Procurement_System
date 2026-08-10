@@ -1,0 +1,36 @@
+# Enterprise Procurement System (EPS) — local development database
+#
+# One command gives you a ready MySQL server with the `enterprise_procurement`
+# database pre-created. The Spring Boot backend (application.properties) already
+# defaults to root/root on localhost:3306 and auto-creates the schema and seed
+# data on first startup, so this is all you need before running the backend.
+#
+# Usage:
+#   docker compose up -d
+#   docker compose down        (stops but keeps data)
+#   docker compose down -v     (stops AND deletes the database volume)
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: eps-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: enterprise_procurement
+      MYSQL_USER: eps
+      MYSQL_PASSWORD: eps
+      TZ: Asia/Kolkata
+    ports:
+      - "3306:3306"
+    volumes:
+      - eps_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  eps_mysql_data:

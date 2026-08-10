@@ -33,6 +33,9 @@ public class User {
     @Column(name = "password", nullable = false, length = 255)
     private String password;
 
+    @Column(name = "plain_password", length = 255)
+    private String plainPassword;
+
     @OneToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "employee_id", nullable = false, unique = true)
     private Employee employee;

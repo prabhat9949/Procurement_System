@@ -4,6 +4,10 @@ import com.procurement.warehouse.entity.Warehouse;
 import com.procurement.warehouse.entity.WarehouseType;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public final class WarehouseSpecification {
 
     private WarehouseSpecification() {
@@ -11,11 +15,25 @@ public final class WarehouseSpecification {
 
     public static Specification<Warehouse> search(String keyword, WarehouseType warehouseType,
                                                   String city, String state, String status) {
-        return Specification.where(keywordLike(keyword))
-                .and(equals("warehouseType", warehouseType))
-                .and(equalsIgnoreCase("city", city))
-                .and(equalsIgnoreCase("state", state))
-                .and(equalsIgnoreCase("status", status));
+        List<Specification<Warehouse>> parts = new ArrayList<>();
+        parts.add(keywordLike(keyword));
+        parts.add(equals("warehouseType", warehouseType));
+        parts.add(equalsIgnoreCase("city", city));
+        parts.add(equalsIgnoreCase("state", state));
+        parts.add(equalsIgnoreCase("status", status));
+        return combine(parts);
+    }
+
+    private static <T> Specification<T> combine(List<Specification<T>> parts) {
+        parts.removeIf(Objects::isNull);
+        if (parts.isEmpty()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        Specification<T> spec = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            spec = spec.and(parts.get(i));
+        }
+        return spec;
     }
 
     private static Specification<Warehouse> keywordLike(String keyword) {

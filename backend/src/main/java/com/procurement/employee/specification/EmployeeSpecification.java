@@ -3,6 +3,10 @@ package com.procurement.employee.specification;
 import com.procurement.employee.entity.Employee;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public final class EmployeeSpecification {
 
     private EmployeeSpecification() {
@@ -11,12 +15,26 @@ public final class EmployeeSpecification {
     public static Specification<Employee> search(String keyword, Long departmentId,
                                                  Long costCenterId, Long roleId,
                                                  Long managerId, Boolean active) {
-        return Specification.where(keywordLike(keyword))
-                .and(equals("department.id", departmentId))
-                .and(equals("costCenter.id", costCenterId))
-                .and(equals("role.id", roleId))
-                .and(equals("manager.id", managerId))
-                .and(equals("active", active));
+        List<Specification<Employee>> parts = new ArrayList<>();
+        parts.add(keywordLike(keyword));
+        parts.add(equals("department.id", departmentId));
+        parts.add(equals("costCenter.id", costCenterId));
+        parts.add(equals("role.id", roleId));
+        parts.add(equals("manager.id", managerId));
+        parts.add(equals("active", active));
+        return combine(parts);
+    }
+
+    private static <T> Specification<T> combine(List<Specification<T>> parts) {
+        parts.removeIf(Objects::isNull);
+        if (parts.isEmpty()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        Specification<T> spec = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            spec = spec.and(parts.get(i));
+        }
+        return spec;
     }
 
     private static Specification<Employee> keywordLike(String keyword) {

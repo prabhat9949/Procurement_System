@@ -7,6 +7,9 @@ import com.procurement.purchaserequest.entity.PurchaseRequestStatus;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 public final class PurchaseRequestSpecification {
 
@@ -22,17 +25,28 @@ public final class PurchaseRequestSpecification {
                                                         LocalDate requiredDateTo,
                                                         LocalDate createdDateFrom,
                                                         LocalDate createdDateTo) {
-        return Specification.where(keywordLike(keyword))
-                .and(equalsPath("requester.id", requesterId))
-                .and(equalsPath("department.id", departmentId))
-                .and(equalsPath("costCenter.id", costCenterId))
-                .and(equalsPath("priority", priority))
-                .and(equalsPath("status", status))
-                .and(equalsPath("approvalStatus", approvalStatus))
-                .and(dateGte("requiredDate", requiredDateFrom))
-                .and(dateLte("requiredDate", requiredDateTo))
-                .and(dateTimeGte("createdAt", createdDateFrom))
-                .and(dateTimeLt("createdAt", createdDateTo));
+        List<Specification<PurchaseRequest>> parts = new ArrayList<>();
+        parts.add(keywordLike(keyword));
+        parts.add(equalsPath("requester.id", requesterId));
+        parts.add(equalsPath("department.id", departmentId));
+        parts.add(equalsPath("costCenter.id", costCenterId));
+        parts.add(equalsPath("priority", priority));
+        parts.add(equalsPath("status", status));
+        parts.add(equalsPath("approvalStatus", approvalStatus));
+        parts.add(dateGte("requiredDate", requiredDateFrom));
+        parts.add(dateLte("requiredDate", requiredDateTo));
+        parts.add(dateTimeGte("createdAt", createdDateFrom));
+        parts.add(dateTimeLt("createdAt", createdDateTo));
+        parts.removeIf(Objects::isNull);
+        if (parts.isEmpty()) {
+            // Spring Data rejects a null Specification; match all when no filters are set
+            return (root, query, cb) -> cb.conjunction();
+        }
+        Specification<PurchaseRequest> spec = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            spec = spec.and(parts.get(i));
+        }
+        return spec;
     }
 
     private static Specification<PurchaseRequest> keywordLike(String keyword) {

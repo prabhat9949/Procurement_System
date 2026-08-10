@@ -39,6 +39,13 @@ public class GlobalExceptionHandler {
     return error(HttpStatus.FORBIDDEN, exception);
   }
 
+  @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+  public ResponseEntity<ApiError> handleAccessDenied(
+      org.springframework.security.access.AccessDeniedException exception) {
+    return error(HttpStatus.FORBIDDEN,
+        new ForbiddenException("You do not have permission to perform this action"));
+  }
+
   @ExceptionHandler(Exception.class)
   public ResponseEntity<ApiError> handleUnexpected(Exception exception) {
     log.error("Unhandled exception", exception);
