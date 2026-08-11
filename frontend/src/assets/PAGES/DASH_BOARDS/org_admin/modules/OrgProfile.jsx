@@ -29,12 +29,6 @@ const OrgProfile = () => {
           <button className="org-btn-primary-sm">
             <Edit3 size={15} /> Edit Profile
           </button>
-          <button
-            className="org-btn-primary-sm"
-            style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}
-          >
-            <Lock size={15} /> Change Password
-          </button>
         </div>
       </div>
 

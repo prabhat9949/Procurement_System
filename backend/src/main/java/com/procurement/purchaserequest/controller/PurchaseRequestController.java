@@ -112,4 +112,9 @@ public class PurchaseRequestController {
     public ApiResponse<PurchaseRequestResponse> submit(@PathVariable Long id) {
         return ApiResponse.success("Purchase request submitted", purchaseRequestService.submit(id));
     }
+
+    @PostMapping("/{id}/cancel")
+    public ApiResponse<PurchaseRequestResponse> cancel(@PathVariable Long id) {
+        return ApiResponse.success("Purchase request cancelled", purchaseRequestService.cancel(id));
+    }
 }

@@ -188,21 +188,7 @@ const FinanceProfile = () => {
         >
           Role & Notification Settings
         </button>
-        <button
-          onClick={() => { setActiveTab("security"); setIsEditing(false); }}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "10px 16px",
-            fontSize: "15px",
-            fontWeight: activeTab === "security" ? "700" : "500",
-            color: activeTab === "security" ? "#d97706" : "#666",
-            borderBottom: activeTab === "security" ? "3px solid #f8b400" : "3px solid transparent",
-            cursor: "pointer",
-          }}
-        >
-          Change Portal Password
-        </button>
+
         <button
           onClick={() => { setActiveTab("logs"); setIsEditing(false); }}
           style={{
@@ -382,35 +368,15 @@ const FinanceProfile = () => {
         </div>
       )}
 
-      {/* 3. Change Password Tab */}
+      {/* 3. Password changes are managed by Admin only. */}
       {activeTab === "security" && (
         <div className="fin-card" style={{ padding: "28px", background: "#fff", border: "1px solid #ececec", borderRadius: "12px", maxWidth: "520px", margin: "0 auto" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#111", borderBottom: "1px solid #eee", paddingBottom: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <Key size={16} color="#dc2626" /> Change Portal Password
+          <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#111", borderBottom: "1px solid #eee", paddingBottom: "8px", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <Key size={16} color="#d97706" /> Account Security
           </h3>
-
-          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div className="fin-form-group">
-              <label className="fin-form-label">Current Password</label>
-              <input type="password" value={currPassword} onChange={(e) => setCurrPassword(e.target.value)} className="fin-form-input" required />
-            </div>
-            <div className="fin-form-group">
-              <label className="fin-form-label">New Password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="fin-form-input" required />
-            </div>
-            <div className="fin-form-group">
-              <label className="fin-form-label">Confirm New Password</label>
-              <input type="password" value={confPassword} onChange={(e) => setConfPassword(e.target.value)} className="fin-form-input" required />
-            </div>
-
-            <button
-              type="submit"
-              className="fin-btn-approve"
-              style={{ width: "100%", justifyContent: "center", padding: "12px", marginTop: "8px" }}
-            >
-              Update Portal Password
-            </button>
-          </form>
+          <p style={{ fontSize: "13.5px", color: "#555", lineHeight: 1.6, margin: 0 }}>
+            Password changes are handled by the system administrator only. Please contact the Admin / HR team if you need your password reset.
+          </p>
         </div>
       )}
 

@@ -172,8 +172,15 @@ public class AuthService {
 
     @Transactional
     public void changePassword(String username, ChangePasswordRequest request) {
+        // Only SUPER_ADMIN / ADMIN may change passwords. All other roles
+        // (employee, HR, manager, vendor, ...) must request it from an admin.
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        Role role = user.getRole();
+        if (role == null || !("SUPER_ADMIN".equals(role.getRoleCode()) || "ADMIN".equals(role.getRoleCode()))) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Only an administrator can change passwords");
+        }
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new UnauthorizedException("Current password is incorrect");
         }

@@ -74,6 +74,13 @@ public class EmployeeController {
                 size, sort, direction);
     }
 
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Get my employee profile", description = "Returns the employee record linked to the authenticated user.")
+    public ApiResponse<EmployeeResponse> myProfile() {
+        return ApiResponse.success(employeeService.myProfile());
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     @Operation(summary = "Get employee by id")

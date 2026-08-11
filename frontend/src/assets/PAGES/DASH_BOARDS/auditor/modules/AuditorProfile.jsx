@@ -53,11 +53,6 @@ const AuditorProfile = () => {
   const [editPhone, setEditPhone] = useState(profile.phone);
   const [editLocation, setEditLocation] = useState(profile.location);
 
-  // Password State
-  const [currPassword, setCurrPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confPassword, setConfPassword] = useState("");
-
   const triggerToast = (msg) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(""), 4000);
@@ -90,27 +85,6 @@ const AuditorProfile = () => {
       ...profile,
       [key]: !profile[key]
     });
-  };
-
-  const handleChangePassword = (e) => {
-    e.preventDefault();
-    if (newPassword !== confPassword) {
-      triggerToast("New passwords do not match!");
-      return;
-    }
-    
-    // Add log
-    const newLog = {
-      action: "Password Changed",
-      ip: "127.0.0.1",
-      date: new Date().toLocaleString(),
-      details: "Security password changed successfully"
-    };
-    setLogs([newLog, ...logs]);
-    setCurrPassword("");
-    setNewPassword("");
-    setConfPassword("");
-    triggerToast("Security password updated successfully!");
   };
 
   return (
@@ -186,21 +160,6 @@ const AuditorProfile = () => {
           }}
         >
           Auditor Details & Alert Preferences
-        </button>
-        <button
-          onClick={() => { setActiveTab("security"); setIsEditing(false); }}
-          style={{
-            background: "none",
-            border: "none",
-            padding: "10px 16px",
-            fontSize: "15px",
-            fontWeight: activeTab === "security" ? "700" : "500",
-            color: activeTab === "security" ? "#d97706" : "#666",
-            borderBottom: activeTab === "security" ? "3px solid #f8b400" : "3px solid transparent",
-            cursor: "pointer",
-          }}
-        >
-          Change Security Password
         </button>
         <button
           onClick={() => { setActiveTab("logs"); setIsEditing(false); }}
@@ -381,37 +340,6 @@ const AuditorProfile = () => {
         </div>
       )}
 
-      {/* 3. Change Password Tab */}
-      {activeTab === "security" && (
-        <div className="aud-card" style={{ padding: "28px", background: "#fff", border: "1px solid #ececec", borderRadius: "12px", maxWidth: "520px", margin: "0 auto" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#111", borderBottom: "1px solid #eee", paddingBottom: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <Key size={16} color="#dc2626" /> Change Portal Security Password
-          </h3>
-
-          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            <div className="aud-form-group">
-              <label className="aud-form-label">Current Password</label>
-              <input type="password" value={currPassword} onChange={(e) => setCurrPassword(e.target.value)} className="aud-form-input" required />
-            </div>
-            <div className="aud-form-group">
-              <label className="aud-form-label">New Password</label>
-              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="aud-form-input" required />
-            </div>
-            <div className="aud-form-group">
-              <label className="aud-form-label">Confirm New Password</label>
-              <input type="password" value={confPassword} onChange={(e) => setConfPassword(e.target.value)} className="aud-form-input" required />
-            </div>
-
-            <button
-              type="submit"
-              className="aud-btn-primary-sm"
-              style={{ width: "100%", justifyContent: "center", padding: "12px", marginTop: "8px" }}
-            >
-              Update Security Password
-            </button>
-          </form>
-        </div>
-      )}
 
       {/* 4. Activity Logs Tab */}
       {activeTab === "logs" && (

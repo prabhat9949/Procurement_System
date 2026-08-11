@@ -16,7 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/uoms")
 @Tag(name = "Unit of Measure", description = "Unit of measure master data")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+@PreAuthorize("isAuthenticated()")
 public class UnitOfMeasureController {
 
     private final UnitOfMeasureService unitOfMeasureService;

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   ShoppingBag,
   Search,
@@ -12,83 +12,76 @@ import {
   Clock,
   Filter,
   FileText,
+  Loader2,
+  WifiOff,
 } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatDateIN } from "../../../../../utils/format";
 
-const mockRequests = [
-  {
-    id: "OPP-2026-101",
-    buyer: "Enterprise Global Inc.",
-    dept: "Engineering & IT",
-    item: "MacBook Pro M3 Max Workstations",
-    productRequirements: "Apple MacBook Pro 16-inch, M3 Max chip (16-core CPU, 40-core GPU), 64GB Unified Memory, 2TB SSD, Space Black. Must include 3-year AppleCare+ for Enterprise.",
-    targetQty: 10,
-    category: "Hardware & IT",
-    publishDate: "2026-07-24",
-    deadline: "2026-08-10",
-    deliveryRequirements: "Delivery to Main HQ, 5th Floor IT Logistics Depot. Inside delivery required. Dock height access available.",
-    status: "Open",
-    isHistory: false,
-  },
-  {
-    id: "OPP-2026-104",
-    buyer: "Enterprise Global Inc.",
-    dept: "Product & UI/UX",
-    item: "iPad Pro 12.9'' M2 Tablets",
-    productRequirements: "iPad Pro 12.9-inch (Wi-Fi, 256GB) - Space Gray (6th Generation) with Apple Pencil (2nd Generation) and Magic Keyboard.",
-    targetQty: 15,
-    category: "Hardware & IT",
-    publishDate: "2026-07-25",
-    deadline: "2026-08-12",
-    deliveryRequirements: "Ship to California branch: 450 Sunset Blvd, Los Angeles, CA. Individual packaging per unit.",
-    status: "Open",
-    isHistory: false,
-  },
-  {
-    id: "OPP-2026-098",
-    buyer: "Enterprise Global Inc.",
-    dept: "Operations & Facilities",
-    item: "Ergonomic Office Chairs (Premium)",
-    productRequirements: "Herman Miller Aeron Chairs, Size B, Standard Carpet Casters, fully adjustable arms, graphite color. Must carry standard 12-year manufacturer warranty.",
-    targetQty: 50,
-    category: "Furniture & Office",
-    publishDate: "2026-07-15",
-    deadline: "2026-07-28",
-    deliveryRequirements: "Deliver to ground floor reception. Delivery window: 9 AM - 4 PM. Call facilities manager 24 hours prior.",
-    status: "Under Review",
-    isHistory: true,
-  },
-  {
-    id: "OPP-2026-089",
-    buyer: "Enterprise Global Inc.",
-    dept: "Administration",
-    item: "Eco-Friendly Recycled A4 Paper Reams",
-    productRequirements: "Double A A4 Paper 80GSM, 100% Recycled. Box of 5 reams. Must meet eco-certifications.",
-    targetQty: 200,
-    category: "Office Supplies",
-    publishDate: "2026-06-20",
-    deadline: "2026-07-05",
-    deliveryRequirements: "Central Warehouse, Loading Bay A, Seattle WA.",
-    status: "Closed",
-    isHistory: true,
-  },
-];
+const statusToUi = (s) => {
+  const map = { OPEN: "Open", DRAFT: "Draft", CLOSED: "Closed", AWARDED: "Awarded", CANCELLED: "Cancelled" };
+  return map[s] || s;
+};
 
 const VendorProcRequests = ({ onNavigate }) => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [selectedStatus, setSelectedStatus] = useState("All");
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [activeView, setActiveView] = useState("received"); // 'received' or 'history'
 
-  const categories = ["All", "Hardware & IT", "Furniture & Office", "Office Supplies"];
-  const statuses = ["All", "Open", "Under Review", "Closed"];
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const page = await apiGet("/api/vendor/my/rfqs?page=0&size=50");
+      setRequests(page?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load procurement opportunities.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Map scoped RFQ records to the opportunity view model.
+  const mockRequests = requests.map((rfq) => {
+    const lines = rfq.lines || [];
+    const itemName = rfq.item || (lines[0] ? lines[0].productName : "General requirement");
+    const qty = rfq.quantity || (lines.length ? lines.reduce((a, l) => a + Number(l.quantity || 0), 0) : 1);
+    const uiStatus = statusToUi(rfq.status);
+    const specText = rfq.remarks || (lines.length ? lines.map((l) => `${l.productName} (${l.sku}) × ${l.quantity}`).join("; ") : "Refer to RFQ details.");
+    return {
+      id: rfq.rfqNumber,
+      buyer: "Enterprise Procurement",
+      dept: "Procurement",
+      item: itemName,
+      productRequirements: specText,
+      targetQty: qty,
+      category: lines[0]?.productName ? "Catalogue Item" : "General",
+      publishDate: rfq.issueDate ? formatDateIN(rfq.issueDate, { withTime: false }) : "",
+      deadline: rfq.closingDate ? formatDateIN(rfq.closingDate, { withTime: false }) : "",
+      deliveryRequirements: "As per the RFQ requirements. Delivery details are shared with the awarded vendor.",
+      status: uiStatus,
+      isHistory: rfq.status === "CLOSED" || rfq.status === "AWARDED" || rfq.status === "CANCELLED",
+    };
+  });
+
+  const categories = ["All", "Catalogue Item", "General"];
+  const statuses = ["All", "Open", "Under Review", "Closed", "Awarded"];
 
   // Filter requests
   const filteredRequests = mockRequests.filter((req) => {
     const matchesSearch =
-      req.item.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.buyer.toLowerCase().includes(searchQuery.toLowerCase());
+      (req.item || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (req.id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (req.buyer || "").toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesCategory =
       selectedCategory === "All" || req.category === selectedCategory;
@@ -101,6 +94,28 @@ const VendorProcRequests = ({ onNavigate }) => {
 
     return matchesSearch && matchesCategory && matchesStatus && matchesTab;
   });
+
+  if (loading) {
+    return (
+      <div className="vnd-proc-requests-container" style={{ padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "80px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading procurement opportunities...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="vnd-proc-requests-container" style={{ padding: "20px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "14px 18px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: 600 }}>
+          <WifiOff size={18} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button onClick={loadData} style={{ background: "#111", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Retry</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="vnd-proc-requests-container" style={{ padding: "20px" }}>

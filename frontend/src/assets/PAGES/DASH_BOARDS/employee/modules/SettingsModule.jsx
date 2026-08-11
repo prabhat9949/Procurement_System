@@ -206,60 +206,24 @@ const SettingsModule = () => {
             </div>
           </div>
 
-          {/* Password Security Form */}
+          {/* Password & Security — managed by Admin only */}
           <div className="emp-card" style={{ gridColumn: "span 2" }}>
             <h3
               style={{
                 color: "#111111",
                 fontSize: "17px",
                 fontWeight: "700",
-                marginBottom: "20px",
+                marginBottom: "8px",
                 display: "flex",
                 alignItems: "center",
                 gap: "10px",
               }}
             >
-              <Lock size={18} color="#f8b400" /> Password & Security Authentication
+              <Lock size={18} color="#f8b400" /> Password & Security
             </h3>
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-              <div className="emp-form-group">
-                <label className="emp-form-label">Current Password</label>
-                <input
-                  type="password"
-                  placeholder="••••••••••••"
-                  className="emp-form-input"
-                />
-              </div>
-              <div className="emp-form-group">
-                <label className="emp-form-label">New Password</label>
-                <input
-                  type="password"
-                  placeholder="Enter new strong password"
-                  className="emp-form-input"
-                />
-              </div>
-              <div className="emp-form-group">
-                <label className="emp-form-label">Confirm New Password</label>
-                <input
-                  type="password"
-                  placeholder="Repeat new password"
-                  className="emp-form-input"
-                />
-              </div>
-            </div>
-
-            <div
-              style={{
-                marginTop: "20px",
-                display: "flex",
-                justifyContent: "flex-end",
-              }}
-            >
-              <button type="submit" className="emp-btn-primary-sm" style={{ padding: "12px 28px" }}>
-                <Save size={16} /> Save Preference Changes
-              </button>
-            </div>
+            <p style={{ color: "#555555", fontSize: "13px", margin: 0 }}>
+              Password changes are managed by your system administrator only. Contact the Admin / HR team to reset your password.
+            </p>
           </div>
         </div>
       </form>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import "./EmployeeDashboard.css";
 
@@ -7,7 +7,8 @@ import {
   PlusCircle,
   FileText,
   Clock,
-  FolderKanban,
+  Bell,
+  UserCircle,
   HelpCircle,
   LogOut,
   Menu,
@@ -20,19 +21,51 @@ import DashboardOverview from "./modules/DashboardOverview";
 import CreateRequest from "./modules/CreateRequest";
 import MyRequests from "./modules/MyRequests";
 import RequestTracking from "./modules/RequestTracking";
-import DocumentsModule from "./modules/DocumentsModule";
+import NotificationsModule from "./modules/NotificationsModule";
+import ProfileModule from "./modules/ProfileModule";
 import SupportModule from "./modules/SupportModule";
-import ProfileDrawer from "../shared_ui/ProfileDrawer";
+import { apiGet, apiPost } from "../../../../services/apiClient";
 
 const EmployeeDashboard = () => {
   const navigate = useNavigate();
-  const displayName = localStorage.getItem("eps_display_name") || "Employee";
   const [activeTab, setActiveTab] = useState("dashboard");
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [currentTime, setCurrentTime] = useState("");
+  const [me, setMe] = useState(null);
+  const [authMe, setAuthMe] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [selectedTrackingId, setSelectedTrackingId] = useState(null);
+
+  const loadIdentity = useCallback(async () => {
+    try {
+      const [auth, employee] = await Promise.all([
+        apiGet("/api/auth/me").catch(() => null),
+        apiGet("/api/employees/me").catch(() => null),
+      ]);
+      setAuthMe(auth);
+      setMe(employee);
+    } catch {
+      /* profile fallbacks below */
+    }
+  }, []);
+
+  const loadUnread = useCallback(async () => {
+    try {
+      const count = await apiGet("/api/notifications/my/unread-count");
+      setUnreadCount(typeof count === "number" ? count : 0);
+    } catch {
+      setUnreadCount(0);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadIdentity();
+    loadUnread();
+    const unreadTimer = setInterval(loadUnread, 30000);
+    return () => clearInterval(unreadTimer);
+  }, [loadIdentity, loadUnread]);
 
   useEffect(() => {
     const updateTime = () => {
@@ -51,28 +84,44 @@ const EmployeeDashboard = () => {
           })
       );
     };
-
     updateTime();
     const interval = setInterval(updateTime, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const displayName =
+    me?.firstName && me?.lastName
+      ? `${me.firstName} ${me.lastName}`
+      : authMe?.displayName || "Employee";
+  const roleLabel = me?.roleName || authMe?.roleName || "Employee (Requester)";
 
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "create-request", label: "Create Request", icon: PlusCircle },
     { id: "my-requests", label: "My Requests", icon: FileText },
     { id: "request-tracking", label: "Request Tracking", icon: Clock },
-    { id: "documents", label: "Documents", icon: FolderKanban },
+    {
+      id: "notifications",
+      label: "Notifications",
+      icon: Bell,
+      badge: unreadCount > 0 ? unreadCount : null,
+    },
+    { id: "profile", label: "My Profile", icon: UserCircle },
     { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await apiPost("/api/auth/logout");
+    } catch {
+      /* backend logout is best-effort */
+    }
     localStorage.removeItem("eps_active_role");
     localStorage.removeItem("eps_access_token");
+    localStorage.removeItem("eps_display_name");
+    localStorage.removeItem("eps_username");
     navigate("/login");
   };
-
-  const [selectedTrackingId, setSelectedTrackingId] = useState(null);
 
   const renderActiveModule = () => {
     switch (activeTab) {
@@ -84,13 +133,23 @@ const EmployeeDashboard = () => {
         return (
           <MyRequests
             onNavigate={(tab) => setActiveTab(tab)}
-            onSelectTracking={(id) => setSelectedTrackingId(id)}
+            onSelectTracking={(id) => {
+              setSelectedTrackingId(id);
+              setActiveTab("request-tracking");
+            }}
           />
         );
       case "request-tracking":
-        return <RequestTracking initialTrackingId={selectedTrackingId} />;
-      case "documents":
-        return <DocumentsModule />;
+        return (
+          <RequestTracking
+            initialTrackingId={selectedTrackingId}
+            onNotifyRefresh={loadUnread}
+          />
+        );
+      case "notifications":
+        return <NotificationsModule onNotifyRefresh={loadUnread} />;
+      case "profile":
+        return <ProfileModule me={me} authMe={authMe} onReload={loadIdentity} />;
       case "support":
         return <SupportModule />;
       default:
@@ -100,13 +159,13 @@ const EmployeeDashboard = () => {
 
   return (
     <div className="emp-dashboard-container">
+      <style>{`@keyframes lroSpin { from{transform:rotate(0)} to{transform:rotate(360deg)} } .lro-spin { animation: lroSpin .9s linear infinite; }`}</style>
       {/* ================= SIDEBAR ================= */}
       <aside
         className={`emp-sidebar ${isSidebarCollapsed ? "collapsed" : ""} ${
           isMobileOpen ? "mobile-open" : ""
         }`}
       >
-        {/* Sidebar Brand */}
         <div className="emp-sidebar-header">
           <div className="emp-brand" onClick={() => setActiveTab("dashboard")}>
             <div className="emp-brand-logo">EPS</div>
@@ -126,10 +185,8 @@ const EmployeeDashboard = () => {
           </button>
         </div>
 
-        {/* Sidebar Navigation */}
         <div className="emp-sidebar-nav">
           <div className="emp-nav-section-title">Main Navigation</div>
-
           {navMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
@@ -144,26 +201,35 @@ const EmployeeDashboard = () => {
               >
                 <Icon className="emp-nav-icon" size={20} />
                 <span className="emp-nav-label">{item.label}</span>
-                {item.badge && <span className="emp-nav-badge">{item.badge}</span>}
+                {item.badge != null && <span className="emp-nav-badge">{item.badge}</span>}
               </button>
             );
           })}
         </div>
 
-        {/* Sidebar Footer User Info & Logout below Profile */}
         <div className="emp-sidebar-user">
           {!isSidebarCollapsed ? (
             <>
               <div
-                className="emp-user-profile-row" onClick={() => { setActiveTab("profile"); setIsMobileOpen(false); }} style={{ cursor: 'pointer' }}
-                onClick={() => setShowProfileDrawer(true)}
+                className="emp-user-profile-row"
+                onClick={() => {
+                  setActiveTab("profile");
+                  setIsMobileOpen(false);
+                }}
                 style={{ cursor: "pointer" }}
                 title="View Profile"
               >
-                <div className="emp-user-avatar">{displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</div>
+                <div className="emp-user-avatar">
+                  {displayName
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")
+                    .slice(0, 2)
+                    .toUpperCase()}
+                </div>
                 <div className="emp-user-details">
                   <span className="emp-user-name">{displayName}</span>
-                  <span className="emp-user-role">Employee (Requester)</span>
+                  <span className="emp-user-role">{roleLabel}</span>
                 </div>
               </div>
 
@@ -202,42 +268,75 @@ const EmployeeDashboard = () => {
       )}
 
       {/* ================= MAIN CONTENT AREA ================= */}
-      <div
-        className={`emp-main-wrapper ${
-          isSidebarCollapsed ? "sidebar-collapsed" : ""
-        }`}
-      >
-        {/* Mobile Toggle Button for Small Screens */}
+      <div className={`emp-main-wrapper ${isSidebarCollapsed ? "sidebar-collapsed" : ""}`}>
         <div className="emp-mobile-bar">
-          <button
-            className="emp-mobile-menu-btn"
-            onClick={() => setIsMobileOpen(!isMobileOpen)}
-          >
+          <button className="emp-mobile-menu-btn" onClick={() => setIsMobileOpen(!isMobileOpen)}>
             <Menu size={22} />
           </button>
           <span style={{ fontWeight: "700", fontSize: "16px", color: "#111" }}>EPS Portal</span>
         </div>
 
-        {/* Page Content Body */}
+        {/* Top navigation bar */}
+        <div className="emp-navbar">
+          <div className="emp-navbar-left">
+            <button
+              className="emp-mobile-menu-btn"
+              onClick={() => setIsMobileOpen(!isMobileOpen)}
+              style={{ display: "none" }}
+            >
+              <Menu size={22} />
+            </button>
+            <span className="emp-navbar-page-title">
+              {navMenuItems.find((n) => n.id === activeTab)?.label || "Dashboard"}
+            </span>
+          </div>
+          <div className="emp-navbar-right">
+            <span className="emp-nav-clock">{currentTime}</span>
+            <button
+              className="emp-nav-icon-btn"
+              title="Notifications"
+              onClick={() => setActiveTab("notifications")}
+              style={{ position: "relative" }}
+            >
+              <Bell size={19} />
+              {unreadCount > 0 && (
+                <span
+                  style={{
+                    position: "absolute",
+                    top: -4,
+                    right: -6,
+                    background: "#dc2626",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 800,
+                    borderRadius: 10,
+                    padding: "1px 5px",
+                    lineHeight: "14px",
+                  }}
+                >
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
+            </button>
+            <button
+              className="emp-nav-icon-btn"
+              title="My Profile"
+              onClick={() => setActiveTab("profile")}
+            >
+              <UserCircle size={19} />
+            </button>
+            <button
+              className="emp-nav-icon-btn"
+              title="Logout"
+              onClick={() => setShowLogoutModal(true)}
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+
         <main className="emp-page-content">{renderActiveModule()}</main>
       </div>
-
-      {/* Profile Drawer */}
-      <ProfileDrawer
-        isOpen={showProfileDrawer}
-        onClose={() => setShowProfileDrawer(false)}
-        user={{
-          name: displayName,
-          role: "Employee (Requester)",
-          email: localStorage.getItem("eps_username") || "",
-          phone: "—",
-          dept: "Employee Portal",
-          empId: "",
-          joinDate: "",
-        }}
-        accentColor="#3b82f6"
-        onLogout={() => { setShowProfileDrawer(false); setShowLogoutModal(true); }}
-      />
 
       {/* Logout Confirm Modal */}
       {showLogoutModal && (

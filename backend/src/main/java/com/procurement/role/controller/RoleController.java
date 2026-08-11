@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/roles")
 @Tag(name = "Role", description = "Role management with permission assignment")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
 public class RoleController {
 
     private final RoleService roleService;
@@ -31,6 +31,7 @@ public class RoleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     @Operation(summary = "Create role")
     public ResponseEntity<ApiResponse<RoleResponse>> create(@Valid @RequestBody RoleRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -64,6 +65,7 @@ public class RoleController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     @Operation(summary = "Update role")
     public ApiResponse<RoleResponse> update(@PathVariable Long id,
                                             @Valid @RequestBody RoleRequest request) {
@@ -71,6 +73,7 @@ public class RoleController {
     }
 
     @PutMapping("/{id}/permissions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     @Operation(summary = "Assign permissions to role")
     public ApiResponse<RoleResponse> setPermissions(@PathVariable Long id,
                                                     @RequestBody List<Long> permissionIds) {
@@ -78,6 +81,7 @@ public class RoleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     @Operation(summary = "Delete role", description = "System roles and roles with assigned users cannot be deleted")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         roleService.delete(id);

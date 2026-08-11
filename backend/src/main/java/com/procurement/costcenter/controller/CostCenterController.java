@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/cost-centers")
 @Tag(name = "Cost Center", description = "Cost center master data with budgets")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
+@PreAuthorize("isAuthenticated()")
 public class CostCenterController {
 
     private final CostCenterService costCenterService;
@@ -32,6 +32,7 @@ public class CostCenterController {
 
     @PostMapping
     @Operation(summary = "Create cost center")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     public ResponseEntity<ApiResponse<CostCenterResponse>> create(@Valid @RequestBody CostCenterRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Cost center created successfully", costCenterService.create(request)));
@@ -72,6 +73,7 @@ public class CostCenterController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update cost center")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     public ApiResponse<CostCenterResponse> update(@PathVariable Long id,
                                                   @Valid @RequestBody CostCenterRequest request) {
         return ApiResponse.success("Cost center updated", costCenterService.update(id, request));
@@ -79,6 +81,7 @@ public class CostCenterController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete cost center", description = "Only allowed when no employees reference it")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         costCenterService.delete(id);
         return ResponseEntity.noContent().build();

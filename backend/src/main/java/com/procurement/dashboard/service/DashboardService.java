@@ -11,5 +11,6 @@ public interface DashboardService {
     DashboardResponse warehouse(DashboardFilter filter);
     DashboardResponse vendor(DashboardFilter filter);
     DashboardResponse hr(DashboardFilter filter);
+    DashboardResponse employee(DashboardFilter filter, String username);
     ChartResponse chart(String type, DashboardFilter filter);
 }

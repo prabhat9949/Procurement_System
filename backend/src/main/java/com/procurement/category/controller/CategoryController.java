@@ -21,7 +21,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/categories")
 @Tag(name = "Category", description = "Product category and subcategory master data")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+@PreAuthorize("isAuthenticated()")
 public class CategoryController {
 
     private final CategoryService categoryService;
@@ -32,6 +32,7 @@ public class CategoryController {
 
     @PostMapping
     @Operation(summary = "Create category")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> create(@Valid @RequestBody CategoryRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Category created successfully", categoryService.create(request)));
@@ -78,6 +79,7 @@ public class CategoryController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update category")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ApiResponse<CategoryResponse> update(@PathVariable Long id,
                                                 @Valid @RequestBody CategoryRequest request) {
         return ApiResponse.success("Category updated", categoryService.update(id, request));
@@ -85,6 +87,7 @@ public class CategoryController {
 
     @DeleteMapping("/{id}")
     @Operation(summary = "Delete category", description = "Only allowed when no products or sub-categories reference it")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         categoryService.delete(id);
         return ResponseEntity.noContent().build();

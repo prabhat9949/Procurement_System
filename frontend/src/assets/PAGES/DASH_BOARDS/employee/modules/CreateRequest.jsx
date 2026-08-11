@@ -1,343 +1,321 @@
 import React, { useEffect, useState } from "react";
 import {
   PlusCircle,
-  UploadCloud,
-  FileText,
-  CheckCircle2,
   Package,
   Building,
-  User,
-  Send,
-  X,
-  Loader2,
+  CalendarClock,
   AlertCircle,
+  CheckCircle2,
+  Send,
+  Save,
+  Loader2,
+  IndianRupee,
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR } from "../../../../../utils/format";
 
+const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+
 const CreateRequest = ({ onNavigate }) => {
-  const displayName = localStorage.getItem("eps_display_name") || "";
-  const username = localStorage.getItem("eps_username") || "";
-
   const [me, setMe] = useState(null);
-  const [formData, setFormData] = useState({
-    employeeName: displayName,
-    employeeEmail: username,
-    department: "—",
-    costCenter: "—",
+  const [products, setProducts] = useState([]);
+  const [costCenters, setCostCenters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
 
-    productName: "",
-    category: "Hardware & IT Equipment",
-    vendorPreference: "",
+  const [form, setForm] = useState({
+    productId: "",
     quantity: 1,
     unitPrice: "",
-    priority: "MEDIUM",
-
-    justification: "",
+    costCenterId: "",
     requiredDate: "",
-    deliveryAddress: "",
+    priority: "MEDIUM",
+    purpose: "",
+    remarks: "",
   });
 
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [submittedRef, setSubmittedRef] = useState("");
-
   useEffect(() => {
-    apiGet("/api/auth/me")
-      .then((meData) => {
-        setMe(meData);
-        setFormData((f) => ({
-          ...f,
-          employeeName: meData.displayName || f.employeeName,
-          employeeEmail: meData.username || f.employeeEmail,
-          department: meData.departmentId ? `Department #${meData.departmentId}` : "—",
-          costCenter: meData.costCenterId ? `Cost Center #${meData.costCenterId}` : "—",
-        }));
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const employee = await apiGet("/api/employees/me");
+        setMe(employee);
+        const productPage = await apiGet("/api/products?active=true&size=500");
+        setProducts(productPage?.content || []);
+        if (employee?.departmentId) {
+          const cc = await apiGet(`/api/cost-centers/by-department/${employee.departmentId}`);
+          setCostCenters(cc || []);
+          setForm((f) => ({
+            ...f,
+            costCenterId:
+              employee.costCenterId && cc?.some((c) => c.id === employee.costCenterId)
+                ? employee.costCenterId
+                : (cc?.[0]?.id ?? ""),
+          }));
+        }
+      } catch (err) {
+        setError(err.message || "Unable to load the request form data.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
+  const selectedProduct = products.find((p) => p.id === Number(form.productId));
 
-  const handleFileUpload = (e) => {
-    const uploaded = Array.from(e.target.files).map((f) => ({
-      name: f.name,
-      size: (f.size / (1024 * 1024)).toFixed(1) + " MB",
+  const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
+
+  const handleProductChange = (value) => {
+    const product = products.find((p) => p.id === Number(value));
+    setForm((f) => ({
+      ...f,
+      productId: value,
+      unitPrice: product?.unitPrice != null ? product.unitPrice : f.unitPrice,
     }));
-    setFiles([...files, ...uploaded]);
   };
 
-  const removeFile = (index) => {
-    setFiles(files.filter((_, i) => i !== index));
+  const total = Number(form.quantity || 0) * Number(form.unitPrice || 0);
+
+  const validate = () => {
+    if (!form.productId) return "Please select a product or service from the catalogue.";
+    if (!form.quantity || Number(form.quantity) <= 0) return "Quantity must be a positive number.";
+    if (form.unitPrice === "" || Number(form.unitPrice) < 0) return "Unit price is required.";
+    if (!form.costCenterId) return "Please select a cost center.";
+    if (!form.requiredDate) return "Required delivery/access date is required.";
+    if (new Date(form.requiredDate) <= new Date(new Date().toDateString()))
+      return "Required date must be in the future.";
+    if (!form.purpose.trim()) return "Please provide a business justification.";
+    return "";
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!me?.employeeId || !me?.departmentId || !me?.costCenterId) {
-      setError("Your account is not linked to an employee record yet. Please contact HR.");
-      return;
-    }
-    const estimatedTotal = (parseFloat(formData.unitPrice) || 0) * (parseInt(formData.quantity) || 1);
-    if (estimatedTotal <= 0) {
-      setError("Please enter a valid unit price and quantity.");
-      return;
-    }
-    if (!formData.requiredDate) {
-      setError("Please select a required delivery date.");
-      return;
-    }
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const chosen = new Date(formData.requiredDate);
-    if (chosen <= today) {
-      setError("Required delivery date must be a future date.");
-      return;
-    }
+  const buildHeaderPayload = () => ({
+    requesterId: me.id,
+    departmentId: me.departmentId,
+    costCenterId: Number(form.costCenterId),
+    requiredDate: form.requiredDate,
+    priority: form.priority,
+    purpose: form.purpose.trim(),
+    remarks: form.remarks.trim() || null,
+    estimatedAmount: Number(total.toFixed(2)),
+  });
 
-    setSubmitting(true);
+  const saveRequest = async (submitAfter) => {
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
+      setSuccess("");
+      return;
+    }
+    setSaving(true);
     setError("");
+    setSuccess("");
     try {
-      const created = await apiPost("/api/purchase-requests", {
-        requesterId: me.employeeId,
-        departmentId: me.departmentId,
-        costCenterId: me.costCenterId,
-        requiredDate: formData.requiredDate,
-        priority: formData.priority,
-        purpose: formData.productName || formData.justification || "Purchase request",
-        remarks: formData.justification,
-        estimatedAmount: estimatedTotal,
+      const pr = await apiPost("/api/purchase-requests", buildHeaderPayload());
+      await apiPost("/api/purchase-request-lines", {
+        purchaseRequestId: pr.id,
+        productId: Number(form.productId),
+        quantity: Number(form.quantity),
+        unitPrice: Number(form.unitPrice),
+        remarks: form.remarks.trim() || null,
       });
-      setSubmittedRef(created.requestNumber || `PR #${created.id}`);
-      setShowSuccessModal(true);
+      if (submitAfter) {
+        await apiPost(`/api/purchase-requests/${pr.id}/submit`);
+        setSuccess(`${pr.requestNumber} submitted for approval.`);
+      } else {
+        setSuccess(`${pr.requestNumber} saved as draft.`);
+      }
+      setTimeout(() => onNavigate("my-requests"), 1400);
     } catch (err) {
-      setError(err.message || "Unable to submit the request. Please try again.");
+      setError(err.message || "Failed to save the request. Please try again.");
     } finally {
-      setSubmitting(false);
+      setSaving(false);
     }
   };
 
-  const estimatedTotal =
-    (parseFloat(formData.unitPrice) || 0) * (parseInt(formData.quantity) || 1);
+  const inputStyle = {
+    width: "100%",
+    padding: "10px 12px",
+    border: "1px solid #d7dce3",
+    borderRadius: "9px",
+    fontSize: "13.5px",
+    background: "#fff",
+    outline: "none",
+  };
+
+  const fieldLabel = { display: "block", fontSize: "12.5px", fontWeight: "700", color: "#374151", marginBottom: "6px" };
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "100px 0", color: "#888", fontWeight: 600 }}>
+        <Loader2 size={22} className="lro-spin" /> Loading your request form...
+      </div>
+    );
+  }
 
   return (
-    <div className="emp-create-request-container">
-      {/* Header */}
-      <div className="emp-page-header">
+    <div className="emp-card" style={{ padding: "28px", maxWidth: 860, margin: "0 auto" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        <div style={{ width: 44, height: 44, borderRadius: 12, background: "#2563eb14", color: "#2563eb", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <PlusCircle size={22} />
+        </div>
         <div>
-          <h1 className="emp-page-title">
-            <PlusCircle color="#f8b400" /> Create Purchase Requisition
-          </h1>
-          <p className="emp-page-subtitle">
-            Submit a requisition against your department cost center. It is saved to the database and routed for approval.
-          </p>
+          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: "#111" }}>Create Purchase Request</h1>
+          <p style={{ margin: 0, fontSize: 13, color: "#666" }}>Raise a requirement — it will be routed through the configured approval workflow after submission.</p>
         </div>
       </div>
 
+      {me && (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "14px 0", padding: "12px 14px", background: "#f8fafc", borderRadius: 10, border: "1px solid #eef1f5", fontSize: 12.5, color: "#475569" }}>
+          <span><strong>Requester:</strong> {me.firstName} {me.lastName}</span>
+          <span><strong>ID:</strong> {me.employeeCode}</span>
+          <span><strong>Department:</strong> {me.departmentName}</span>
+          <span><strong>Role:</strong> {me.roleName}</span>
+        </div>
+      )}
+
       {error && (
-        <div style={{ display: "flex", alignItems: "center", gap: "10px", background: "#fff1f2", color: "#be123c", padding: "14px 18px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: 600 }}>
-          <AlertCircle size={18} /> {error}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 10, padding: "12px 14px", margin: "12px 0", fontSize: 13 }}>
+          <AlertCircle size={17} /> {error}
+        </div>
+      )}
+      {success && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#ecfdf5", border: "1px solid #a7f3d0", color: "#065f46", borderRadius: 10, padding: "12px 14px", margin: "12px 0", fontSize: 13 }}>
+          <CheckCircle2 size={17} /> {success}
         </div>
       )}
 
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "24px" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            {/* Section 1: Employee & Department Details */}
-            <div className="emp-card emp-card-gold-glow">
-              <h3 style={{ color: "#111111", fontSize: "17px", fontWeight: "700", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <User size={18} color="#f8b400" /> Requester & Cost Center Information
-              </h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Full Name</label>
-                  <input type="text" value={formData.employeeName} readOnly className="emp-form-input" style={{ background: "#f8f9fb", color: "#666666" }} />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Work Email / Username</label>
-                  <input type="text" value={formData.employeeEmail} readOnly className="emp-form-input" style={{ background: "#f8f9fb", color: "#666666" }} />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Department</label>
-                  <input type="text" value={formData.department} readOnly className="emp-form-input" style={{ background: "#f8f9fb", color: "#666666" }} />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Cost Center</label>
-                  <input type="text" value={formData.costCenter} readOnly className="emp-form-input" style={{ background: "#f8f9fb", color: "#666666" }} />
-                </div>
+      {/* ============ Item & Requirement ============ */}
+      <section style={{ marginTop: 20 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+          <Package size={16} color="#2563eb" /> Item &amp; Requirement
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 14 }}>
+          <div>
+            <label style={fieldLabel}>Product / Service *</label>
+            <select style={inputStyle} value={form.productId} onChange={(e) => handleProductChange(e.target.value)}>
+              <option value="">Select from catalogue…</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.productName} {p.sku ? `(${p.sku})` : ""} — {p.categoryName || "Uncategorised"}
+                </option>
+              ))}
+            </select>
+            {selectedProduct && (
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                {selectedProduct.description || "No description on file"} · Reference price {formatINR(selectedProduct.unitPrice)}
               </div>
-            </div>
-
-            {/* Section 2: Product / Item Details */}
-            <div className="emp-card">
-              <h3 style={{ color: "#111111", fontSize: "17px", fontWeight: "700", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <Package size={18} color="#f8b400" /> Item & Product Specifications
-              </h3>
-
-              <div className="emp-form-group">
-                <label className="emp-form-label">Product / Service Item Name *</label>
-                <input type="text" name="productName" placeholder="e.g. Dell XPS 15 Laptop 32GB RAM" value={formData.productName} onChange={handleChange} required className="emp-form-input" />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Category</label>
-                  <select name="category" value={formData.category} onChange={handleChange} className="emp-form-select">
-                    <option value="Hardware & IT Equipment">Hardware & IT Equipment</option>
-                    <option value="Software & Subscriptions">Software & Subscriptions</option>
-                    <option value="Office Supplies & Furniture">Office Supplies & Furniture</option>
-                    <option value="Professional Services">Professional Services</option>
-                    <option value="Cloud Infrastructure">Cloud Infrastructure</option>
-                    <option value="Maintenance & Repair">Maintenance & Repair</option>
-                  </select>
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Preferred Vendor / Supplier</label>
-                  <input type="text" name="vendorPreference" placeholder="e.g. TechNova India" value={formData.vendorPreference} onChange={handleChange} className="emp-form-input" />
-                </div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px" }}>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Quantity</label>
-                  <input type="number" min="1" name="quantity" value={formData.quantity} onChange={handleChange} required className="emp-form-input" />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Est. Unit Price (₹)</label>
-                  <input type="number" step="0.01" name="unitPrice" placeholder="0.00" value={formData.unitPrice} onChange={handleChange} required className="emp-form-input" />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Priority Level</label>
-                  <select name="priority" value={formData.priority} onChange={handleChange} className="emp-form-select">
-                    <option value="LOW">Low Priority</option>
-                    <option value="MEDIUM">Medium Priority</option>
-                    <option value="HIGH">High Priority</option>
-                    <option value="URGENT">Urgent (Requires Justification)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Section 3: Justification & Delivery */}
-            <div className="emp-card">
-              <h3 style={{ color: "#111111", fontSize: "17px", fontWeight: "700", marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
-                <Building size={18} color="#f8b400" /> Justification & Delivery Location
-              </h3>
-
-              <div className="emp-form-group">
-                <label className="emp-form-label">Business Justification *</label>
-                <textarea name="justification" rows="3" placeholder="Explain why this procurement is required for business operations..." value={formData.justification} onChange={handleChange} required className="emp-form-textarea" />
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Required Delivery Date *</label>
-                  <input type="date" name="requiredDate" min={new Date().toISOString().split("T")[0]} value={formData.requiredDate} onChange={handleChange} required className="emp-form-input" />
-                </div>
-                <div className="emp-form-group">
-                  <label className="emp-form-label">Delivery Address</label>
-                  <input type="text" name="deliveryAddress" value={formData.deliveryAddress} onChange={handleChange} placeholder="Office address / floor" className="emp-form-input" />
-                </div>
-              </div>
-            </div>
+            )}
           </div>
-
-          {/* Right Summary & File Attachments */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-            <div className="emp-card" style={{ background: "linear-gradient(135deg, rgba(248, 180, 0, 0.1) 0%, rgba(255, 255, 255, 1) 100%)", border: "1px solid #f8b400" }}>
-              <h3 style={{ color: "#111111", fontSize: "16px", fontWeight: "700", marginBottom: "16px" }}>Requisition Cost Breakdown</h3>
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "14px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#555555" }}>
-                  <span>Quantity:</span>
-                  <span style={{ color: "#111111", fontWeight: "700" }}>{formData.quantity || 1}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#555555" }}>
-                  <span>Unit Price:</span>
-                  <span style={{ color: "#111111", fontWeight: "700" }}>{formatINR(formData.unitPrice || 0)}</span>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", color: "#555555" }}>
-                  <span>Estimated Tax (10%):</span>
-                  <span style={{ color: "#111111", fontWeight: "700" }}>{formatINR(estimatedTotal * 0.1)}</span>
-                </div>
-                <hr style={{ borderColor: "#ececec", margin: "8px 0" }} />
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: "18px", fontWeight: "800" }}>
-                  <span style={{ color: "#111111" }}>Total Estimated:</span>
-                  <span style={{ color: "#d97706" }}>{formatINR(estimatedTotal * 1.1)}</span>
-                </div>
-              </div>
-
-              <button type="submit" disabled={submitting || loading} className="emp-btn-primary-sm" style={{ width: "100%", marginTop: "20px", padding: "14px", justifyContent: "center", fontSize: "15px", opacity: submitting ? 0.7 : 1 }}>
-                {submitting ? (
-                  <>
-                    <Loader2 size={18} className="login-spin" /> Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Send size={18} /> Submit Requisition
-                  </>
-                )}
-              </button>
-            </div>
-
-            {/* File Upload Dropzone */}
-            <div className="emp-card">
-              <h3 style={{ color: "#111111", fontSize: "16px", fontWeight: "700", marginBottom: "14px" }}>Quotations & Attachments</h3>
-              <label className="emp-file-dropzone">
-                <input type="file" multiple onChange={handleFileUpload} style={{ display: "none" }} />
-                <UploadCloud size={32} color="#f8b400" style={{ marginBottom: "8px" }} />
-                <p style={{ fontSize: "13px", color: "#111111", fontWeight: "700" }}>Click to upload quotes or specifications</p>
-                <p style={{ fontSize: "11px", color: "#666666", marginTop: "4px" }}>PDF, DOCX, PNG, JPG up to 15MB</p>
-              </label>
-
-              <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                {files.map((file, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", background: "#f8f9fb", borderRadius: "8px", border: "1px solid #ececec" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-                      <FileText size={16} color="#f8b400" />
-                      <div>
-                        <p style={{ fontSize: "12px", color: "#111111", fontWeight: "600", whiteSpace: "nowrap" }}>{file.name}</p>
-                        <p style={{ fontSize: "10px", color: "#666666" }}>{file.size}</p>
-                      </div>
-                    </div>
-                    <button type="button" onClick={() => removeFile(i)} style={{ background: "none", border: "none", color: "#dc2626", cursor: "pointer" }}>
-                      <X size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div>
+            <label style={fieldLabel}>Quantity *</label>
+            <input type="number" min="0.001" step="any" style={inputStyle} value={form.quantity} onChange={(e) => update("quantity", e.target.value)} />
+          </div>
+          <div>
+            <label style={fieldLabel}>Unit Price (₹) *</label>
+            <input type="number" min="0" step="any" style={inputStyle} value={form.unitPrice} onChange={(e) => update("unitPrice", e.target.value)} />
           </div>
         </div>
-      </form>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 12, padding: "10px 14px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10, fontSize: 13.5, color: "#1e3a8a" }}>
+          <IndianRupee size={16} />
+          <strong>Estimated Total Cost:</strong>&nbsp;{formatINR(total)}
+          <span style={{ color: "#64748b", fontSize: 12 }}>(quantity × unit price — final amount is validated by the backend)</span>
+        </div>
+      </section>
 
-      {/* Success Modal */}
-      {showSuccessModal && (
-        <div className="emp-modal-overlay">
-          <div className="emp-modal" style={{ textAlign: "center" }}>
-            <CheckCircle2 size={56} color="#059669" style={{ margin: "0 auto 16px" }} />
-            <h2 style={{ fontSize: "22px", color: "#111111", fontWeight: "700" }}>Requisition Submitted Successfully!</h2>
-            <p style={{ color: "#555555", fontSize: "14px", marginTop: "8px" }}>Your purchase request has been assigned Reference Number:</p>
-            <div style={{ fontSize: "24px", fontWeight: "800", color: "#d97706", margin: "16px 0", padding: "12px", background: "rgba(248, 180, 0, 0.15)", borderRadius: "10px", border: "1px dashed #f8b400" }}>
-              {submittedRef}
-            </div>
-            <p style={{ fontSize: "13px", color: "#666666", marginBottom: "24px" }}>An approval notification has been dispatched to your Department Manager.</p>
-
-            <div style={{ display: "flex", gap: "12px", justifyContent: "center" }}>
-              <button className="emp-btn-primary-sm" onClick={() => { setShowSuccessModal(false); onNavigate("my-requests"); }}>
-                Go to My Requests
-              </button>
-              <button className="emp-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111111", border: "1px solid #d9d9d9" }} onClick={() => { setShowSuccessModal(false); onNavigate("dashboard"); }}>
-                Back to Dashboard
-              </button>
-            </div>
+      {/* ============ Cost Center & Dates ============ */}
+      <section style={{ marginTop: 24 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+          <Building size={16} color="#2563eb" /> Cost Center &amp; Timeline
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+          <div>
+            <label style={fieldLabel}>Cost Center *</label>
+            <select style={inputStyle} value={form.costCenterId} onChange={(e) => update("costCenterId", e.target.value)}>
+              <option value="">Select cost center…</option>
+              {costCenters.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.code} — {c.name}
+                </option>
+              ))}
+            </select>
+            {costCenters.length === 0 && (
+              <div style={{ fontSize: 12, color: "#b45309", marginTop: 6 }}>No active cost centers found for your department. Please contact Finance.</div>
+            )}
+          </div>
+          <div>
+            <label style={fieldLabel}>Required By (Delivery / Access) *</label>
+            <input type="date" style={inputStyle} value={form.requiredDate} onChange={(e) => update("requiredDate", e.target.value)} />
+          </div>
+          <div>
+            <label style={fieldLabel}>Priority *</label>
+            <select style={inputStyle} value={form.priority} onChange={(e) => update("priority", e.target.value)}>
+              {PRIORITIES.map((p) => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
           </div>
         </div>
-      )}
+      </section>
+
+      {/* ============ Justification ============ */}
+      <section style={{ marginTop: 24 }}>
+        <h3 style={{ fontSize: 15, fontWeight: 800, color: "#111", margin: "0 0 14px", display: "flex", alignItems: "center", gap: 8 }}>
+          <CalendarClock size={16} color="#2563eb" /> Business Justification
+        </h3>
+        <div>
+          <label style={fieldLabel}>Why is this product/service required? *</label>
+          <textarea
+            rows={3}
+            style={{ ...inputStyle, resize: "vertical" }}
+            value={form.purpose}
+            maxLength={1000}
+            onChange={(e) => update("purpose", e.target.value)}
+            placeholder="e.g. Required for the new development workstation being onboarded this month."
+          />
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <label style={fieldLabel}>Remarks / Delivery Notes (optional)</label>
+          <textarea
+            rows={2}
+            style={{ ...inputStyle, resize: "vertical" }}
+            value={form.remarks}
+            maxLength={1000}
+            onChange={(e) => update("remarks", e.target.value)}
+            placeholder="Delivery location, access details, or any additional notes."
+          />
+        </div>
+      </section>
+
+      {/* ============ Actions ============ */}
+      <div style={{ display: "flex", gap: 12, marginTop: 28, paddingTop: 20, borderTop: "1px solid #eef1f5" }}>
+        <button
+          className="emp-btn-primary-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
+          disabled={saving}
+          onClick={() => saveRequest(false)}
+        >
+          {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
+        </button>
+        <button
+          className="emp-btn-primary-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
+          disabled={saving}
+          onClick={() => saveRequest(true)}
+        >
+          {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
+        </button>
+        <button
+          className="emp-btn-primary-sm"
+          style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}
+          onClick={() => onNavigate("my-requests")}
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   );
 };

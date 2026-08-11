@@ -7,10 +7,7 @@ import {
   FileCheck2,
   Send,
   MessageSquare,
-  ChevronRight,
-  ShieldAlert,
   CheckCircle2,
-  Clock,
 } from "lucide-react";
 
 const guidelinesList = [
@@ -64,9 +61,12 @@ const SupportModule = () => {
 
   const handleTicketSubmit = (e) => {
     e.preventDefault();
-    setToastMsg("Support ticket successfully created! Ticket ID: TCK-2026-9041");
+    const subject = encodeURIComponent(`[EPS Support] ${ticketCategory}: ${ticketSubject || "Support request"}`);
+    const body = encodeURIComponent(`${ticketMessage}\n\n— Sent from the EPS Employee Portal`);
+    window.location.href = `mailto:support@enterprise-procurement.com?subject=${subject}&body=${body}`;
     setTicketSubject("");
     setTicketMessage("");
+    setToastMsg("Opening your email client to send the support request to the helpdesk.");
     setTimeout(() => setToastMsg(""), 4000);
   };
 

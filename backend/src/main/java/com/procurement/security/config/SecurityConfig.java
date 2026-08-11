@@ -102,6 +102,11 @@ public class SecurityConfig {
                         // ===========================
                         // HR / IDENTITY
                         // ===========================
+                        // Any authenticated user may view their own employee profile.
+                        .requestMatchers(
+                                "/api/employees/me"
+                        ).authenticated()
+
                         .requestMatchers(
                                 "/api/employees/**",
                                 "/api/departments/**",
@@ -109,7 +114,7 @@ public class SecurityConfig {
                                 "/api/roles/**",
                                 "/api/permissions/**",
                                 "/api/role-permissions/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE")
 
                         .requestMatchers(
                                 "/api/users/**"
@@ -119,13 +124,17 @@ public class SecurityConfig {
                         // MASTER DATA
                         // ===========================
                         .requestMatchers(
+                                "/api/vendor/my/**"
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "VENDOR")
+
+                        .requestMatchers(
                                 "/api/vendors/**",
                                 "/api/categories/**",
                                 "/api/uoms/**",
                                 "/api/products/**",
                                 "/api/warehouses/**",
                                 "/api/inventory/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "WAREHOUSE_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "WAREHOUSE_MANAGER", "EMPLOYEE")
 
                         // ===========================
                         // PROCUREMENT WORKFLOW
@@ -153,7 +162,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/purchase-orders/**",
                                 "/api/purchase-order-lines/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "WAREHOUSE_MANAGER", "VENDOR", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "WAREHOUSE_MANAGER", "VENDOR", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD")
 
                         .requestMatchers(
                                 "/api/goods-receipts/**"
@@ -201,6 +210,10 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/dashboard/hr"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER")
+
+                        .requestMatchers(
+                                "/api/dashboard/employee"
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "EMPLOYEE")
 
                         .requestMatchers(
                                 "/api/dashboard/charts/**"

@@ -106,11 +106,6 @@ const VendorProfile = () => {
   const [editIfsc, setEditIfsc] = useState(profile.ifscCode);
   const [editSwift, setEditSwift] = useState(profile.swiftCode);
 
-  // Change Password Form State
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-
   // Custom Category Input
   const [newCategory, setNewCategory] = useState("");
 
@@ -162,31 +157,6 @@ const VendorProfile = () => {
     setEditIfsc(profile.ifscCode);
     setEditSwift(profile.swiftCode);
     setIsEditing(false);
-  };
-
-  const handleChangePassword = (e) => {
-    e.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      triggerToast("Please fill all password fields.");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      triggerToast("New passwords do not match!");
-      return;
-    }
-    
-    // Add log
-    const log = {
-      action: "Password Change",
-      ip: "127.0.0.1",
-      timestamp: new Date().toLocaleString(),
-      details: "Updated active sign-in security credentials."
-    };
-    setActivityLogs([log, ...activityLogs]);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    triggerToast("Security password updated successfully!");
   };
 
   const handleTogglePref = (key) => {
@@ -789,54 +759,6 @@ const VendorProfile = () => {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Right: Change Password */}
-          <div className="vnd-card" style={{ padding: "28px", background: "#fff", border: "1px solid #ececec", borderRadius: "12px" }}>
-            <h3 style={{ fontSize: "16px", fontWeight: "700", color: "#111", borderBottom: "1px solid #eee", paddingBottom: "8px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-              <Key size={18} color="#dc2626" /> Change Portal Password
-            </h3>
-
-            <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-              <div className="vnd-form-group">
-                <label className="vnd-form-label">Current Account Password</label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="vnd-form-input"
-                  required
-                />
-              </div>
-              <div className="vnd-form-group">
-                <label className="vnd-form-label">New Password</label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="vnd-form-input"
-                  required
-                />
-              </div>
-              <div className="vnd-form-group">
-                <label className="vnd-form-label">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="vnd-form-input"
-                  required
-                />
-              </div>
-              
-              <button
-                type="submit"
-                className="vnd-btn-primary-sm"
-                style={{ width: "100%", justifyContent: "center", marginTop: "10px" }}
-              >
-                Change Security Password
-              </button>
-            </form>
           </div>
 
         </div>

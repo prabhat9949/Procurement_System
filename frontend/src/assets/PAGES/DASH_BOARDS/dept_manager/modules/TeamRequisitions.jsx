@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import ReactDOM from "react-dom";
 import {
   FileText,
@@ -15,245 +15,122 @@ import {
   ShieldCheck,
   ArrowRight,
   FileCheck,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  WifiOff
 } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
 
-const teamRequestsMock = [
-  {
-    id: "REQ-2026-8921",
-    requester: "Alex Morgan",
-    email: "alex.morgan@enterprise.com",
-    role: "Senior Frontend Architect",
-    empId: "EMP-90482",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "MacBook Pro M3 Max 64GB",
-    category: "Hardware & IT",
-    vendor: "Apple Business Direct",
-    cost: "$3,899.00",
-    rawCost: 3899,
-    priority: "Urgent",
-    status: "pending",
-    date: "2026-07-24",
-    time: "10:42 AM EST",
-    justification: "Required for high-performance mobile software compilation, local LLM testing, and multi-display output.",
-    projectCode: "PRJ-2026-FE-ARCH",
-    attachments: ["Quotation_Apple_Direct_2026.pdf", "Tech_Architecture_Approval.pdf"],
-    managerDecision: null,
-  },
-  {
-    id: "REQ-2026-8945",
-    requester: "David Miller",
-    email: "david.miller@enterprise.com",
-    role: "DevOps Lead",
-    empId: "EMP-77102",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "Datadog APM Enterprise Renewal",
-    category: "Software & SaaS",
-    vendor: "Datadog Inc.",
-    cost: "$8,500.00",
-    rawCost: 8500,
-    priority: "High",
-    status: "pending",
-    date: "2026-07-25",
-    time: "02:15 PM EST",
-    justification: "Annual renewal for production microservice observability and latency telemetry dashboards.",
-    projectCode: "PRJ-2026-INFRA",
-    attachments: ["Datadog_Enterprise_Quote_2026.pdf"],
-    managerDecision: null,
-  },
-  {
-    id: "REQ-2026-8894",
-    requester: "Hannah Lee",
-    email: "hannah.lee@enterprise.com",
-    role: "UI/UX Designer",
-    empId: "EMP-44810",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "Figma Enterprise License (20 Seats)",
-    category: "Software & SaaS",
-    vendor: "Figma Inc.",
-    cost: "$4,500.00",
-    rawCost: 4500,
-    priority: "High",
-    status: "approved",
-    date: "2026-07-20",
-    time: "10:00 AM EST",
-    justification: "Annual UX design workspace licenses for the core product design team.",
-    projectCode: "PRJ-2026-DESIGN-SYS",
-    attachments: ["Figma_Enterprise_Commercial_Quote.pdf"],
-    managerDecision: {
-      action: "approved",
-      approvedBy: "Sarah Jenkins (VP Engineering & IT)",
-      decisionDate: "2026-07-20 at 01:20 PM EST",
-      approvedCost: "$4,500.00",
-      costCenterAllocated: "CC-8902-ENG (Engineering Operational)",
-      slaTargetDate: "2026-08-05",
-      notes: "Approved by VP Sarah Jenkins. Cost cleared under CC-8902-ENG. Forwarded for PO issuance.",
-      verificationHash: "VERIFIED-SIG-SHA256-8894-SJ",
-    },
-  },
-  {
-    id: "REQ-2026-8850",
-    requester: "James Kim",
-    email: "james.kim@enterprise.com",
-    role: "QA Engineer",
-    empId: "EMP-55109",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "Ergonomic Office Chairs (x5)",
-    category: "Office Supplies",
-    vendor: "Herman Miller Direct",
-    cost: "$1,250.00",
-    rawCost: 1250,
-    priority: "Medium",
-    status: "approved",
-    date: "2026-07-15",
-    time: "09:00 AM EST",
-    justification: "Replacement seating for QA pod to meet health & ergonomics compliance.",
-    projectCode: "PRJ-2026-QA-FACILITY",
-    attachments: ["Herman_Miller_Quote_8850.pdf"],
-    managerDecision: {
-      action: "approved",
-      approvedBy: "Sarah Jenkins (VP Engineering & IT)",
-      decisionDate: "2026-07-15 at 11:00 AM EST",
-      approvedCost: "$1,250.00",
-      costCenterAllocated: "CC-8902-ENG (Facilities & Pod Budget)",
-      slaTargetDate: "2026-08-01",
-      notes: "Approved by Sarah Jenkins under team wellness initiative.",
-      verificationHash: "VERIFIED-SIG-SHA256-8850-SJ",
-    },
-  },
-  {
-    id: "REQ-2026-8812",
-    requester: "Alex Morgan",
-    email: "alex.morgan@enterprise.com",
-    role: "Senior Frontend Architect",
-    empId: "EMP-90482",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "AWS Cloud Infrastructure Upgrade",
-    category: "Cloud Infrastructure",
-    vendor: "Amazon Web Services",
-    cost: "$12,000.00",
-    rawCost: 12000,
-    priority: "High",
-    status: "approved",
-    date: "2026-07-10",
-    time: "08:30 AM EST",
-    justification: "Production environment capacity scale-up and RDS multi-AZ cluster redundancy for Q3.",
-    projectCode: "PRJ-2026-CLOUD-SCALE",
-    attachments: ["AWS_Enterprise_Discount_Agreement.pdf"],
-    managerDecision: {
-      action: "approved",
-      approvedBy: "Sarah Jenkins (VP Engineering & IT)",
-      decisionDate: "2026-07-10 at 10:15 AM EST",
-      approvedCost: "$12,000.00",
-      costCenterAllocated: "CC-8902-ENG (Cloud Infrastructure Budget)",
-      slaTargetDate: "2026-07-28",
-      notes: "Approved by VP Sarah Jenkins. Essential for Q3 enterprise workload spike.",
-      verificationHash: "VERIFIED-SIG-SHA256-8812-SJ",
-    },
-  },
-  {
-    id: "REQ-2026-8790",
-    requester: "Marcus Vance",
-    email: "marcus.vance@enterprise.com",
-    role: "Systems Admin",
-    empId: "EMP-33120",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "Standing Desk Converters (x2)",
-    category: "Office Supplies",
-    vendor: "ErgoFurniture Direct",
-    cost: "$850.00",
-    rawCost: 850,
-    priority: "Low",
-    status: "rejected",
-    date: "2026-07-05",
-    time: "02:20 PM EST",
-    justification: "Ergonomic upgrades for QA office workstations.",
-    projectCode: "PRJ-2026-OFFICE-UP",
-    attachments: ["ErgoDesk_Quote.pdf"],
-    managerDecision: {
-      action: "rejected",
-      approvedBy: "Sarah Jenkins (VP Engineering & IT)",
-      decisionDate: "2026-07-05 at 04:15 PM EST",
-      approvedCost: "$0.00",
-      costCenterAllocated: "N/A - Non-allocated",
-      slaTargetDate: "N/A",
-      notes: "Rejected by Sarah Jenkins: Exceeds non-essential office supply allocation threshold for Q3. Please re-apply next fiscal quarter.",
-      verificationHash: "REJECTED-DECISION-SHA256-8790-SJ",
-    },
-  },
-  {
-    id: "REQ-2026-8710",
-    requester: "Priya Sharma",
-    email: "priya.sharma@enterprise.com",
-    role: "Lead QA Engineer",
-    empId: "EMP-65981",
-    dept: "Engineering & IT",
-    costCenter: "CC-8902-ENG",
-    product: "Dell UltraSharp 32'' 4K Monitors (x3)",
-    category: "Hardware & IT",
-    vendor: "Dell Commercial Direct",
-    cost: "$2,400.00",
-    rawCost: 2400,
-    priority: "Medium",
-    status: "approved",
-    date: "2026-06-28",
-    time: "11:20 AM EST",
-    justification: "Dual monitor setup for senior frontend developers to accelerate UI testing.",
-    projectCode: "PRJ-2026-QA-HARDWARE",
-    attachments: ["Dell_Commercial_Quote_8710.pdf"],
-    managerDecision: {
-      action: "approved",
-      approvedBy: "Sarah Jenkins (VP Engineering & IT)",
-      decisionDate: "2026-06-28 at 03:00 PM EST",
-      approvedCost: "$2,400.00",
-      costCenterAllocated: "CC-8902-ENG (Hardware Capital)",
-      slaTargetDate: "2026-07-20",
-      notes: "Approved by VP Sarah Jenkins. Dispatched for PO generation.",
-      verificationHash: "VERIFIED-SIG-SHA256-8710-SJ",
-    },
-  },
-];
+const statusToUi = (status) => {
+  const s = (status || "").toUpperCase();
+  if (s === "APPROVED" || s === "COMPLETED") return "approved";
+  if (s === "REJECTED" || s === "CANCELLED") return "rejected";
+  return "pending";
+};
 
-import { getStoredRequests } from "../../../../../services/purchaseRequestService";
-import { epsEventBus, fetchTeamRequisitions } from "../../../../../services/epsApiService";
+const priorityToUi = (priority) => {
+  const p = (priority || "").toUpperCase();
+  if (p === "URGENT") return "Urgent";
+  if (p === "HIGH") return "High";
+  if (p === "LOW") return "Low";
+  return "Medium";
+};
+
+const mapPrToUi = (pr, lines = []) => {
+  const firstLine = lines[0];
+  const productName = firstLine?.productName || pr.purpose || "General requirement";
+  const rawCost = Number(firstLine?.estimatedAmount ?? pr.estimatedAmount ?? 0);
+  const uiStatus = statusToUi(pr.approvalStatus || pr.status);
+  const isApproved = uiStatus === "approved";
+  const isRejected = uiStatus === "rejected";
+  return {
+    id: pr.requestNumber || `PR-${pr.id}`,
+    numericId: pr.id,
+    requester: pr.requesterName || "Team Member",
+    email: "",
+    role: "",
+    empId: "",
+    dept: pr.departmentName || "",
+    costCenter: pr.costCenterName || "",
+    product: productName,
+    category: firstLine?.productName ? "Catalogue Item" : "General",
+    vendor: "",
+    cost: formatINR(rawCost),
+    rawCost,
+    priority: priorityToUi(pr.priority),
+    status: uiStatus,
+    date: formatDateIN(pr.requestDate || pr.createdAt, { withTime: false }) || "",
+    time: "",
+    justification: pr.purpose || "",
+    projectCode: "",
+    attachments: [],
+    managerDecision: isApproved || isRejected
+      ? {
+          action: uiStatus,
+          approvedBy: "Approval Workflow",
+          decisionDate: pr.updatedAt ? formatDateIN(pr.updatedAt) : "",
+          approvedCost: formatINR(rawCost),
+          costCenterAllocated: pr.costCenterName || "—",
+          slaTargetDate: pr.requiredDate ? formatDateIN(pr.requiredDate, { withTime: false }) : "—",
+          notes: pr.remarks || (isApproved ? "Approved through the configured approval workflow." : "Rejected through the configured approval workflow."),
+          verificationHash: `HASH-${pr.id}-${uiStatus.toUpperCase().slice(0, 4)}`,
+        }
+      : null,
+  };
+};
 
 const TeamRequisitions = ({ onTrackForm }) => {
-  const [teamRequests, setTeamRequests] = useState(() => getStoredRequests());
+  const [teamRequests, setTeamRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [selectedPriority, setSelectedPriority] = useState("all");
   const [viewReq, setViewReq] = useState(null);
 
-  useEffect(() => {
-    const load = async () => {
-      const data = await fetchTeamRequisitions(1);
-      if (data && data.length) {
-        setTeamRequests(getStoredRequests());
-      }
-    };
-    load();
-    const unsub = epsEventBus.subscribe(() => {
-      setTeamRequests(getStoredRequests());
-    });
-    return unsub;
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const me = await apiGet("/api/auth/me").catch(() => null);
+      const deptId = me?.departmentId;
+      const query = deptId
+        ? `?departmentId=${deptId}&page=0&size=200&sort=createdAt&direction=desc`
+        : "?page=0&size=200&sort=createdAt&direction=desc";
+      const page = await apiGet(`/api/purchase-requests${query}`);
+      const prs = page?.content || [];
+
+      const withLines = await Promise.all(
+        prs.map(async (pr) => {
+          const linePage = await apiGet(`/api/purchase-request-lines?purchaseRequestId=${pr.id}&page=0&size=20`)
+            .catch(() => null);
+          return mapPrToUi(pr, linePage?.content || []);
+        })
+      );
+      setTeamRequests(withLines);
+    } catch (err) {
+      setError(err.message || "Unable to load team requisitions.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   const filtered = teamRequests.filter((req) => {
+    const q = searchTerm.toLowerCase();
     const matchesSearch =
-      req.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (req.requester && req.requester.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      req.product.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus =
-      selectedStatus === "all" || req.status === selectedStatus;
+      !q ||
+      (req.id && req.id.toLowerCase().includes(q)) ||
+      (req.requester && req.requester.toLowerCase().includes(q)) ||
+      (req.product && req.product.toLowerCase().includes(q));
+    const matchesStatus = selectedStatus === "all" || req.status === selectedStatus;
     const matchesPriority =
       selectedPriority === "all" ||
-      req.priority.toLowerCase() === selectedPriority.toLowerCase();
+      (req.priority && req.priority.toLowerCase() === selectedPriority.toLowerCase());
 
     return matchesSearch && matchesStatus && matchesPriority;
   });
@@ -267,7 +144,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
             <FileText color="#f8b400" /> Department Requisitions Directory
           </h1>
           <p className="dm-page-subtitle">
-            Complete audit trail of all purchase requisitions submitted across Engineering & IT.
+            Live purchase requisitions submitted within your department, straight from the database.
           </p>
         </div>
 
@@ -278,6 +155,14 @@ const TeamRequisitions = ({ onTrackForm }) => {
           <Download size={16} /> Export Requisitions CSV
         </button>
       </div>
+
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "14px 18px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: 600 }}>
+          <WifiOff size={18} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button onClick={loadData} style={{ background: "#111", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Retry</button>
+        </div>
+      )}
 
       {/* Filter Bar */}
       <div className="dm-card" style={{ marginBottom: "24px", padding: "18px 24px" }}>
@@ -355,80 +240,93 @@ const TeamRequisitions = ({ onTrackForm }) => {
 
       {/* Main Table */}
       <div className="dm-card">
-        <div className="dm-table-container">
-          <table className="dm-table">
-            <thead>
-              <tr>
-                <th>Request ID</th>
-                <th>Employee / Role</th>
-                <th>Product Name</th>
-                <th>Category</th>
-                <th>Est. Cost</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Submitted Date</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((req) => (
-                <tr key={req.id}>
-                  <td style={{ fontWeight: "700", color: "#d97706" }}>{req.id}</td>
-                  <td>
-                    <div style={{ display: "flex", flexDirection: "column" }}>
-                      <span style={{ fontWeight: "700", color: "#111111" }}>{req.requester}</span>
-                      <span style={{ fontSize: "11px", color: "#666666" }}>{req.role}</span>
-                    </div>
-                  </td>
-                  <td style={{ fontWeight: "600", color: "#111111" }}>{req.product}</td>
-                  <td style={{ color: "#555555" }}>{req.category}</td>
-                  <td style={{ fontWeight: "800", color: "#111111" }}>{req.cost}</td>
-                  <td>
-                    <span className={`emp-priority ${req.priority.toLowerCase()}`}>
-                      {req.priority}
-                    </span>
-                  </td>
-                  <td>
-                    <span className={`dm-badge ${req.status}`}>
-                      <span className="dm-badge-dot"></span>
-                      {req.status}
-                    </span>
-                  </td>
-                  <td style={{ color: "#666666", fontSize: "13px" }}>{req.date}</td>
-                  <td style={{ textAlign: "right" }}>
-                    <div style={{ display: "inline-flex", gap: "6px" }}>
-                      {req.status === "approved" && onTrackForm && (
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "60px 0", color: "#888", fontWeight: 600 }}>
+            <Loader2 size={22} className="login-spin" /> Loading requisitions from the database...
+          </div>
+        ) : (
+          <div className="dm-table-container">
+            <table className="dm-table">
+              <thead>
+                <tr>
+                  <th>Request ID</th>
+                  <th>Employee / Role</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Est. Cost</th>
+                  <th>Priority</th>
+                  <th>Status</th>
+                  <th>Submitted Date</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.length === 0 && !loading && (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: "center", padding: "40px", color: "#888" }}>
+                      No requisitions found.
+                    </td>
+                  </tr>
+                )}
+                {filtered.map((req) => (
+                  <tr key={req.id}>
+                    <td style={{ fontWeight: "700", color: "#d97706" }}>{req.id}</td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: "700", color: "#111111" }}>{req.requester}</span>
+                        <span style={{ fontSize: "11px", color: "#666666" }}>{req.dept || "Team Member"}</span>
+                      </div>
+                    </td>
+                    <td style={{ fontWeight: "600", color: "#111111" }}>{req.product}</td>
+                    <td style={{ color: "#555555" }}>{req.category}</td>
+                    <td style={{ fontWeight: "800", color: "#111111" }}>{req.cost}</td>
+                    <td>
+                      <span className={`emp-priority ${(req.priority || "medium").toLowerCase()}`}>
+                        {req.priority}
+                      </span>
+                    </td>
+                    <td>
+                      <span className={`dm-badge ${req.status}`}>
+                        <span className="dm-badge-dot"></span>
+                        {req.status}
+                      </span>
+                    </td>
+                    <td style={{ color: "#666666", fontSize: "13px" }}>{req.date}</td>
+                    <td style={{ textAlign: "right" }}>
+                      <div style={{ display: "inline-flex", gap: "6px" }}>
+                        {req.status === "approved" && onTrackForm && (
+                          <button
+                            className="dm-sidebar-toggle"
+                            style={{
+                              width: "32px",
+                              height: "32px",
+                              display: "inline-flex",
+                              borderColor: "#059669",
+                              color: "#059669",
+                              background: "rgba(5, 150, 105, 0.08)",
+                            }}
+                            title="Track Approved Form Status"
+                            onClick={() => onTrackForm(req.numericId || req.id)}
+                          >
+                            <Clock size={15} />
+                          </button>
+                        )}
                         <button
                           className="dm-sidebar-toggle"
-                          style={{
-                            width: "32px",
-                            height: "32px",
-                            display: "inline-flex",
-                            borderColor: "#059669",
-                            color: "#059669",
-                            background: "rgba(5, 150, 105, 0.08)",
-                          }}
-                          title="Track Approved Form Status"
-                          onClick={() => onTrackForm(req.id)}
+                          style={{ width: "32px", height: "32px", display: "inline-flex" }}
+                          title="View Full Requisition & Decision Form"
+                          onClick={() => setViewReq(req)}
                         >
-                          <Clock size={15} />
+                          <Eye size={15} />
                         </button>
-                      )}
-                      <button
-                        className="dm-sidebar-toggle"
-                        style={{ width: "32px", height: "32px", display: "inline-flex" }}
-                        title="View Full Requisition & Decision Form"
-                        onClick={() => setViewReq(req)}
-                      >
-                        <Eye size={15} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* REACT PORTAL: FULL SCREEN ENTIRE FORM & MANAGER FILLED VIEW */}
@@ -512,7 +410,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                     className="dm-btn-primary-sm"
                     style={{ background: "#059669", border: "none", color: "#ffffff" }}
                     onClick={() => {
-                      const reqId = viewReq.id;
+                      const reqId = viewReq.numericId || viewReq.id;
                       setViewReq(null);
                       onTrackForm(reqId);
                     }}
@@ -554,29 +452,21 @@ const TeamRequisitions = ({ onTrackForm }) => {
                         <p style={{ color: "#111111", fontWeight: "700", fontSize: "15px" }}>{viewReq.requester}</p>
                       </div>
                       <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Job Role / Title:</span>
-                        <p style={{ color: "#111111", fontWeight: "700" }}>{viewReq.role}</p>
+                        <span style={{ color: "#666666", fontSize: "12px" }}>Department:</span>
+                        <p style={{ color: "#111111", fontWeight: "700" }}>{viewReq.dept || "—"}</p>
                       </div>
                       <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Employee Badge ID:</span>
-                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.empId || "EMP-90482"}</p>
+                        <span style={{ color: "#666666", fontSize: "12px" }}>Cost Center:</span>
+                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.costCenter || "—"}</p>
                       </div>
                       <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Official Email:</span>
-                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.email || `${viewReq.requester.toLowerCase().replace(" ", ".")}@enterprise.com`}</p>
-                      </div>
-                      <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Department & Cost Center:</span>
-                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.dept || "Engineering & IT"} ({viewReq.costCenter || "CC-8902-ENG"})</p>
-                      </div>
-                      <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Submission Date & Raised Time:</span>
-                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.date} at {viewReq.time || "10:00 AM EST"}</p>
+                        <span style={{ color: "#666666", fontSize: "12px" }}>Submitted Date:</span>
+                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.date}</p>
                       </div>
                       <div>
                         <span style={{ color: "#666666", fontSize: "12px" }}>Priority Urgency:</span>
                         <p style={{ marginTop: "2px" }}>
-                          <span className={`emp-priority ${viewReq.priority.toLowerCase()}`}>
+                          <span className={`emp-priority ${(viewReq.priority || "medium").toLowerCase()}`}>
                             {viewReq.priority} Priority
                           </span>
                         </p>
@@ -609,16 +499,8 @@ const TeamRequisitions = ({ onTrackForm }) => {
                         <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.category}</p>
                       </div>
                       <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Preferred Vendor:</span>
-                        <p style={{ color: "#111111", fontWeight: "700" }}>{viewReq.vendor || "Apple Business Direct"}</p>
-                      </div>
-                      <div>
                         <span style={{ color: "#666666", fontSize: "12px" }}>Total Estimated Cost:</span>
                         <p style={{ color: "#059669", fontWeight: "800", fontSize: "18px" }}>{viewReq.cost}</p>
-                      </div>
-                      <div>
-                        <span style={{ color: "#666666", fontSize: "12px" }}>Project Code:</span>
-                        <p style={{ color: "#111111", fontWeight: "600" }}>{viewReq.projectCode || "PRJ-2026-FE-ARCH"}</p>
                       </div>
                     </div>
                   </div>
@@ -626,7 +508,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                   {/* Business Justification Card */}
                   <div className="dm-card">
                     <h4 style={{ fontSize: "16px", color: "#d97706", fontWeight: "800", marginBottom: "10px", display: "flex", alignItems: "center", gap: "8px" }}>
-                      <Building size={18} /> 3. Employee Business Justification
+                      <Building size={18} /> 3. Business Justification
                     </h4>
                     <div style={{ background: "#f8f9fb", padding: "16px", borderRadius: "10px", border: "1px solid #ececec" }}>
                       <p style={{ fontSize: "14px", color: "#333333", lineHeight: "1.6", fontStyle: "italic" }}>
@@ -638,10 +520,13 @@ const TeamRequisitions = ({ onTrackForm }) => {
                   {/* Attached Vendor Documents */}
                   <div className="dm-card">
                     <h4 style={{ fontSize: "16px", color: "#d97706", fontWeight: "800", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                      <Paperclip size={18} /> 4. Attached Vendor Quotation PDFs
+                      <Paperclip size={18} /> 4. Attached Documents
                     </h4>
                     <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                      {(viewReq.attachments || ["Vendor_Quote_Approved.pdf"]).map((att, idx) => (
+                      {(viewReq.attachments || []).length === 0 && (
+                        <p style={{ fontSize: "13px", color: "#666" }}>No documents attached to this requisition.</p>
+                      )}
+                      {(viewReq.attachments || []).map((att, idx) => (
                         <div
                           key={idx}
                           style={{
@@ -660,7 +545,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                           <button
                             className="dm-btn-primary-sm"
                             style={{ padding: "6px 14px", fontSize: "12px" }}
-                            onClick={() => alert(`Downloading vendor quotation: ${att}`)}
+                            onClick={() => alert(`Downloading document: ${att}`)}
                           >
                             Download PDF
                           </button>
@@ -675,13 +560,13 @@ const TeamRequisitions = ({ onTrackForm }) => {
                   <div className="dm-card dm-card-gold-glow" style={{ borderLeft: viewReq.status === "approved" ? "5px solid #059669" : viewReq.status === "rejected" ? "5px solid #dc2626" : "5px solid #f8b400" }}>
                     <div style={{ borderBottom: "1px solid #ececec", paddingBottom: "16px", marginBottom: "20px" }}>
                       <span style={{ fontSize: "11px", color: viewReq.status === "approved" ? "#059669" : viewReq.status === "rejected" ? "#dc2626" : "#d97706", fontWeight: "800", letterSpacing: "0.5px" }}>
-                        DEPARTMENT MANAGER DECISION & SIGN-OFF RECORD
+                        APPROVAL STATUS
                       </span>
                       <h3 style={{ fontSize: "20px", color: "#111111", fontWeight: "800", marginTop: "4px" }}>
-                        Manager Authorization Section
+                        Workflow Decision Record
                       </h3>
                       <p style={{ fontSize: "13px", color: "#555555" }}>
-                        Official operational sign-off and cost center clearance details.
+                        Approval state as recorded by the configured approval workflow.
                       </p>
                     </div>
 
@@ -710,7 +595,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                               DECISION RESULT
                             </span>
                             <h4 style={{ fontSize: "16px", fontWeight: "800", color: "#111111", margin: "2px 0 0" }}>
-                              {viewReq.status === "approved" ? "APPROVED & AUTHORIZED" : "REJECTED & RETURNED"}
+                              {viewReq.status === "approved" ? "APPROVED" : "REJECTED"}
                             </h4>
                           </div>
                         </div>
@@ -718,14 +603,14 @@ const TeamRequisitions = ({ onTrackForm }) => {
                         {/* Manager Filled Fields Grid */}
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", fontSize: "13px" }}>
                           <div style={{ gridColumn: "span 2" }}>
-                            <span style={{ color: "#666666", fontSize: "11px", textTransform: "uppercase" }}>Sign-off Officer:</span>
+                            <span style={{ color: "#666666", fontSize: "11px", textTransform: "uppercase" }}>Decision By:</span>
                             <p style={{ fontWeight: "800", color: "#111111", fontSize: "14.5px" }}>
                               {viewReq.managerDecision.approvedBy}
                             </p>
                           </div>
                           <div>
                             <span style={{ color: "#666666", fontSize: "11px", textTransform: "uppercase" }}>Decision Timestamp:</span>
-                            <p style={{ fontWeight: "700", color: "#111111" }}>{viewReq.managerDecision.decisionDate}</p>
+                            <p style={{ fontWeight: "700", color: "#111111" }}>{viewReq.managerDecision.decisionDate || "—"}</p>
                           </div>
                           <div>
                             <span style={{ color: "#666666", fontSize: "11px", textTransform: "uppercase" }}>Approved Amount:</span>
@@ -752,7 +637,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                         {/* Manager Notes */}
                         <div>
                           <span style={{ color: "#666666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>
-                            Manager Remarks & Approval Instructions:
+                            Remarks:
                           </span>
                           <div style={{ background: "#f8f9fb", padding: "14px", borderRadius: "10px", border: "1px solid #ececec", marginTop: "6px" }}>
                             <p style={{ fontSize: "13.5px", color: "#222222", lineHeight: "1.5" }}>
@@ -775,7 +660,7 @@ const TeamRequisitions = ({ onTrackForm }) => {
                               marginTop: "8px",
                             }}
                             onClick={() => {
-                              const reqId = viewReq.id;
+                              const reqId = viewReq.numericId || viewReq.id;
                               setViewReq(null);
                               onTrackForm(reqId);
                             }}
@@ -804,13 +689,13 @@ const TeamRequisitions = ({ onTrackForm }) => {
                               DECISION STATUS
                             </span>
                             <h4 style={{ fontSize: "15px", fontWeight: "800", color: "#111111", margin: "2px 0 0" }}>
-                              PENDING MANAGER REVIEW
+                              PENDING REVIEW
                             </h4>
                           </div>
                         </div>
 
                         <p style={{ fontSize: "13px", color: "#555555", lineHeight: "1.5" }}>
-                          This requisition has been submitted by employee <strong>{viewReq.requester}</strong> and is currently waiting for manager review and sign-off in your Approval Queue.
+                          This requisition has been submitted by employee <strong>{viewReq.requester}</strong> and is currently waiting for review and sign-off in your Approval Queue.
                         </p>
 
                         <div style={{ background: "#f8f9fb", padding: "14px", borderRadius: "10px", border: "1px solid #ececec", fontSize: "12.5px", color: "#666" }}>

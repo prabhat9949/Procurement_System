@@ -5,6 +5,8 @@ import com.procurement.dashboard.dto.response.ChartResponse;
 import com.procurement.dashboard.dto.response.DashboardResponse;
 import com.procurement.dashboard.dto.response.KpiResponse;
 import com.procurement.dashboard.repository.DashboardRepository;
+import com.procurement.common.exception.ForbiddenException;
+import com.procurement.user.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,8 +20,12 @@ import java.util.Map;
 @Transactional(readOnly = true)
 public class DashboardServiceImpl implements DashboardService {
     private final DashboardRepository repository;
+    private final UserRepository userRepository;
 
-    public DashboardServiceImpl(DashboardRepository repository) { this.repository = repository; }
+    public DashboardServiceImpl(DashboardRepository repository, UserRepository userRepository) {
+        this.repository = repository;
+        this.userRepository = userRepository;
+    }
 
     @Override
     public DashboardResponse admin(DashboardFilter filter) {
@@ -97,10 +103,46 @@ public class DashboardServiceImpl implements DashboardService {
         List<KpiResponse> kpis = new ArrayList<>();
         addCount(kpis, "TOTAL_EMPLOYEES", "Total Employees", "select count(*) from employees", Map.of());
         addCount(kpis, "ACTIVE_EMPLOYEES", "Active Employees", "select count(*) from employees where active_flag = true", Map.of());
+        addCount(kpis, "INACTIVE_EMPLOYEES", "Inactive Employees", "select count(*) from employees where active_flag = false", Map.of());
         addCount(kpis, "NEW_EMPLOYEES", "New Employees", "select count(*) from employees where created_at >= date_format(curdate(), '%Y-%m-01')", Map.of());
+        addCount(kpis, "WITH_USER_ACCOUNT", "With User Account", "select count(*) from users", Map.of());
+        addCount(kpis, "WITHOUT_USER_ACCOUNT", "Without User Account", "select count(*) from employees e left join users u on u.employee_id = e.employee_id where u.user_id is null", Map.of());
         addCount(kpis, "WITHOUT_MANAGER", "Without Manager", "select count(*) from employees where manager_id is null", Map.of());
+        addCount(kpis, "DESIGNATIONS", "Designations (Roles)", "select count(distinct role_id) from employees", Map.of());
         addCount(kpis, "DEPARTMENTS", "Departments", "select count(*) from departments where active_flag = true", Map.of());
-        return response("hr", kpis, List.of(chart("pr", filter)), filter);
+        addCount(kpis, "COST_CENTERS", "Cost Centers", "select count(*) from cost_centers where active_flag = true", Map.of());
+        return response("hr", kpis, List.of(
+                hrChart("EMPLOYEES_BY_DEPARTMENT", "Employees by Department", "select d.department_name, count(*) from employees e join departments d on d.department_id = e.department_id group by d.department_name order by 2 desc"),
+                hrChart("EMPLOYEES_BY_DESIGNATION", "Employees by Designation", "select r.role_name, count(*) from employees e join roles r on r.role_id = e.role_id group by r.role_name order by 2 desc"),
+                hrChart("EMPLOYEES_BY_STATUS", "Active vs Inactive", "select case when e.active_flag = true then 'Active' else 'Inactive' end, count(*) from employees e group by case when e.active_flag = true then 'Active' else 'Inactive' end order by 2 desc"),
+                hrChart("EMPLOYEES_BY_MANAGER", "Employees by Manager", "select coalesce(concat(m.first_name, ' ', m.last_name), 'No Manager'), count(*) from employees e left join employees m on m.employee_id = e.manager_id group by coalesce(concat(m.first_name, ' ', m.last_name), 'No Manager') order by 2 desc"),
+                hrChart("EMPLOYEE_ACCOUNT_STATUS", "Employee Account Status", "select case when u.user_id is null then 'No Account' when u.enabled = false then 'Disabled' when u.account_locked = true then 'Locked' else 'Active' end, count(*) from employees e left join users u on u.employee_id = e.employee_id group by case when u.user_id is null then 'No Account' when u.enabled = false then 'Disabled' when u.account_locked = true then 'Locked' else 'Active' end order by 2 desc")
+        ), filter);
+    }
+
+    @Override
+    public DashboardResponse employee(DashboardFilter filter, String username) {
+        Long employeeId = userRepository.findByUsername(username)
+                .map(user -> user.getEmployee() == null ? null : user.getEmployee().getId())
+                .orElseThrow(() -> new ForbiddenException("Authenticated user is not linked to an employee"));
+        Map<String, Object> emp = Map.of("empId", employeeId);
+        String scope = " requester_id = :empId";
+        List<KpiResponse> kpis = new ArrayList<>();
+        addCount(kpis, "TOTAL_REQUESTS", "Total Requests", "select count(*) from purchase_requests where" + scope, emp);
+        addCount(kpis, "DRAFTS", "Draft", "select count(*) from purchase_requests where" + scope + " and status = 'DRAFT'", emp);
+        addCount(kpis, "PENDING", "Pending Approval", "select count(*) from purchase_requests where" + scope + " and status in ('SUBMITTED','UNDER_REVIEW')", emp);
+        addCount(kpis, "APPROVED", "Approved", "select count(*) from purchase_requests where" + scope + " and status = 'APPROVED'", emp);
+        addCount(kpis, "REJECTED", "Rejected", "select count(*) from purchase_requests where" + scope + " and status = 'REJECTED'", emp);
+        addCount(kpis, "RETURNED", "Returned for Correction", "select count(*) from purchase_requests where" + scope + " and approval_status = 'RETURNED'", emp);
+        addCount(kpis, "CANCELLED", "Cancelled", "select count(*) from purchase_requests where" + scope + " and status = 'CANCELLED'", emp);
+        addCount(kpis, "RFQ_CREATED", "In Sourcing", "select count(*) from purchase_requests where" + scope + " and status = 'RFQ_CREATED'", emp);
+        addAmount(kpis, "TOTAL_VALUE", "Estimated Request Value", "select coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " and status <> 'CANCELLED'", emp);
+        addAmount(kpis, "APPROVED_VALUE", "Approved Value", "select coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " and status = 'APPROVED'", emp);
+        return response("employee", kpis, List.of(
+                hrChart("REQUESTS_BY_STATUS", "Requests by Status", "select status, count(*) from purchase_requests where" + scope + " group by status order by 2 desc", emp),
+                hrChart("REQUESTS_BY_MONTH", "Monthly Requests", "select date_format(request_date, '%Y-%m'), count(*) from purchase_requests where" + scope + " group by date_format(request_date, '%Y-%m') order by 1", emp),
+                hrChart("REQUEST_VALUE_BY_MONTH", "Monthly Request Value", "select date_format(request_date, '%Y-%m'), coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " group by date_format(request_date, '%Y-%m') order by 1", emp)
+        ), filter);
     }
 
     @Override
@@ -145,6 +187,8 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     private ChartResponse chart(String code, String label, String sql, Map<String, Object> params) { return new ChartResponse(code, label, repository.chart(sql, params)); }
+    private ChartResponse hrChart(String code, String label, String sql) { return chart(code, label, sql, Map.of()); }
+    private ChartResponse hrChart(String code, String label, String sql, Map<String, Object> params) { return chart(code, label, sql, params); }
     private DashboardResponse response(String name, List<KpiResponse> kpis, List<ChartResponse> charts, DashboardFilter filter) { return new DashboardResponse(name, LocalDateTime.now(), kpis, charts, repository.recentActivities(filter, 20)); }
     private void addCount(List<KpiResponse> kpis, String code, String label, String sql, Map<String, Object> params) { kpis.add(new KpiResponse(code, label, repository.count(sql, params), null)); }
     private void addAmount(List<KpiResponse> kpis, String code, String label, String sql, Map<String, Object> params) { kpis.add(new KpiResponse(code, label, null, repository.amount(sql, params))); }

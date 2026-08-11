@@ -2,6 +2,7 @@ package com.procurement.user.entity;
 
 import com.procurement.employee.entity.Employee;
 import com.procurement.role.entity.Role;
+import com.procurement.vendor.entity.Vendor;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -43,6 +44,10 @@ public class User {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "vendor_id")
+    private Vendor vendor;
 
     @Builder.Default
     @Column(name = "enabled", nullable = false)

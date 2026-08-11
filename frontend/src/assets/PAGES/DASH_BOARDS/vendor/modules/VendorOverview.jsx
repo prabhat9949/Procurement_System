@@ -19,9 +19,9 @@ const VendorOverview = ({ onNavigate }) => {
         { label: "View RFQs", icon: Send, primary: true, onClick: () => onNavigate("rfqs") },
       ]}
       endpoints={{
-        rfqs: "/api/rfqs?page=0&size=30&sort=createdAt&direction=desc",
-        quotes: "/api/vendor-quotations?page=0&size=30&sort=createdAt&direction=desc",
-        pos: "/api/purchase-orders?page=0&size=30&sort=orderDate&direction=desc",
+        rfqs: "/api/vendor/my/rfqs?page=0&size=30",
+        quotes: "/api/vendor/my/quotations?page=0&size=30&sort=createdAt&direction=desc",
+        pos: "/api/vendor/my/purchase-orders?page=0&size=30&sort=orderDate&direction=desc",
         poTrend: "/api/dashboard/charts/po",
       }}
       kpiFn={(data) => {

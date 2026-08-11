@@ -180,26 +180,39 @@ public class DataInitializerConfig {
                     "Inventory, goods receipt, and stock movement operations");
 
             // ==========================
-            // 3. Seed Cost Centers
+            // 3. Seed Cost Centers — every cost centre gets ₹10,00,000 (10 lakh).
             // ==========================
             CostCenter admCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "ADM-001", "Corporate Administration",
-                    adminDept, new BigDecimal("1500000"));
+                    adminDept, new BigDecimal("1000000"));
             CostCenter procCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "PROC-001", "Strategic Procurement",
-                    procurementDept, new BigDecimal("12000000"));
+                    procurementDept, new BigDecimal("1000000"));
             CostCenter finCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "FIN-001", "Finance Operations",
-                    financeDept, new BigDecimal("3500000"));
+                    financeDept, new BigDecimal("1000000"));
             CostCenter itCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "IT-001", "Infrastructure & Software",
-                    itDept, new BigDecimal("5000000"));
+                    itDept, new BigDecimal("1000000"));
             CostCenter hrCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "HR-001", "HR Operations",
-                    hrDept, new BigDecimal("2000000"));
+                    hrDept, new BigDecimal("1000000"));
             CostCenter warehouseCostCenter = createCostCenterIfNotExists(
                     costCenterRepository, "WH-001", "Warehouse Operations",
-                    warehouseDept, new BigDecimal("7000000"));
+                    warehouseDept, new BigDecimal("1000000"));
+
+            // Sweep: force every existing cost centre in the live database to
+            // the 10-lakh budget so the requirement holds on already-seeded data.
+            BigDecimal TEN_LAKH = new BigDecimal("1000000");
+            for (CostCenter cc : costCenterRepository.findAll()) {
+                BigDecimal used = cc.getUsedBudget() == null ? BigDecimal.ZERO : cc.getUsedBudget();
+                if (!TEN_LAKH.equals(cc.getBudget())) {
+                    cc.setBudget(TEN_LAKH);
+                }
+                cc.setRemainingBudget(TEN_LAKH.subtract(used));
+                costCenterRepository.save(cc);
+            }
+            log.info("All cost centres enforced to a ₹10,00,000 (10 lakh) budget.");
 
             // ==========================
             // 4. Seed Employees
@@ -281,6 +294,25 @@ public class DataInitializerConfig {
                     "deepak.malhotra@enterprise.com", "9876543227", adminDept, admCostCenter, auditorRole);
 
             // ==========================
+            // 4.16 Seed Reporting Relationships (top-down org chart; only applied
+            //     when the employee has no manager yet, so HR changes made through
+            //     the panel are preserved across restarts)
+            // ==========================
+            assignManagerIfMissing(employeeRepository, seniorManager, head);          // Senior Manager reports to Head
+            assignManagerIfMissing(employeeRepository, hrEmployee, head);             // HR Manager reports to Head
+            assignManagerIfMissing(employeeRepository, auditor, head);                // Auditor reports to Head
+            assignManagerIfMissing(employeeRepository, procurementOfficer, head);     // Procurement reports to Head
+            assignManagerIfMissing(employeeRepository, deptManager, seniorManager);   // Department Manager reports to Senior Manager
+            assignManagerIfMissing(employeeRepository, financeEmployee, seniorManager);   // Finance reports to Senior Manager
+            assignManagerIfMissing(employeeRepository, warehouseEmployee, seniorManager); // Warehouse reports to Senior Manager
+            assignManagerIfMissing(employeeRepository, generalEmployee, deptManager); // Employee reports to Department Manager
+            assignManagerIfMissing(employeeRepository, employee2, deptManager);       // Employee 2 reports to Department Manager
+            assignManagerIfMissing(employeeRepository, equipment, procurementOfficer);    // Equipment Team reports to Procurement
+            assignManagerIfMissing(employeeRepository, software, procurementOfficer);     // Software Team reports to Procurement
+            assignManagerIfMissing(employeeRepository, facilities, procurementOfficer);    // Facilities Team reports to Procurement
+            log.info("Reporting relationships seeded (manager assigned only when missing).");
+
+            // ==========================
             // 5. Seed Users (development login matrix)
             // ==========================
             createAdminUserIfNotExists(userRepository, passwordEncoder, adminEmployee, superAdminRole);
@@ -353,6 +385,21 @@ public class DataInitializerConfig {
 
     private void logMatrix(Logger log, String role, String username, String password) {
         log.info(" - {} : {} / {}", role, username, password);
+    }
+
+    /** Sets employee.manager = manager, but only when the employee has no manager yet. */
+    private void assignManagerIfMissing(
+            EmployeeRepository employeeRepository,
+            Employee employee,
+            Employee manager
+    ) {
+        if (employee == null || manager == null || employee.getId() == null) {
+            return;
+        }
+        if (employee.getManager() == null && !employee.getId().equals(manager.getId())) {
+            employee.setManager(manager);
+            employeeRepository.save(employee);
+        }
     }
 
     private Role createRoleIfNotExists(

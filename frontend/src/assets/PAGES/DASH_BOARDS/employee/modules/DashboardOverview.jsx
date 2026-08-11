@@ -1,55 +1,102 @@
 import React from "react";
-import { FileText, Clock, CheckCircle2, XCircle, Edit3, PlusCircle, IndianRupee, UserIcon } from "lucide-react";
+import { FileText, Clock, CheckCircle2, XCircle, Edit3, PlusCircle, IndianRupee, UserIcon, RotateCcw, Send } from "lucide-react";
 import LiveRoleOverview from "../../shared_ui/LiveRoleOverview";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 
-const DashboardOverview = ({ onNavigate }) => {
-  const displayName = localStorage.getItem("eps_display_name") || "there";
+const STATUS_STYLE = {
+  DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
+  SUBMITTED: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
+  UNDER_REVIEW: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
+  APPROVED: { bg: "rgba(5,150,105,.12)", color: "#059669" },
+  REJECTED: { bg: "rgba(220,38,38,.12)", color: "#dc2626" },
+  CANCELLED: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
+  RFQ_CREATED: { bg: "rgba(37,99,235,.12)", color: "#2563eb" },
+};
 
+const DashboardOverview = ({ onNavigate }) => {
   return (
     <LiveRoleOverview
       header={{
-        title: `Welcome back, ${displayName}`,
-        subtitle: "Create and track your purchase requests — every status below is live from the database.",
+        title: "Welcome back to your Procurement Dashboard",
+        subtitle:
+          "Create and track your purchase requests — every number below is aggregated live from the database for your account.",
         badge: "EMPLOYEE PORTAL",
         icon: UserIcon,
         accent: "#2563eb",
       }}
       actions={[
-        { label: "Create New Request", icon: PlusCircle, primary: true, onClick: () => onNavigate("create-request") },
+        {
+          label: "Create New Request",
+          icon: PlusCircle,
+          primary: true,
+          onClick: () => onNavigate("create-request"),
+        },
+        {
+          label: "My Requests",
+          icon: FileText,
+          onClick: () => onNavigate("my-requests"),
+        },
       ]}
       endpoints={{
-        prs: "/api/purchase-requests?page=0&size=50",
-        prTrend: "/api/dashboard/charts/pr",
+        emp: "/api/dashboard/employee",
+        recent: "/api/purchase-requests?page=0&size=8&sort=createdAt&direction=desc",
       }}
       kpiFn={(data) => {
-        const rows = data.prs?.content || [];
-        const count = (status) => rows.filter((r) => r.status === status).length;
+        const kpis = data.emp?.kpis || [];
+        const kpi = (code) => kpis.find((item) => item.code === code);
+        const count = (code) => kpi(code)?.count ?? 0;
+        const amount = (code) => kpi(code)?.amount;
         return [
-          { label: "Total Requests", value: rows.length, icon: FileText, color: "#2563eb" },
-          { label: "Draft", value: count("DRAFT"), icon: Edit3, color: "#7c3aed" },
-          { label: "Pending / Under Review", value: count("SUBMITTED") + count("UNDER_REVIEW"), icon: Clock, color: "#d97706" },
+          { label: "Total Requests", value: count("TOTAL_REQUESTS"), icon: FileText, color: "#2563eb" },
+          { label: "Draft", value: count("DRAFTS"), icon: Edit3, color: "#7c3aed" },
+          { label: "Pending Approval", value: count("PENDING"), icon: Clock, color: "#d97706" },
           { label: "Approved", value: count("APPROVED"), icon: CheckCircle2, color: "#059669" },
           { label: "Rejected", value: count("REJECTED"), icon: XCircle, color: "#dc2626" },
+          { label: "Returned", value: count("RETURNED"), icon: RotateCcw, color: "#f59e0b" },
+          { label: "Cancelled", value: count("CANCELLED"), icon: XCircle, color: "#64748b" },
+          { label: "In Sourcing", value: count("RFQ_CREATED"), icon: Send, color: "#2563eb" },
+          { label: "Request Value", value: amount("TOTAL_VALUE") != null ? formatINR(amount("TOTAL_VALUE")) : "—", icon: IndianRupee, color: "#0d9488" },
+          { label: "Approved Value", value: amount("APPROVED_VALUE") != null ? formatINR(amount("APPROVED_VALUE")) : "—", icon: IndianRupee, color: "#059669" },
         ];
       }}
       charts={[
-        { key: "prTrend", label: "Purchase Request Trend", color: "#2563eb", type: "bar" },
+        { key: "emp", code: "REQUESTS_BY_STATUS", label: "Requests by Status", color: "#2563eb", type: "bar" },
+        { key: "emp", code: "REQUESTS_BY_MONTH", label: "Monthly Requests", color: "#7c3aed", type: "bar" },
+        { key: "emp", code: "REQUEST_VALUE_BY_MONTH", label: "Monthly Request Value", color: "#0d9488", type: "area" },
       ]}
       tables={[
         {
-          key: "prs",
-          title: "Recent Purchase Requests",
+          key: "recent",
+          title: "Recently Submitted Requests",
           emptyText: "No purchase requests yet. Create your first request to get started.",
-          maxRows: 10,
+          maxRows: 8,
           columns: [
-            { header: "Request No.", render: (r) => <strong style={{ color: "#2563eb" }}>{r.requestNumber}</strong> },
-            { header: "Purpose", render: (r) => <span style={{ fontWeight: 600 }}>{r.purpose}</span> },
-            { header: "Department", accessor: "departmentName" },
-            { header: "Amount", render: (r) => <strong>{formatINR(r.estimatedAmount)}</strong> },
-            { header: "Priority", render: (r) => <span className="lro-badge" style={{ background: "rgba(217,119,6,.12)", color: "#d97706" }}>{r.priority}</span> },
-            { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.status === "APPROVED" ? "rgba(5,150,105,.12)" : r.status === "REJECTED" ? "rgba(220,38,38,.12)" : r.status === "DRAFT" ? "rgba(100,116,139,.12)" : "rgba(217,119,6,.12)", color: r.status === "APPROVED" ? "#059669" : r.status === "REJECTED" ? "#dc2626" : r.status === "DRAFT" ? "#64748b" : "#d97706" }}>{r.status}</span> },
-            { header: "Created", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.createdAt)}</span> },
+            { header: "PR Number", render: (r) => <strong style={{ color: "#111" }}>{r.requestNumber}</strong> },
+            {
+              header: "Purpose",
+              render: (r) => (
+                <span style={{ display: "block", maxWidth: 300, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.purpose || "—"}
+                </span>
+              ),
+            },
+            {
+              header: "Amount",
+              align: "right",
+              render: (r) => <span style={{ fontWeight: 700, color: "#0f172a" }}>{formatINR(r.estimatedAmount)}</span>,
+            },
+            {
+              header: "Status",
+              render: (r) => {
+                const s = STATUS_STYLE[r.status] || STATUS_STYLE.DRAFT;
+                return (
+                  <span className="lro-badge" style={{ background: s.bg, color: s.color }}>
+                    {r.status === "UNDER_REVIEW" ? "Pending" : r.status.replace("_", " ")}
+                  </span>
+                );
+              },
+            },
+            { header: "Required By", render: (r) => formatDateIN(r.requiredDate, { withTime: false }) },
           ],
         },
       ]}

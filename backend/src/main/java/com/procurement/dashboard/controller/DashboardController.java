@@ -35,6 +35,9 @@ public class DashboardController {
     @GetMapping("/hr") @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     public DashboardResponse hr(DashboardFilter filter) { return dashboardService.hr(filter); }
 
+    @GetMapping("/employee") @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','EMPLOYEE')")
+    public DashboardResponse employee(DashboardFilter filter, Authentication authentication) { return dashboardService.employee(filter, authentication.getName()); }
+
     @GetMapping("/charts/spend") @PreAuthorize("isAuthenticated()") public ChartResponse spend(DashboardFilter filter) { return dashboardService.chart("spend", filter); }
     @GetMapping("/charts/pr") @PreAuthorize("isAuthenticated()") public ChartResponse purchaseRequests(DashboardFilter filter) { return dashboardService.chart("pr", filter); }
     @GetMapping("/charts/rfq") @PreAuthorize("isAuthenticated()") public ChartResponse rfqs(DashboardFilter filter) { return dashboardService.chart("rfq", filter); }
