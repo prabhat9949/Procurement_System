@@ -14,6 +14,8 @@ public interface NotificationService {
     NotificationResponse markRead(Long id);
     NotificationResponse archive(Long id);
     PageResponse<NotificationRecipientResponse> recipients(Long id, Pageable pageable);
+    PageResponse<MyNotificationResponse> myNotifications(Pageable pageable);
+    long myUnreadCount();
     NotificationTemplateResponse createTemplate(NotificationTemplateRequest request);
     PageResponse<NotificationTemplateResponse> templates(Pageable pageable);
     NotificationTemplateResponse updateTemplate(Long id, NotificationTemplateRequest request);

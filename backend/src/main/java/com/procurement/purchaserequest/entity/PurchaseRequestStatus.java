@@ -6,5 +6,6 @@ public enum PurchaseRequestStatus {
     UNDER_REVIEW,
     APPROVED,
     REJECTED,
+    CANCELLED,
     RFQ_CREATED
 }

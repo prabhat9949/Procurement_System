@@ -15,6 +15,9 @@ public interface EmployeeService {
 
     EmployeeResponse getById(Long id);
 
+    /** Resolve the employee record linked to the authenticated user. */
+    EmployeeResponse myProfile();
+
     EmployeeResponse update(Long id, EmployeeRequest request);
 
     void delete(Long id);

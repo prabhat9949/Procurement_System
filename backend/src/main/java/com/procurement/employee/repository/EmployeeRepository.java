@@ -24,4 +24,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>,
     boolean existsByPhone(String phone);
 
     Optional<Employee> findFirstByRoleIdAndActiveTrue(Long roleId);
+
+    long countByDepartmentId(Long departmentId);
+
+    long countByCostCenterId(Long costCenterId);
+
+    long countByActiveTrue();
+
+    long countByActiveFalse();
+
+    long countByManagerIdIsNull();
 }

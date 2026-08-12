@@ -3,6 +3,10 @@ package com.procurement.inventory.specification;
 import com.procurement.inventory.entity.Inventory;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public final class InventorySpecification {
 
     private InventorySpecification() {
@@ -11,13 +15,27 @@ public final class InventorySpecification {
     public static Specification<Inventory> search(String keyword, Long productId, Long warehouseId,
                                                   Long categoryId, String status, Boolean lowStock,
                                                   Boolean outOfStock) {
-        return Specification.where(keywordLike(keyword))
-                .and(equalsPath("product.id", productId))
-                .and(equalsPath("warehouse.id", warehouseId))
-                .and(equalsPath("product.category.id", categoryId))
-                .and(equalsPath("status", status))
-                .and(lowStock(lowStock))
-                .and(outOfStock(outOfStock));
+        List<Specification<Inventory>> parts = new ArrayList<>();
+        parts.add(keywordLike(keyword));
+        parts.add(equalsPath("product.id", productId));
+        parts.add(equalsPath("warehouse.id", warehouseId));
+        parts.add(equalsPath("product.category.id", categoryId));
+        parts.add(equalsPath("status", status));
+        parts.add(lowStock(lowStock));
+        parts.add(outOfStock(outOfStock));
+        return combine(parts);
+    }
+
+    private static <T> Specification<T> combine(List<Specification<T>> parts) {
+        parts.removeIf(Objects::isNull);
+        if (parts.isEmpty()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        Specification<T> spec = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            spec = spec.and(parts.get(i));
+        }
+        return spec;
     }
 
     private static Specification<Inventory> keywordLike(String keyword) {
