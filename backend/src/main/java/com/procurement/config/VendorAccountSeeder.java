@@ -29,12 +29,12 @@ import java.util.Optional;
  * and bid on RFQs. Runs after {@link DemoDataSeeder} (which creates the vendor
  * companies) and {@link DataInitializerConfig} (which creates the VENDOR role).
  *
- * Accounts:
+ * Accounts (one password per vendor, following the matrix pattern):
  *   vendor@123  / Vendor@123   -> Delhi Tech Solutions (VEN-2026-001)
  *   vendor2@123 / Vendor2@123  -> Mumbai Office Supplies (VEN-2026-002)
- *   vendor3@123 / Vendor@123   -> Bengaluru Software Distributors (VEN-2026-003)
- *   vendor4@123 / Vendor@123   -> Chennai Furniture Works (VEN-2026-004)
- *   vendor5@123 / Vendor@123   -> Pune Facility Services (VEN-2026-005)
+ *   vendor3@123 / Vendor3@123  -> Bengaluru Software Distributors (VEN-2026-003)
+ *   vendor4@123 / Vendor4@123  -> Chennai Furniture Works (VEN-2026-004)
+ *   vendor5@123 / Vendor5@123  -> Pune Facility Services (VEN-2026-005)
  *
  * Each vendor account is scoped via User.vendor so the portal only ever shows
  * that supplier's own RFQs, quotations and purchase orders.
@@ -47,6 +47,9 @@ public class VendorAccountSeeder {
 
     private static final String VENDOR_PASSWORD = "Vendor@123";
     private static final String VENDOR2_PASSWORD = "Vendor2@123";
+    private static final String VENDOR3_PASSWORD = "Vendor3@123";
+    private static final String VENDOR4_PASSWORD = "Vendor4@123";
+    private static final String VENDOR5_PASSWORD = "Vendor5@123";
 
     @Bean
     @org.springframework.core.annotation.Order(3)
@@ -81,8 +84,16 @@ public class VendorAccountSeeder {
                 Vendor vendor = vendors.get(i);
                 final int index = i;
                 String username = index == 0 ? "vendor@123" : "vendor" + (index + 1) + "@123";
-                // Demo account contract: vendor2@123 (Mumbai Office Supplies, VEN-2026-002) uses Vendor2@123.
-                String password = index == 1 ? VENDOR2_PASSWORD : VENDOR_PASSWORD;
+                // Demo account contract: one distinct password per vendor account.
+                String password;
+                switch (index) {
+                    case 0: password = VENDOR_PASSWORD; break;
+                    case 1: password = VENDOR2_PASSWORD; break;
+                    case 2: password = VENDOR3_PASSWORD; break;
+                    case 3: password = VENDOR4_PASSWORD; break;
+                    case 4: password = VENDOR5_PASSWORD; break;
+                    default: password = "Vendor" + (index + 1) + "@123"; break;
+                }
                 Optional<User> existing = userRepository.findByUsername(username);
                 if (existing.isPresent()) {
                     User user = existing.get();
@@ -134,8 +145,7 @@ public class VendorAccountSeeder {
                 log.info("Created vendor account '{}' for '{}'", username, vendor.getVendorName());
             }
 
-            log.info("Vendor portal accounts ready (vendor@123: {}, vendor2@123: {}, others: {}).",
-                    VENDOR_PASSWORD, VENDOR2_PASSWORD, VENDOR_PASSWORD);
+            log.info("Vendor portal accounts ready — one distinct password per vendor.");
         };
     }
 }

@@ -34,9 +34,11 @@ const ROLE_MAP = {
   AUDITOR: "auditor",
 };
 
-// Development-only helper so every role can be tested. These match the accounts seeded by
-// the backend DataInitializer (the simple role-based login matrix).
-const DEMO_ACCOUNTS = [
+// Development-only helper so every role can be tested.
+// The account list is loaded from GET /api/dev/accounts (database-backed) when the
+// backend is reachable; the static list below is only a last-resort fallback for
+// demo/offline scenarios so the panel never breaks.
+const FALLBACK_ACCOUNTS = [
   { role: "Admin", username: "admin@123", password: "Admin@123" },
   { role: "HR", username: "hr@123", password: "Hr@123" },
   { role: "Employee", username: "employee@123", password: "Employee@123" },
@@ -53,6 +55,12 @@ const DEMO_ACCOUNTS = [
   { role: "Vendor", username: "vendor@123", password: "Vendor@123" },
 ];
 
+const CATEGORY_ORDER = [
+  "ADMIN", "HR", "EMPLOYEES", "MANAGERS", "SENIOR MANAGERS", "HEAD",
+  "PROCUREMENT", "EQUIPMENT", "SOFTWARE", "FACILITIES", "WAREHOUSE",
+  "FINANCE", "AUDITOR", "VENDORS", "OTHER",
+];
+
 const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
 
 const Loginout = () => {
@@ -64,6 +72,70 @@ const Loginout = () => {
   const [remember, setRemember] = useState(Boolean(localStorage.getItem("eps_remember_username")));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Database-backed dev login panel.
+  const [devGroups, setDevGroups] = useState(null); // { CATEGORY: [accounts] }
+  const [devSearch, setDevSearch] = useState("");
+  const [devLoading, setDevLoading] = useState(false);
+
+  // Load dev accounts from the backend once (dev mode only).
+  React.useEffect(() => {
+    if (!SHOW_DEMO_ACCOUNTS || devGroups) return;
+    let cancelled = false;
+    setDevLoading(true);
+    apiFetch("/api/dev/accounts", { auth: false })
+      .then((groups) => {
+        if (!cancelled) setDevGroups(groups || {});
+      })
+      .catch(() => {
+        // Backend unavailable: fall back to the static matrix so the panel still works.
+        if (!cancelled) {
+          const fallback = {};
+          FALLBACK_ACCOUNTS.forEach((acc) => {
+            const cat = acc.role.toUpperCase() === "SENIOR MANAGER" ? "SENIOR MANAGERS"
+              : acc.role.toUpperCase() === "VENDOR" ? "VENDORS"
+              : acc.role.toUpperCase() + "S";
+            const key = cat === "EMPLOYEES" ? "EMPLOYEES" : cat;
+            (fallback[key] = fallback[key] || []).push({
+              name: acc.role,
+              username: acc.username,
+              password: acc.password,
+              roleName: acc.role,
+              category: key,
+            });
+          });
+          setDevGroups(fallback);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setDevLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [devGroups]);
+
+  const filteredGroups = React.useMemo(() => {
+    if (!devGroups) return null;
+    const q = devSearch.trim().toLowerCase();
+    const out = {};
+    Object.keys(devGroups).forEach((cat) => {
+      const list = devGroups[cat].filter((a) => {
+        if (!q) return true;
+        return (
+          (a.name || "").toLowerCase().includes(q) ||
+          (a.username || "").toLowerCase().includes(q) ||
+          (a.employeeCode || "").toLowerCase().includes(q) ||
+          (a.employeeId || "").toLowerCase().includes(q) ||
+          (a.vendorId || "").toLowerCase().includes(q) ||
+          (a.department || "").toLowerCase().includes(q) ||
+          (a.roleName || "").toLowerCase().includes(q)
+        );
+      });
+      if (list.length) out[cat] = list;
+    });
+    return out;
+  }, [devGroups, devSearch]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -226,27 +298,50 @@ const Loginout = () => {
         </form>
 
         {SHOW_DEMO_ACCOUNTS && (
-          <details className="demo-accounts">
+          <details className="demo-accounts" open={devGroups ? false : undefined}>
             <summary>
-              Demo accounts <span className="demo-hint">(dev only)</span>
+              Demo accounts <span className="demo-hint">(dev only — from database)</span>
             </summary>
-            <div className="demo-accounts-grid">
-              {DEMO_ACCOUNTS.map((acc) => (
-                <button
-                  type="button"
-                  key={acc.username}
-                  className="demo-account-chip"
-                  onClick={() => {
-                    setUsername(acc.username);
-                    setPassword(acc.password);
-                    setError("");
-                  }}
-                >
-                  <strong>{acc.role}</strong>
-                  <span>{acc.username}</span>
-                </button>
-              ))}
-            </div>
+            {devLoading && <p className="demo-loading">Loading development accounts…</p>}
+            {filteredGroups && (
+              <>
+                <input
+                  type="text"
+                  className="demo-search"
+                  placeholder="Search by name, username, ID, role or department…"
+                  value={devSearch}
+                  onChange={(e) => setDevSearch(e.target.value)}
+                />
+                {CATEGORY_ORDER.filter((c) => filteredGroups[c]).map((cat) => (
+                  <div key={cat} className="demo-group">
+                    <div className="demo-group-title">{cat}</div>
+                    <div className="demo-accounts-grid">
+                      {filteredGroups[cat].map((acc) => (
+                        <button
+                          type="button"
+                          key={acc.username}
+                          className="demo-account-chip"
+                          onClick={() => {
+                            setUsername(acc.username);
+                            setPassword(acc.password || "");
+                            setError("");
+                          }}
+                        >
+                          <strong>{acc.name || acc.roleName || acc.username}</strong>
+                          <span>{acc.username}</span>
+                          {(acc.employeeCode || acc.vendorId) && (
+                            <small className="demo-chip-meta">
+                              {acc.employeeCode || `VEN-${acc.vendorId}`}
+                              {acc.department ? ` · ${acc.department}` : ""}
+                            </small>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
           </details>
         )}
 

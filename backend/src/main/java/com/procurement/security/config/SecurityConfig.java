@@ -84,6 +84,9 @@ public class SecurityConfig {
                                 "/actuator/health",
                                 "/actuator/info",
 
+                                // Dev login matrix (dev profile only)
+                                "/api/dev/accounts",
+
                                 // Error
                                 "/error"
 

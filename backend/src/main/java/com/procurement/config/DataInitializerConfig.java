@@ -55,30 +55,54 @@ public class DataInitializerConfig {
     private static final String USER_HR = "hr@123";
     private static final String USER_EMPLOYEE = "employee@123";
     private static final String USER_EMPLOYEE2 = "employee2@123";
+    private static final String USER_EMPLOYEE3 = "employee3@123";
+    private static final String USER_EMPLOYEE4 = "employee4@123";
     private static final String USER_MANAGER = "manager@123";
+    private static final String USER_MANAGER2 = "manager2@123";
+    private static final String USER_MANAGER3 = "manager3@123";
     private static final String USER_SENIOR_MANAGER = "seniormanager@123";
+    private static final String USER_SENIOR_MANAGER2 = "seniormanager2@123";
     private static final String USER_HEAD = "head@123";
     private static final String USER_PROCUREMENT = "procurement@123";
+    private static final String USER_PROCUREMENT2 = "procurement2@123";
+    private static final String USER_PROCUREMENT3 = "procurement3@123";
     private static final String USER_EQUIPMENT = "equipment@123";
+    private static final String USER_EQUIPMENT2 = "equipment2@123";
     private static final String USER_SOFTWARE = "software@123";
+    private static final String USER_SOFTWARE2 = "software2@123";
     private static final String USER_FACILITIES = "facilities@123";
+    private static final String USER_FACILITIES2 = "facilities2@123";
     private static final String USER_WAREHOUSE = "warehouse@123";
+    private static final String USER_WAREHOUSE2 = "warehouse2@123";
     private static final String USER_FINANCE = "finance@123";
+    private static final String USER_FINANCE2 = "finance2@123";
     private static final String USER_AUDITOR = "auditor@123";
     private static final String USER_VENDOR = "vendor@123";
 
     private static final String PASSWORD_HR = "Hr@123";
     private static final String PASSWORD_EMPLOYEE = "Employee@123";
     private static final String PASSWORD_EMPLOYEE2 = "Employee2@123";
+    private static final String PASSWORD_EMPLOYEE3 = "Employee3@123";
+    private static final String PASSWORD_EMPLOYEE4 = "Employee4@123";
     private static final String PASSWORD_MANAGER = "Manager@123";
-    private static final String PASSWORD_SENIOR_MANAGER = "Senior@123";
+    private static final String PASSWORD_MANAGER2 = "Manager2@123";
+    private static final String PASSWORD_MANAGER3 = "Manager3@123";
+    private static final String PASSWORD_SENIOR_MANAGER = "SeniorManager@123";
+    private static final String PASSWORD_SENIOR_MANAGER2 = "SeniorManager2@123";
     private static final String PASSWORD_HEAD = "Head@123";
     private static final String PASSWORD_PROCUREMENT = "Procurement@123";
+    private static final String PASSWORD_PROCUREMENT2 = "Procurement2@123";
+    private static final String PASSWORD_PROCUREMENT3 = "Procurement3@123";
     private static final String PASSWORD_EQUIPMENT = "Equipment@123";
+    private static final String PASSWORD_EQUIPMENT2 = "Equipment2@123";
     private static final String PASSWORD_SOFTWARE = "Software@123";
+    private static final String PASSWORD_SOFTWARE2 = "Software2@123";
     private static final String PASSWORD_FACILITIES = "Facilities@123";
+    private static final String PASSWORD_FACILITIES2 = "Facilities2@123";
     private static final String PASSWORD_WAREHOUSE = "Warehouse@123";
+    private static final String PASSWORD_WAREHOUSE2 = "Warehouse2@123";
     private static final String PASSWORD_FINANCE = "Finance@123";
+    private static final String PASSWORD_FINANCE2 = "Finance2@123";
     private static final String PASSWORD_AUDITOR = "Auditor@123";
     private static final String PASSWORD_VENDOR = "Vendor@123";
 
@@ -293,6 +317,44 @@ public class DataInitializerConfig {
                     employeeRepository, "EMP017", "Deepak", "Malhotra",
                     "deepak.malhotra@enterprise.com", "9876543227", adminDept, admCostCenter, auditorRole);
 
+            // 4.15b Additional employees for the multi-user demo matrix
+            Employee employee3 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP018", "Rohan", "Singh",
+                    "rohan.singh@enterprise.com", "9876543228", itDept, itCostCenter, employeeRole);
+            Employee employee4 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP019", "Sneha", "Gupta",
+                    "sneha.gupta@enterprise.com", "9876543229", hrDept, hrCostCenter, employeeRole);
+            Employee manager2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP020", "Rahul", "Mehta",
+                    "rahul.mehta@enterprise.com", "9876543230", itDept, itCostCenter, departmentManagerRole);
+            Employee manager3 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP021", "Kavita", "Sharma",
+                    "kavita.sharma@enterprise.com", "9876543231", hrDept, hrCostCenter, departmentManagerRole);
+            Employee seniorManager2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP022", "Pooja", "Mehra",
+                    "pooja.mehra@enterprise.com", "9876543232", adminDept, admCostCenter, seniorManagerRole);
+            Employee procurement2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP023", "Nitin", "Kapoor",
+                    "nitin.kapoor@enterprise.com", "9876543233", procurementDept, procCostCenter, procurementOfficerRole);
+            Employee procurement3 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP024", "Meera", "Joshi",
+                    "meera.joshi@enterprise.com", "9876543234", procurementDept, procCostCenter, procurementOfficerRole);
+            Employee equipment2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP025", "Varun", "Bansal",
+                    "varun.bansal@enterprise.com", "9876543235", procurementDept, procCostCenter, equipmentRole);
+            Employee software2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP026", "Nisha", "Kapoor",
+                    "nisha.kapoor@enterprise.com", "9876543236", itDept, itCostCenter, softwareRole);
+            Employee facilities2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP027", "Ankit", "Gupta",
+                    "ankit.gupta@enterprise.com", "9876543237", adminDept, admCostCenter, facilitiesRole);
+            Employee warehouse2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP028", "Rajesh", "Kumar",
+                    "rajesh.kumar@enterprise.com", "9876543238", warehouseDept, warehouseCostCenter, warehouseManagerRole);
+            Employee finance2 = createEmployeeIfNotExists(
+                    employeeRepository, "EMP029", "Manish", "Agarwal",
+                    "manish.agarwal@enterprise.com", "9876543239", financeDept, finCostCenter, financeManagerRole);
+
             // ==========================
             // 4.16 Seed Reporting Relationships (top-down org chart; only applied
             //     when the employee has no manager yet, so HR changes made through
@@ -310,6 +372,19 @@ public class DataInitializerConfig {
             assignManagerIfMissing(employeeRepository, equipment, procurementOfficer);    // Equipment Team reports to Procurement
             assignManagerIfMissing(employeeRepository, software, procurementOfficer);     // Software Team reports to Procurement
             assignManagerIfMissing(employeeRepository, facilities, procurementOfficer);    // Facilities Team reports to Procurement
+            // Additional employees / teams reporting structure
+            assignManagerIfMissing(employeeRepository, employee3, deptManager);
+            assignManagerIfMissing(employeeRepository, employee4, manager3);
+            assignManagerIfMissing(employeeRepository, manager2, seniorManager);
+            assignManagerIfMissing(employeeRepository, manager3, seniorManager);
+            assignManagerIfMissing(employeeRepository, seniorManager2, head);
+            assignManagerIfMissing(employeeRepository, procurement2, head);
+            assignManagerIfMissing(employeeRepository, procurement3, head);
+            assignManagerIfMissing(employeeRepository, equipment2, procurementOfficer);
+            assignManagerIfMissing(employeeRepository, software2, procurementOfficer);
+            assignManagerIfMissing(employeeRepository, facilities2, procurementOfficer);
+            assignManagerIfMissing(employeeRepository, warehouse2, seniorManager);
+            assignManagerIfMissing(employeeRepository, finance2, seniorManager);
             log.info("Reporting relationships seeded (manager assigned only when missing).");
 
             // ==========================
@@ -324,23 +399,47 @@ public class DataInitializerConfig {
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_EMPLOYEE2, PASSWORD_EMPLOYEE2, null, employee2, employeeRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_EMPLOYEE3, PASSWORD_EMPLOYEE3, null, employee3, employeeRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_EMPLOYEE4, PASSWORD_EMPLOYEE4, null, employee4, employeeRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_MANAGER, PASSWORD_MANAGER, LEGACY_MANAGER, deptManager, departmentManagerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_MANAGER2, PASSWORD_MANAGER2, null, manager2, departmentManagerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_MANAGER3, PASSWORD_MANAGER3, null, manager3, departmentManagerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_SENIOR_MANAGER, PASSWORD_SENIOR_MANAGER, null, seniorManager, seniorManagerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_SENIOR_MANAGER2, PASSWORD_SENIOR_MANAGER2, null, seniorManager2, seniorManagerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_HEAD, PASSWORD_HEAD, null, head, headRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_PROCUREMENT, PASSWORD_PROCUREMENT, LEGACY_PROCUREMENT, procurementOfficer, procurementOfficerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_PROCUREMENT2, PASSWORD_PROCUREMENT2, null, procurement2, procurementOfficerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_PROCUREMENT3, PASSWORD_PROCUREMENT3, null, procurement3, procurementOfficerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_EQUIPMENT, PASSWORD_EQUIPMENT, null, equipment, equipmentRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_EQUIPMENT2, PASSWORD_EQUIPMENT2, null, equipment2, equipmentRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_SOFTWARE, PASSWORD_SOFTWARE, null, software, softwareRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_SOFTWARE2, PASSWORD_SOFTWARE2, null, software2, softwareRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_FACILITIES, PASSWORD_FACILITIES, null, facilities, facilitiesRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_FACILITIES2, PASSWORD_FACILITIES2, null, facilities2, facilitiesRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_WAREHOUSE, PASSWORD_WAREHOUSE, LEGACY_WAREHOUSE, warehouseEmployee, warehouseManagerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_WAREHOUSE2, PASSWORD_WAREHOUSE2, null, warehouse2, warehouseManagerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_FINANCE, PASSWORD_FINANCE, LEGACY_FINANCE, financeEmployee, financeManagerRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_FINANCE2, PASSWORD_FINANCE2, null, finance2, financeManagerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_AUDITOR, PASSWORD_AUDITOR, null, auditor, auditorRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
@@ -366,15 +465,27 @@ public class DataInitializerConfig {
             logMatrix(log, "HR", USER_HR, PASSWORD_HR);
             logMatrix(log, "Employee", USER_EMPLOYEE, PASSWORD_EMPLOYEE);
             logMatrix(log, "Employee 2", USER_EMPLOYEE2, PASSWORD_EMPLOYEE2);
+            logMatrix(log, "Employee 3", USER_EMPLOYEE3, PASSWORD_EMPLOYEE3);
+            logMatrix(log, "Employee 4", USER_EMPLOYEE4, PASSWORD_EMPLOYEE4);
             logMatrix(log, "Manager", USER_MANAGER, PASSWORD_MANAGER);
+            logMatrix(log, "Manager 2", USER_MANAGER2, PASSWORD_MANAGER2);
+            logMatrix(log, "Manager 3", USER_MANAGER3, PASSWORD_MANAGER3);
             logMatrix(log, "Senior Manager", USER_SENIOR_MANAGER, PASSWORD_SENIOR_MANAGER);
+            logMatrix(log, "Senior Manager 2", USER_SENIOR_MANAGER2, PASSWORD_SENIOR_MANAGER2);
             logMatrix(log, "Head", USER_HEAD, PASSWORD_HEAD);
             logMatrix(log, "Procurement", USER_PROCUREMENT, PASSWORD_PROCUREMENT);
+            logMatrix(log, "Procurement 2", USER_PROCUREMENT2, PASSWORD_PROCUREMENT2);
+            logMatrix(log, "Procurement 3", USER_PROCUREMENT3, PASSWORD_PROCUREMENT3);
             logMatrix(log, "Equipment", USER_EQUIPMENT, PASSWORD_EQUIPMENT);
+            logMatrix(log, "Equipment 2", USER_EQUIPMENT2, PASSWORD_EQUIPMENT2);
             logMatrix(log, "Software", USER_SOFTWARE, PASSWORD_SOFTWARE);
+            logMatrix(log, "Software 2", USER_SOFTWARE2, PASSWORD_SOFTWARE2);
             logMatrix(log, "Facilities", USER_FACILITIES, PASSWORD_FACILITIES);
+            logMatrix(log, "Facilities 2", USER_FACILITIES2, PASSWORD_FACILITIES2);
             logMatrix(log, "Warehouse", USER_WAREHOUSE, PASSWORD_WAREHOUSE);
+            logMatrix(log, "Warehouse 2", USER_WAREHOUSE2, PASSWORD_WAREHOUSE2);
             logMatrix(log, "Finance", USER_FINANCE, PASSWORD_FINANCE);
+            logMatrix(log, "Finance 2", USER_FINANCE2, PASSWORD_FINANCE2);
             logMatrix(log, "Auditor", USER_AUDITOR, PASSWORD_AUDITOR);
             logMatrix(log, "Vendor", USER_VENDOR, PASSWORD_VENDOR);
             log.info("====================================");
@@ -585,6 +696,13 @@ public class DataInitializerConfig {
                 // Account already on the matrix default: just ensure plaintext is recorded.
                 user.setPlainPassword(rawPassword);
                 log.info("Matrix account '{}' confirmed (role: {})", username, role.getRoleCode());
+            } else if (isRetiredDefault(user.getPlainPassword())) {
+                // Account still on an older seeded default (e.g. Senior@123 before the
+                // matrix contract was aligned) — upgrade to the current matrix password.
+                user.setPassword(passwordEncoder.encode(rawPassword));
+                user.setPlainPassword(rawPassword);
+                log.info("Matrix account '{}' upgraded from retired default to the current contract (role: {})",
+                        username, role.getRoleCode());
             } else {
                 log.info("Matrix account '{}' exists with a custom password, left unchanged.", username);
             }
@@ -613,6 +731,18 @@ public class DataInitializerConfig {
 
         userRepository.save(user);
         log.info("Matrix account created: {} (role: {})", username, role.getRoleCode());
+    }
+
+    /**
+     * True when the recorded plaintext is one of the retired seeded defaults that
+     * predate the current login-matrix contract (these get upgraded automatically).
+     */
+    private boolean isRetiredDefault(String plainPassword) {
+        if (plainPassword == null) {
+            return false;
+        }
+        return plainPassword.equals("Senior@123")
+                || plainPassword.equals("Senior2@123");
     }
 
     /**

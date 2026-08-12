@@ -572,6 +572,55 @@ body,
   font-family: monospace;
 }
 
+.demo-loading {
+  font-size: 12px;
+  color: #8a94a3;
+  margin-top: 10px;
+}
+
+.demo-search {
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 12px;
+  padding: 9px 12px;
+  border: 1px solid #e3e8ef;
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: #16202e;
+  background: #fbfcfe;
+  outline: none;
+}
+
+.demo-search:focus {
+  border-color: #f8b400;
+  box-shadow: 0 0 0 3px rgba(248, 180, 0, 0.12);
+}
+
+.demo-group {
+  margin-top: 14px;
+}
+
+.demo-group-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: #f8b400;
+  margin-bottom: 7px;
+}
+
+.demo-chip-meta {
+  font-size: 10.5px;
+  color: #a3adbc;
+  margin-top: 2px;
+  font-family: monospace;
+}
+
+.demo-account-chip {
+  max-height: 64px;
+  overflow: hidden;
+}
+
 /* ================= FOOTER ================= */
 
 .footer {
