@@ -93,6 +93,17 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     @Override
+    public DashboardResponse hr(DashboardFilter filter) {
+        List<KpiResponse> kpis = new ArrayList<>();
+        addCount(kpis, "TOTAL_EMPLOYEES", "Total Employees", "select count(*) from employees", Map.of());
+        addCount(kpis, "ACTIVE_EMPLOYEES", "Active Employees", "select count(*) from employees where active_flag = true", Map.of());
+        addCount(kpis, "NEW_EMPLOYEES", "New Employees", "select count(*) from employees where created_at >= date_format(curdate(), '%Y-%m-01')", Map.of());
+        addCount(kpis, "WITHOUT_MANAGER", "Without Manager", "select count(*) from employees where manager_id is null", Map.of());
+        addCount(kpis, "DEPARTMENTS", "Departments", "select count(*) from departments where active_flag = true", Map.of());
+        return response("hr", kpis, List.of(chart("pr", filter)), filter);
+    }
+
+    @Override
     public ChartResponse chart(String type, DashboardFilter filter) {
         return switch (type) {
             case "spend" -> chart("MONTHLY_SPEND", "Monthly Procurement Spend", "select date_format(po.order_date, '%Y-%m'), coalesce(sum(po.grand_total),0) from purchase_orders po" + repository.filter(filter, "po", "order_date", true, true, false, true, true).where() + " group by date_format(po.order_date, '%Y-%m') order by 1", repository.filter(filter, "po", "order_date", true, true, false, true, true).params());

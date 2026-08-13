@@ -1,0 +1,11 @@
+import { apiGet, apiPost } from "./apiClient";
+import { withQuery } from "./serviceUtils";
+export const getPurchaseOrders = (filters = {}) => apiGet(withQuery("/api/purchase-orders", filters));
+export const getPurchaseOrder = (id) => apiGet(`/api/purchase-orders/${id}`);
+export const createPurchaseOrder = (request) => apiPost("/api/purchase-orders", request);
+export const sendPurchaseOrder = (id) => apiPost(`/api/purchase-orders/${id}/send`);
+export const acknowledgePurchaseOrder = (id) => apiPost(`/api/purchase-orders/${id}/acknowledge`);
+export const cancelPurchaseOrder = (id) => apiPost(`/api/purchase-orders/${id}/cancel`);
+export const closePurchaseOrder = (id) => apiPost(`/api/purchase-orders/${id}/close`);
+export const getPurchaseOrderLines = (filters = {}) => apiGet(withQuery("/api/purchase-order-lines", filters));
+export const getPurchaseOrderHistory = (id) => apiGet(`/api/purchase-orders/${id}/history`);

@@ -25,9 +25,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
     private final AuthenticationManager authenticationManager;
     private final JwtTokenProvider tokenProvider;
@@ -71,22 +75,27 @@ public class AuthService {
         User user = User.builder()
                 .username(request.username())
                 .password(passwordEncoder.encode(request.password()))
+                .plainPassword(request.password())
                 .employee(employee)
                 .role(role)
                 .enabled(true)
                 .accountLocked(false)
                 .build();
         user = userRepository.save(user);
-        eventPublisher.publish(
-                BusinessEventType.LOGIN,
-                "Auth",
-                "User",
-                user.getId(),
-                user.getUsername(),
-                "User account registered",
-                user.getUsername(),
-                NotificationType.SYSTEM
-        );
+        try {
+            eventPublisher.publish(
+                    BusinessEventType.LOGIN,
+                    "Auth",
+                    "User",
+                    user.getId(),
+                    user.getUsername(),
+                    "User account registered",
+                    user.getUsername(),
+                    NotificationType.SYSTEM
+            );
+        } catch (Exception exception) {
+            log.warn("Auth registration event could not be published for user '{}'", user.getUsername(), exception);
+        }
         return new RegisterResponse(user.getId(), user.getUsername());
     }
 
@@ -98,6 +107,10 @@ public class AuthService {
                     new UsernamePasswordAuthenticationToken(request.username(), request.password()));
         } catch (BadCredentialsException exception) {
             throw new UnauthorizedException("Invalid username or password");
+        } catch (org.springframework.security.authentication.DisabledException exception) {
+            throw new UnauthorizedException("This account is disabled. Contact your administrator.");
+        } catch (org.springframework.security.authentication.LockedException exception) {
+            throw new UnauthorizedException("This account is locked. Contact your administrator.");
         }
 
         User user = userRepository.findByUsername(authentication.getName())
@@ -105,20 +118,56 @@ public class AuthService {
         user.setLastLogin(java.time.LocalDateTime.now());
         userRepository.save(user);
 
-        eventPublisher.publish(
-                BusinessEventType.LOGIN,
-                "Auth",
-                "User",
-                user.getId(),
-                user.getUsername(),
-                "User logged in",
-                user.getUsername(),
-                NotificationType.SYSTEM
-        );
+        try {
+            eventPublisher.publish(
+                    BusinessEventType.LOGIN,
+                    "Auth",
+                    "User",
+                    user.getId(),
+                    user.getUsername(),
+                    "User logged in",
+                    user.getUsername(),
+                    NotificationType.SYSTEM
+            );
+        } catch (Exception exception) {
+            log.warn("Auth login event could not be published for user '{}'", user.getUsername(), exception);
+        }
 
         String token = tokenProvider.generateToken(authentication);
+        String displayName = user.getEmployee() == null
+                ? user.getUsername()
+                : user.getEmployee().getFirstName() + " " + user.getEmployee().getLastName();
         return new LoginResponse(token, "Bearer", tokenProvider.getExpirationMs(),
-                authentication.getName());
+                authentication.getName(),
+                user.getRole().getRoleCode(),
+                user.getRole().getRoleName(),
+                displayName);
+    }
+
+    @Transactional(readOnly = true)
+    public Long employeeIdForUser(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getEmployee)
+                .map(Employee::getId)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Long departmentIdForUser(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getEmployee)
+                .map(Employee::getDepartment)
+                .map(com.procurement.department.entity.Department::getId)
+                .orElse(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Long costCenterIdForUser(Long userId) {
+        return userRepository.findById(userId)
+                .map(User::getEmployee)
+                .map(Employee::getCostCenter)
+                .map(com.procurement.costcenter.entity.CostCenter::getId)
+                .orElse(null);
     }
 
     @Transactional
@@ -129,6 +178,34 @@ public class AuthService {
             throw new UnauthorizedException("Current password is incorrect");
         }
         user.setPassword(passwordEncoder.encode(request.newPassword()));
+        user.setPlainPassword(request.newPassword());
         userRepository.save(user);
     }
+
+    @Transactional
+public void changePasswordAsAdmin(
+        String actingUsername,
+        String targetUsername,
+        String newPassword) {
+
+    User acting = userRepository.findByUsername(actingUsername)
+            .orElseThrow(() -> new ResourceNotFoundException("Acting user not found"));
+
+    String roleCode = acting.getRole() == null
+            ? null
+            : acting.getRole().getRoleCode();
+
+    if (roleCode == null ||
+            !("SUPER_ADMIN".equals(roleCode) || "ADMIN".equals(roleCode))) {
+        throw new UnauthorizedException(
+                "Only SUPER_ADMIN or ADMIN may change other users' passwords");
+    }
+
+    User user = userRepository.findByUsername(targetUsername)
+            .orElseThrow(() -> new ResourceNotFoundException("Target user not found"));
+
+    user.setPassword(passwordEncoder.encode(newPassword));
+    user.setPlainPassword(newPassword);
+    userRepository.save(user);
+}
 }

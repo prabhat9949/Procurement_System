@@ -1,0 +1,12 @@
+import { apiGet, apiPost } from "./apiClient";
+import { withQuery } from "./serviceUtils";
+export const getRfqs = (filters = {}) => apiGet(withQuery("/api/rfqs", filters));
+export const getRfq = (id) => apiGet(`/api/rfqs/${id}`);
+export const createRfq = (request) => apiPost("/api/rfqs", request);
+export const openRfq = (id) => apiPost(`/api/rfqs/${id}/open`);
+export const closeRfq = (id) => apiPost(`/api/rfqs/${id}/close`);
+export const cancelRfq = (id) => apiPost(`/api/rfqs/${id}/cancel`);
+export const getRfqVendors = (id) => apiGet(`/api/rfqs/${id}/vendors`);
+export const addRfqVendor = (id, request) => apiPost(`/api/rfqs/${id}/vendors`, request);
+export const getRfqLines = (filters = {}) => apiGet(withQuery("/api/rfq-lines", filters));
+export const createRfqLine = (request) => apiPost("/api/rfq-lines", request);

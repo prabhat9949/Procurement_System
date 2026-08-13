@@ -10,5 +10,6 @@ public interface DashboardService {
     DashboardResponse finance(DashboardFilter filter);
     DashboardResponse warehouse(DashboardFilter filter);
     DashboardResponse vendor(DashboardFilter filter);
+    DashboardResponse hr(DashboardFilter filter);
     ChartResponse chart(String type, DashboardFilter filter);
 }

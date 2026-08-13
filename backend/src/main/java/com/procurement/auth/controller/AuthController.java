@@ -39,10 +39,19 @@ public class AuthController {
 
     @GetMapping("/me")
     public Map<String, Object> me(@AuthenticationPrincipal CustomUserDetails userDetails) {
-        return Map.of(
-                "userId", userDetails.userId(),
-                "username", userDetails.getUsername(),
-                "authorities", userDetails.getAuthorities());
+        // Use a HashMap: Map.of() throws NullPointerException when any value is
+        // null (e.g. vendor accounts that have no linked employee record).
+        Map<String, Object> result = new java.util.HashMap<>();
+        result.put("userId", userDetails.userId());
+        result.put("username", userDetails.getUsername());
+        result.put("authorities", userDetails.getAuthorities());
+        result.put("roleCode", userDetails.roleCode());
+        result.put("roleName", userDetails.roleName());
+        result.put("displayName", userDetails.displayName());
+        result.put("employeeId", authService.employeeIdForUser(userDetails.userId()));
+        result.put("departmentId", authService.departmentIdForUser(userDetails.userId()));
+        result.put("costCenterId", authService.costCenterIdForUser(userDetails.userId()));
+        return result;
     }
 
     @PostMapping("/change-password")
@@ -52,6 +61,18 @@ public class AuthController {
         authService.changePassword(userDetails.getUsername(), request);
         return ResponseEntity.noContent().build();
     }
+
+    @PostMapping("/change-password/admin")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+public ResponseEntity<Void> changePasswordAsAdmin(
+        @AuthenticationPrincipal CustomUserDetails userDetails,
+        @Valid @RequestBody com.procurement.auth.dto.AdminChangePasswordRequest request) {
+    authService.changePasswordAsAdmin(
+            userDetails.getUsername(),
+            request.targetUsername(),
+            request.newPassword());
+    return ResponseEntity.noContent().build();
+}
 
     @PostMapping("/logout")
     public ResponseEntity<Void> logout() {

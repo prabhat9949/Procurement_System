@@ -9,6 +9,9 @@ public record CustomUserDetails(
         Long userId,
         String username,
         String password,
+        String roleCode,
+        String roleName,
+        String displayName,
         boolean enabled,
         boolean accountLocked,
         Collection<? extends GrantedAuthority> authorities) implements UserDetails {

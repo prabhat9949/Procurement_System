@@ -1,0 +1,10 @@
+import { apiGet, apiPost } from "./apiClient";
+import { withQuery } from "./serviceUtils";
+export const getPayments = (filters = {}) => apiGet(withQuery("/api/payments", filters));
+export const getPayment = (id) => apiGet(`/api/payments/${id}`);
+export const createPayment = (request) => apiPost("/api/payments", request);
+export const approvePayment = (id, request = {}) => apiPost(`/api/payments/${id}/approve`, request);
+export const processPayment = (id, request = {}) => apiPost(`/api/payments/${id}/process`, request);
+export const completePayment = (id, request = {}) => apiPost(`/api/payments/${id}/complete`, request);
+export const failPayment = (id, request = {}) => apiPost(`/api/payments/${id}/fail`, request);
+export const cancelPayment = (id, request = {}) => apiPost(`/api/payments/${id}/cancel`, request);

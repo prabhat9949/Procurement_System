@@ -3,6 +3,10 @@ package com.procurement.vendor.specification;
 import com.procurement.vendor.entity.Vendor;
 import org.springframework.data.jpa.domain.Specification;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 public final class VendorSpecification {
 
     private VendorSpecification() {
@@ -10,10 +14,24 @@ public final class VendorSpecification {
 
     public static Specification<Vendor> search(String keyword, String vendorType,
                                                String status, Boolean approved) {
-        return Specification.where(keywordLike(keyword))
-                .and(equalsIgnoreCase("vendorType", vendorType))
-                .and(equalsIgnoreCase("status", status))
-                .and(equals("approved", approved));
+        List<Specification<Vendor>> parts = new ArrayList<>();
+        parts.add(keywordLike(keyword));
+        parts.add(equalsIgnoreCase("vendorType", vendorType));
+        parts.add(equalsIgnoreCase("status", status));
+        parts.add(equals("approved", approved));
+        return combine(parts);
+    }
+
+    private static <T> Specification<T> combine(List<Specification<T>> parts) {
+        parts.removeIf(Objects::isNull);
+        if (parts.isEmpty()) {
+            return (root, query, cb) -> cb.conjunction();
+        }
+        Specification<T> spec = parts.get(0);
+        for (int i = 1; i < parts.size(); i++) {
+            spec = spec.and(parts.get(i));
+        }
+        return spec;
     }
 
     private static Specification<Vendor> keywordLike(String keyword) {
