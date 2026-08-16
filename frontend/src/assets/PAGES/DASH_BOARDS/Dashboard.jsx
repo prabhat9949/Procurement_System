@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet } from '../../../services/apiClient';
 
 import SuperAdminDashboard from './super_admin/SuperAdminDashboard';
 import OrgAdminDashboard from './org_admin/OrgAdminDashboard';
@@ -15,14 +16,67 @@ import HrDashboard from './hr/HrDashboard';
 import ManagementDashboard from './management/ManagementDashboard';
 import FulfilmentDashboard from './fulfilment/FulfilmentDashboard';
 
+// Maps the backend role code (database-driven) to the frontend dashboard key.
+// Kept in sync with the ROLE_MAP in the login page so a role change by Admin
+// immediately routes the account to the correct dashboard on next load.
+const ROLE_MAP = {
+  SUPER_ADMIN: "super_admin",
+  ADMIN: "org_admin",
+  HR_MANAGER: "hr_manager",
+  PROCUREMENT_MANAGER: "proc_manager",
+  PROCUREMENT_OFFICER: "proc_executive",
+  FINANCE_MANAGER: "finance_manager",
+  WAREHOUSE_MANAGER: "inventory_manager",
+  DEPARTMENT_MANAGER: "dept_manager",
+  SENIOR_MANAGER: "senior_manager",
+  HEAD: "head",
+  EQUIPMENT_ASSET_TEAM: "equipment",
+  IT_SOFTWARE_TEAM: "software",
+  FACILITIES_TEAM: "facilities",
+  EMPLOYEE: "employee",
+  VENDOR: "vendor",
+  AUDITOR: "auditor",
+};
+
 const Dashboard = () => {
-  const activeRole = localStorage.getItem("eps_active_role");
+  // First paint uses the role stored at login; then /api/auth/me refreshes it
+  // from the database (the JWT filter reloads role + permissions on every
+  // request), so Admin role/permission changes show up without re-login.
+  const [activeRole, setActiveRole] = useState(() => localStorage.getItem("eps_active_role") || "employee");
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (localStorage.getItem("eps_first_time_welcome") === "true") {
       setShowWelcome(true);
     }
+
+    let mounted = true;
+    apiGet("/api/auth/me")
+      .then((me) => {
+        if (!mounted || !me) return;
+        const roleCode = me.roleCode || "";
+        const resolved = ROLE_MAP[roleCode] || roleCode.toLowerCase();
+        // Keep the localStorage snapshot in sync so every downstream screen
+        // (permission-gated buttons, dev-login panels, profile) sees the
+        // current role and permissions without a manual re-login.
+        localStorage.setItem("eps_role_code", roleCode);
+        localStorage.setItem("eps_active_role", resolved);
+        // /api/auth/me serializes GrantedAuthority as { authority: "..." } objects.
+        const permissionCodes = Array.isArray(me.authorities)
+          ? me.authorities
+              .map((a) => (a && typeof a === "object" && a.authority ? a.authority : a))
+              .filter((a) => typeof a === "string" && !a.startsWith("ROLE_"))
+              .sort()
+          : [];
+        localStorage.setItem("eps_permissions", JSON.stringify(permissionCodes));
+        setActiveRole(resolved);
+      })
+      .catch(() => {
+        // Backend unreachable — keep the login-time role; the app stays usable offline.
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const handleDismissWelcome = () => {

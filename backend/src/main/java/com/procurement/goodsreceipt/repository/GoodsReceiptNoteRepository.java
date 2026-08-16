@@ -1,1 +1,4 @@
-package com.procurement.goodsreceipt.repository;import com.procurement.goodsreceipt.entity.*;import org.springframework.data.jpa.repository.*;import org.springframework.stereotype.Repository;import java.util.*;@Repository public interface GoodsReceiptNoteRepository extends JpaRepository<GoodsReceiptNote,Long>,JpaSpecificationExecutor<GoodsReceiptNote>{boolean existsByGrnNumber(String n);List<GoodsReceiptNote>findByPurchaseOrderId(Long id);}
+package com.procurement.goodsreceipt.repository;import com.procurement.goodsreceipt.entity.*;import org.springframework.data.jpa.repository.*;import org.springframework.stereotype.Repository;import java.util.*;@Repository public interface GoodsReceiptNoteRepository extends JpaRepository<GoodsReceiptNote,Long>,JpaSpecificationExecutor<GoodsReceiptNote>{    boolean existsByGrnNumber(String n);
+    List<GoodsReceiptNote> findByPurchaseOrderId(Long id);
+    List<GoodsReceiptNote> findByVendorId(Long vendorId);
+}

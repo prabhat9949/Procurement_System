@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
+
+const canApprove = hasPermission("CAN_APPROVE_PR");
+const canReject = hasPermission("CAN_REJECT_PR");
+const canReturn = hasPermission("CAN_RETURN_PR");
 
 const ApprovalQueue = ({ onTrackForm }) => {
   const [tasks, setTasks] = useState([]);
@@ -196,7 +201,7 @@ const ApprovalQueue = ({ onTrackForm }) => {
                 <button
                   className="dm-btn-primary-sm"
                   style={{ background: "linear-gradient(135deg, #f8b400 0%, #e2a000 100%)", color: "#000000", fontWeight: "800", fontSize: "13px", padding: "9px 20px", display: "inline-flex", alignItems: "center", gap: "8px" }}
-                  onClick={() => { setTargetTask(t); setDecision("APPROVED"); setComments(""); }}
+                  onClick={() => { setTargetTask(t); setDecision(canApprove ? "APPROVED" : canReject ? "REJECTED" : "RETURNED"); setComments(""); }}
                 >
                   <ArrowRight size={16} /> Review & Decide
                 </button>
@@ -221,10 +226,10 @@ const ApprovalQueue = ({ onTrackForm }) => {
             <form onSubmit={submitDecision}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px", marginBottom: "18px" }}>
                 {[
-                  { value: "APPROVED", label: "Approve", icon: CheckCircle2, color: "#059669", bg: "rgba(5,150,105,.08)" },
-                  { value: "REJECTED", label: "Reject", icon: XCircle, color: "#dc2626", bg: "rgba(220,38,38,.08)" },
-                  { value: "RETURNED", label: "Return", icon: AlertCircle, color: "#2563eb", bg: "rgba(37,99,235,.08)" },
-                ].map((opt) => {
+                  { value: "APPROVED", label: "Approve", icon: CheckCircle2, color: "#059669", bg: "rgba(5,150,105,.08)", visible: canApprove },
+                  { value: "REJECTED", label: "Reject", icon: XCircle, color: "#dc2626", bg: "rgba(220,38,38,.08)", visible: canReject },
+                  { value: "RETURNED", label: "Return", icon: AlertCircle, color: "#2563eb", bg: "rgba(37,99,235,.08)", visible: canReturn },
+                ].filter((o) => o.visible).map((opt) => {
                   const Icon = opt.icon;
                   return (
                     <button
@@ -264,17 +269,24 @@ const ApprovalQueue = ({ onTrackForm }) => {
                 <button type="button" className="dm-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setTargetTask(null)}>
                   Cancel
                 </button>
-                <button type="submit" disabled={submitting} className="dm-btn-primary-sm" style={{ background: decision === "REJECTED" ? "#dc2626" : decision === "RETURNED" ? "#2563eb" : "linear-gradient(135deg, #f8b400 0%, #e2a000 100%)", color: decision === "REJECTED" || decision === "RETURNED" ? "#fff" : "#000", opacity: submitting ? 0.7 : 1 }}>
-                  {submitting ? (
-                    <>
-                      <Loader2 size={16} className="login-spin" /> Submitting...
-                    </>
-                  ) : (
-                    <>
-                      {decision === "APPROVED" ? "Approve" : decision === "REJECTED" ? "Reject" : "Return for Correction"}
-                    </>
-                  )}
-                </button>
+                {(canApprove || canReject || canReturn) && (
+                  <button type="submit" disabled={submitting} className="dm-btn-primary-sm" style={{ background: decision === "REJECTED" ? "#dc2626" : decision === "RETURNED" ? "#2563eb" : "linear-gradient(135deg, #f8b400 0%, #e2a000 100%)", color: decision === "REJECTED" || decision === "RETURNED" ? "#fff" : "#000", opacity: submitting ? 0.7 : 1 }}>
+                    {submitting ? (
+                      <>
+                        <Loader2 size={16} className="login-spin" /> Submitting...
+                      </>
+                    ) : (
+                      <>
+                        {decision === "APPROVED" ? "Approve" : decision === "REJECTED" ? "Reject" : "Return for Correction"}
+                      </>
+                    )}
+                  </button>
+                )}
+              {!canApprove && !canReject && !canReturn && (
+                <div style={{ fontSize: "12.5px", color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px", marginBottom: 14, display: "flex", alignItems: "center", gap: 8 }}>
+                  <AlertCircle size={15} /> You do not have permission to approve, reject or return requests. Contact your administrator.
+                </div>
+              )}
               </div>
             </form>
           </div>

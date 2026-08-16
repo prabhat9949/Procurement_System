@@ -138,10 +138,10 @@ const ManagerProfile = () => {
                   Single Request Sign-off Limit
                 </span>
                 <h4 style={{ fontSize: "22px", color: "#059669", fontWeight: "800", marginTop: "4px" }}>
-                  $25,000.00 USD
+                  ₹25,000.00
                 </h4>
                 <p style={{ fontSize: "12px", color: "#555555", marginTop: "2px" }}>
-                  Requisitions over $25,000 escalate to CTO for co-approval.
+                  Requisitions over ₹25,000 escalate to CTO for co-approval.
                 </p>
               </div>
 
@@ -157,7 +157,7 @@ const ManagerProfile = () => {
                   Monthly Cost Center Budget Cap
                 </span>
                 <h4 style={{ fontSize: "22px", color: "#d97706", fontWeight: "800", marginTop: "4px" }}>
-                  $120,000.00 USD
+                  ₹1,20,000.00
                 </h4>
                 <p style={{ fontSize: "12px", color: "#555555", marginTop: "2px" }}>
                   Managed under Cost Center CC-8902-ENG.

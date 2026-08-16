@@ -1,239 +1,126 @@
-import React, { useState } from "react";
-import {
-  Boxes,
-  Search,
-  Eye,
-  Edit3,
-  CheckCircle2,
-  X,
-  Package,
-  Barcode,
-  Building,
-} from "lucide-react";
-
-const masterProductCatalogMock = [
-  {
-    sku: "SKU-MAC-101",
-    name: "MacBook Pro M3 Max 64GB Workstation",
-    category: "Hardware & IT",
-    qty: 24,
-    unitCost: "$3,699.00",
-    location: "Rack A-01 (Zone A)",
-    status: "Available",
-    barcode: "880942001928",
-    reorderPoint: 5,
-  },
-  {
-    sku: "SKU-SER-202",
-    name: "Dell PowerEdge R760 Rack Server",
-    category: "DevOps & Infra",
-    qty: 6,
-    unitCost: "$13,550.00",
-    location: "Rack A-05 (Zone A)",
-    status: "Available",
-    barcode: "880942001995",
-    reorderPoint: 2,
-  },
-  {
-    sku: "SKU-NET-992",
-    name: "Cisco Catalyst 9300 Switch Module",
-    category: "Networking",
-    qty: 2,
-    unitCost: "$7,100.00",
-    location: "Rack B-04 (Zone A)",
-    status: "Low Stock Alert",
-    barcode: "880942001882",
-    reorderPoint: 5,
-  },
-  {
-    sku: "SKU-CHAIR-50",
-    name: "Herman Miller Aeron Ergonomic Chair",
-    category: "Office Furniture",
-    qty: 18,
-    unitCost: "$1,450.00",
-    location: "Rack C-02 (Zone C)",
-    status: "Available",
-    barcode: "880942001712",
-    reorderPoint: 4,
-  },
-];
+import React, { useState, useEffect, useCallback } from "react";
+import { Boxes, Search, Loader2, WifiOff, X, Eye, IndianRupee } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR } from "../../../../../utils/format";
 
 const ProductManagement = () => {
-  const [catalog, setCatalog] = useState(masterProductCatalogMock);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [previewProduct, setPreviewProduct] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState(null);
 
-  const categories = ["All", "Hardware & IT", "DevOps & Infra", "Networking", "Office Furniture"];
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const page = await apiGet("/api/products?page=0&size=200");
+      setProducts(page?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load products.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const filtered = catalog.filter((item) => {
-    const matchesSearch =
-      item.sku.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat = selectedCategory === "All" || item.category === selectedCategory;
-    return matchesSearch && matchesCat;
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const filtered = products.filter((p) => {
+    const s = search.toLowerCase();
+    return !s || (p.productName || "").toLowerCase().includes(s) || (p.sku || "").toLowerCase().includes(s)
+      || (p.categoryName || "").toLowerCase().includes(s);
   });
 
+  const inputStyle = { width: "100%", padding: "10px 12px", border: "1px solid #d7dce3", borderRadius: "9px", fontSize: "13.5px", background: "#fff", outline: "none" };
+
   return (
-    <div className="inv-product-mgmt-container">
-      {/* Header */}
+    <div style={{ padding: "20px" }}>
       <div className="inv-page-header">
         <div>
-          <h1 className="inv-page-title">
-            <Boxes color="#f8b400" /> Master Product Catalog & SKU Registry
+          <h1 className="inv-page-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <Boxes color="#f8b400" /> Product Management
           </h1>
-          <p className="inv-page-subtitle">
-            Enterprise SKU database, barcode indexing, stock levels, and warehouse rack placement.
-          </p>
+          <p className="inv-page-subtitle">Product catalogue master data — live from the database.</p>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="inv-card" style={{ marginBottom: "24px", padding: "18px 24px" }}>
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
-          <div style={{ position: "relative", width: "320px" }}>
-            <Search
-              size={16}
-              color="#666666"
-              style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
-            />
-            <input
-              type="text"
-              placeholder="Search SKU Code or Product Name..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="inv-form-input"
-              style={{ paddingLeft: "42px", height: "42px" }}
-            />
-          </div>
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "14px 18px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: 600 }}>
+          <WifiOff size={18} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button onClick={loadData} style={{ background: "#111", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Retry</button>
+        </div>
+      )}
 
-          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "20px",
-                  fontSize: "13px",
-                  fontWeight: "700",
-                  border: selectedCategory === cat ? "1px solid #f8b400" : "1px solid #ececec",
-                  background: selectedCategory === cat ? "rgba(248,180,0,0.18)" : "#ffffff",
-                  color: selectedCategory === cat ? "#111111" : "#555555",
-                  cursor: "pointer",
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+      <div className="inv-card" style={{ padding: "16px 20px", marginBottom: "20px" }}>
+        <div style={{ position: "relative", maxWidth: "380px" }}>
+          <Search size={16} color="#666" style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }} />
+          <input type="text" placeholder="Search product, SKU or category..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ ...inputStyle, paddingLeft: "38px" }} />
         </div>
       </div>
 
-      {/* Table */}
-      <div className="inv-card">
-        <div className="inv-table-container">
-          <table className="inv-table">
-            <thead>
-              <tr>
-                <th>SKU Code</th>
-                <th>Product Description</th>
-                <th>Category</th>
-                <th>Available Units</th>
-                <th>Unit Cost</th>
-                <th>Warehouse Rack Location</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((item) => (
-                <tr key={item.sku}>
-                  <td style={{ fontWeight: "800", color: "#d97706" }}>{item.sku}</td>
-                  <td style={{ fontWeight: "700", color: "#111111" }}>{item.name}</td>
-                  <td style={{ color: "#666666", fontSize: "13px" }}>{item.category}</td>
-                  <td style={{ fontWeight: "800" }}>{item.qty} Units</td>
-                  <td style={{ fontWeight: "700", color: "#059669" }}>{item.unitCost}</td>
-                  <td style={{ color: "#555555" }}>{item.location}</td>
-                  <td>
-                    <span
-                      className={`inv-badge ${
-                        item.status.includes("Low") ? "lowstock" : "available"
-                      }`}
-                    >
-                      {item.status}
-                    </span>
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    <button
-                      className="inv-sidebar-toggle"
-                      style={{ width: "32px", height: "32px", display: "inline-flex" }}
-                      onClick={() => setPreviewProduct(item)}
-                    >
-                      <Eye size={15} />
-                    </button>
-                  </td>
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "60px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading products...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="inv-card" style={{ textAlign: "center", padding: "48px" }}>
+          <Boxes size={48} color="#059669" style={{ margin: "0 auto 12px" }} />
+          <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "700" }}>No Products</h3>
+          <p style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>No product records are currently available.</p>
+        </div>
+      ) : (
+        <div className="inv-card" style={{ overflow: "hidden" }}>
+          <div className="inv-table-container">
+            <table className="inv-table">
+              <thead>
+                <tr>
+                  <th>SKU</th><th>Product</th><th>Category</th><th>Brand</th><th>UoM</th><th>Unit Price</th><th>Reorder Level</th><th>Status</th><th style={{ textAlign: "right" }}>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {filtered.map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: "800", color: "#d97706" }}>{p.sku || p.productCode}</td>
+                    <td style={{ fontWeight: 600 }}>{p.productName}</td>
+                    <td style={{ fontSize: "13px" }}>{p.categoryName || "—"}</td>
+                    <td style={{ fontSize: "13px" }}>{p.brand || "—"}</td>
+                    <td style={{ fontSize: "13px" }}>{p.uomName || "—"}</td>
+                    <td style={{ fontWeight: "700" }}>{formatINR(p.unitPrice)}</td>
+                    <td style={{ fontSize: "13px" }}>{p.reorderLevel ?? "—"}</td>
+                    <td><span style={{ fontSize: "11px", fontWeight: "700", padding: "2px 8px", borderRadius: "12px", background: p.active ? "rgba(5,150,105,.12)" : "rgba(100,116,139,.12)", color: p.active ? "#059669" : "#64748b" }}>{p.active ? "ACTIVE" : "INACTIVE"}</span></td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="inv-btn-primary-sm" onClick={() => setSelected(p)}><Eye size={14} /> View</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Product Detail Modal */}
-      {previewProduct && (
+      {selected && (
         <div className="inv-modal-overlay">
           <div className="inv-modal" style={{ maxWidth: "560px" }}>
-            <div
-              style={{
-                display: "flex",
-                justify: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
-            >
-              <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700" }}>
-                SKU Specification: {previewProduct.sku}
-              </h3>
-              <button
-                onClick={() => setPreviewProduct(null)}
-                style={{ background: "none", border: "none", color: "#666666", cursor: "pointer" }}
-              >
-                <X size={20} />
-              </button>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "700" }}>{selected.productName}</h3>
+              <button onClick={() => setSelected(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
             </div>
-
-            <div
-              style={{
-                padding: "20px",
-                background: "#f8f9fb",
-                borderRadius: "12px",
-                border: "1px solid #ececec",
-                display: "flex",
-                flexDirection: "column",
-                gap: "12px",
-                fontSize: "14px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                <Barcode size={24} color="#f8b400" />
-                <span>Barcode Index: <strong>{previewProduct.barcode}</strong></span>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", fontSize: "13.5px" }}>
+              <div><span style={{ color: "#888" }}>SKU:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{selected.sku || selected.productCode}</p></div>
+              <div><span style={{ color: "#888" }}>Category:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{selected.categoryName || "—"}</p></div>
+              <div><span style={{ color: "#888" }}>Brand:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{selected.brand || "—"}</p></div>
+              <div><span style={{ color: "#888" }}>Manufacturer:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{selected.manufacturer || "—"}</p></div>
+              <div><span style={{ color: "#888" }}>UoM:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{selected.uomName || "—"}</p></div>
+              <div><span style={{ color: "#888" }}>Unit Price:</span><p style={{ fontWeight: 700, margin: "2px 0" }}>{formatINR(selected.unitPrice)}</p></div>
+              <div style={{ gridColumn: "1 / -1" }}>
+                <span style={{ color: "#888" }}>Description:</span>
+                <p style={{ fontWeight: 600, margin: "2px 0" }}>{selected.description || "—"}</p>
               </div>
-              <p><strong>Item Name:</strong> {previewProduct.name}</p>
-              <p><strong>Category:</strong> {previewProduct.category}</p>
-              <p><strong>Unit Replacement Cost:</strong> <span style={{ color: "#059669", fontWeight: "800" }}>{previewProduct.unitCost}</span></p>
-              <p><strong>Warehouse Location:</strong> {previewProduct.location}</p>
-              <p><strong>Reorder Threshold:</strong> {previewProduct.reorderPoint} Units</p>
             </div>
-
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
-              <button
-                className="inv-btn-primary-sm"
-                style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}
-                onClick={() => setPreviewProduct(null)}
-              >
-                Close Specification
-              </button>
+              <button className="inv-btn-primary-sm" onClick={() => setSelected(null)}>Close</button>
             </div>
           </div>
         </div>

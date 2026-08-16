@@ -10,6 +10,7 @@ import {
   KeyRound,
   Loader2,
   AlertCircle,
+  UserRound,
 } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../../../../services/apiClient";
 
@@ -21,6 +22,7 @@ const SuperRoleManagement = () => {
   const [editingRole, setEditingRole] = useState(null); // null | role object
   const [showDialog, setShowDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [usersTarget, setUsersTarget] = useState(null); // role whose users are shown
   const [toast, setToast] = useState(null);
   const [error, setError] = useState("");
 
@@ -139,13 +141,17 @@ const SuperRoleManagement = () => {
     }
   };
 
-  // Group permissions by module for the checklist
-  const groupedPermissions = permissions.reduce((acc, p) => {
-    const mod = p.moduleName || "General";
-    if (!acc[mod]) acc[mod] = [];
-    acc[mod].push(p);
-    return acc;
-  }, {});
+  // Group permissions by module for the checklist. Only active permissions are
+  // shown — legacy/deactivated permissions (e.g. Reset Password, Deactivate User)
+  // are excluded so the checklist only offers procurement-relevant access.
+  const groupedPermissions = permissions
+    .filter((p) => p.active !== false)
+    .reduce((acc, p) => {
+      const mod = p.moduleName || "General";
+      if (!acc[mod]) acc[mod] = [];
+      acc[mod].push(p);
+      return acc;
+    }, {});
 
   return (
     <div className="sadmin-role-mgmt-container" style={{ padding: "20px" }}>
@@ -252,6 +258,13 @@ const SuperRoleManagement = () => {
                         >
                           <Edit size={14} />
                         </button>
+                        <button
+                          style={{ width: "32px", height: "32px", marginRight: "6px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px", background: "#fff", cursor: "pointer", color: "#2563eb" }}
+                          onClick={() => setUsersTarget(r)}
+                          title="View Assigned Users"
+                        >
+                          <UserRound size={14} />
+                        </button>
                         {!r.systemRole && (
                           <button
                             style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px", background: "#fff", cursor: "pointer", color: "#dc2626" }}
@@ -319,10 +332,14 @@ const SuperRoleManagement = () => {
               <div style={{ marginTop: "20px" }}>
                 <h4 style={{ fontSize: "15px", fontWeight: "700", color: "#111", margin: "0 0 4px", display: "flex", alignItems: "center", gap: "8px" }}>
                   <KeyRound size={16} color="#2563eb" /> Permissions
-                  <span style={{ fontSize: "12px", color: "#888", fontWeight: "500" }}>({form.permissionIds.length} selected of {permissions.length})</span>
+                  <span style={{ fontSize: "12px", color: "#888", fontWeight: "500" }}>({form.permissionIds.length} selected of {Object.values(groupedPermissions).reduce((n, l) => n + l.length, 0)})</span>
                 </h4>
                 <p style={{ color: "#888", fontSize: "12.5px", margin: "0 0 12px" }}>
                   These are real permission records from the database. Changes take effect on the next authorization refresh.
+                </p>
+                <p style={{ color: "#b45309", fontSize: "12px", margin: "0 0 12px" }}>
+                  Required dependencies are added automatically — e.g. selecting APPROVE_PR also grants VIEW_ASSIGNED_APPROVAL,
+                  and CREATE_PO grants VIEW_PO.
                 </p>
 
                 {permissions.length === 0 ? (
@@ -364,6 +381,15 @@ const SuperRoleManagement = () => {
         </div>
       )}
 
+      {/* Role Users Modal */}
+      {usersTarget && (
+        <RoleUsersModal
+          role={usersTarget}
+          onClose={() => setUsersTarget(null)}
+          onSelectUser={(u) => triggerToast(`${u.displayName || u.username} — open User Management to edit their profile or permissions.`, "ok")}
+        />
+      )}
+
       {/* Delete Confirm */}
       {deleteTarget && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0, 0, 0, 0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "16px" }}>
@@ -384,6 +410,88 @@ const SuperRoleManagement = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+/**
+ * Lists the users currently assigned to a role. Counts are read from the
+ * database (role.userCount / /api/users) — nothing is hardcoded.
+ */
+const RoleUsersModal = ({ role, onClose }) => {
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    apiGet("/api/users")
+      .then((list) => {
+        const roleUsers = (list || []).filter((u) => u.roleId === role.id);
+        setUsers(roleUsers);
+      })
+      .catch((err) => setError(err.message || "Could not load assigned users."))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role.id]);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1100, padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "720px", maxHeight: "85vh", display: "flex", flexDirection: "column", boxShadow: "0 12px 36px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec" }}>
+          <div>
+            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>ROLE USERS</span>
+            <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#111", margin: 0 }}>
+              {role.roleName} <span style={{ color: "#888", fontSize: "14px" }}>({role.roleCode})</span>
+            </h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+          {error ? (
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#dc2626", fontSize: "13.5px" }}>
+              <AlertCircle size={16} /> {error}
+            </div>
+          ) : loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "40px 0", color: "#888", fontWeight: "600" }}>
+              <Loader2 size={20} className="login-spin" /> Loading assigned users...
+            </div>
+          ) : users.length === 0 ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#999" }}>No users are currently assigned to this role.</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13.5px" }}>
+                <thead>
+                  <tr>
+                    {["Name", "Employee ID", "Department", "Status", "Last Login"].map((h) => (
+                      <th key={h} style={{ textAlign: "left", color: "#7a8999", fontSize: "11.5px", textTransform: "uppercase", letterSpacing: ".4px", padding: "10px", borderBottom: "1px solid #eceef1" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id} style={{ borderTop: "1px solid #f2f4f6" }}>
+                      <td style={{ padding: "10px", fontWeight: "700", color: "#111" }}>{u.displayName}</td>
+                      <td style={{ padding: "10px", color: "#555" }}>{u.employeeCode}</td>
+                      <td style={{ padding: "10px", color: "#555" }}>{u.departmentName || "—"}</td>
+                      <td style={{ padding: "10px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "800", padding: "2px 8px", borderRadius: "12px", background: u.enabled ? "rgba(5,150,105,.12)" : "rgba(220,38,38,.12)", color: u.enabled ? "#059669" : "#dc2626" }}>
+                          {u.enabled ? "ACTIVE" : "INACTIVE"}
+                        </span>
+                      </td>
+                      <td style={{ padding: "10px", color: "#666" }}>{u.lastLogin ? new Date(u.lastLogin).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
+          <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", fontWeight: "700", cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
     </div>
   );
 };

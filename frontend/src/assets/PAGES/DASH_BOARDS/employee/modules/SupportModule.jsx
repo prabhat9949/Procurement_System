@@ -13,11 +13,11 @@ import {
 const guidelinesList = [
   {
     title: "1. Purchasing Threshold & Approval Delegation",
-    desc: "Requisitions under $5,000 require Department Manager approval only. Requisitions between $5,000 and $25,000 require Procurement Manager sign-off. Items above $25,000 require CFO authorization.",
+    desc: "Requisitions under ₹5,000 require Department Manager approval only. Requisitions between ₹5,000 and ₹25,000 require Procurement Manager sign-off. Items above ₹25,000 require CFO authorization.",
   },
   {
     title: "2. Vendor Sourcing & Mandatory Quotes",
-    desc: "For IT hardware purchases over $3,000, employees must attach at least one official vendor quotation PDF during requisition creation.",
+    desc: "For IT hardware purchases over ₹3,000, employees must attach at least one official vendor quotation PDF during requisition creation.",
   },
   {
     title: "3. Delivery & Inventory Tagging",

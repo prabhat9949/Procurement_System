@@ -1,5 +1,5 @@
 import React from "react";
-import { PackageCheck, Truck, IndianRupee, AlertTriangle, Boxes, Warehouse as WarehouseIcon, FileCheck2 } from "lucide-react";
+import { Warehouse, Boxes, PackageCheck, AlertTriangle, Truck, Package, CheckCircle2 } from "lucide-react";
 import LiveRoleOverview from "../../shared_ui/LiveRoleOverview";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 
@@ -10,62 +10,66 @@ const InventoryOverview = ({ onNavigate }) => {
     <LiveRoleOverview
       header={{
         title: `Welcome back, ${displayName}`,
-        subtitle: "Pending GRNs, stock levels and inbound deliveries — all live from the database.",
-        badge: "WAREHOUSE & INVENTORY PORTAL",
-        icon: WarehouseIcon,
-        accent: "#0891b2",
+        subtitle: "Receiving, GRN and stock position — every number is live from the database.",
+        badge: "INVENTORY CONTROL PORTAL",
+        icon: Warehouse,
+        accent: "#f8b400",
       }}
       actions={[
-        { label: "Goods Receiving", icon: PackageCheck, primary: true, onClick: () => onNavigate("goods-receiving") },
+        { label: "Goods Receiving", icon: Truck, primary: true, onClick: () => onNavigate("goods-receiving") },
+        { label: "Stock Management", icon: PackageCheck, onClick: () => onNavigate("stock-management") },
       ]}
       endpoints={{
         dash: "/api/dashboard/warehouse",
-        inv: "/api/inventory?page=0&size=50",
-        grns: "/api/goods-receipts?page=0&size=20",
+        inventory: "/api/inventory?page=0&size=100",
+        grns: "/api/goods-receipts?page=0&size=30",
+        warehouses: "/api/warehouses?page=0&size=30",
+        invChart: "/api/dashboard/charts/inventory",
       }}
       kpiFn={(data) => {
         const kpi = (code) => data.dash?.kpis?.find((k) => k.code === code);
         const count = (code) => kpi(code)?.count ?? 0;
-        const amount = (code) => kpi(code)?.amount ?? 0;
+        const inv = data.inventory?.content || [];
+        const grns = data.grns?.content || [];
+        const low = inv.filter((i) => Number(i.availableQuantity) <= Number(i.reorderLevel || 0) && Number(i.availableQuantity) > 0).length;
+        const out = inv.filter((i) => Number(i.availableQuantity) <= 0).length;
         return [
-          { label: "Pending GRNs", value: count("PENDING_GRNS"), icon: FileCheck2, color: "#d97706" },
-          { label: "Goods Received Today", value: count("GOODS_RECEIVED_TODAY"), icon: Truck, color: "#2563eb" },
-          { label: "Inventory Value", value: formatINR(amount("INVENTORY_VALUE")), icon: IndianRupee, color: "#059669" },
-          { label: "Low Stock", value: count("LOW_STOCK"), icon: AlertTriangle, color: "#d97706" },
-          { label: "Out of Stock", value: count("OUT_OF_STOCK"), icon: Boxes, color: "#dc2626" },
+          { label: "Inventory Records", value: count("INVENTORY") || inv.length, icon: Boxes, color: "#2563eb" },
+          { label: "Low Stock", value: low, icon: AlertTriangle, color: "#d97706" },
+          { label: "Out of Stock", value: out, icon: AlertTriangle, color: "#dc2626" },
+          { label: "GRNs Completed", value: grns.filter((g) => g.status === "COMPLETED" || g.status === "RECEIVED").length, icon: CheckCircle2, color: "#059669" },
+          { label: "Warehouses", value: count("WAREHOUSES") || data.warehouses?.content?.length || 0, icon: Warehouse, color: "#7c3aed" },
+          { label: "Pending GRNs", value: grns.filter((g) => !["COMPLETED", "RECEIVED", "REJECTED", "CANCELLED"].includes(g.status)).length, icon: Package, color: "#0891b2" },
         ];
       }}
-      charts={[
-        { key: "dash", code: "GRNS", label: "Goods Receipt Trend", color: "#0891b2", type: "bar" },
-        { key: "dash", code: "INVENTORY_VALUE", label: "Inventory Value by Warehouse", color: "#059669", type: "area" },
-      ]}
+      charts={[{ key: "invChart", label: "Inventory Trend", color: "#f8b400", type: "area" }]}
       tables={[
         {
-          key: "inv",
-          title: "Current Stock Levels",
-          emptyText: "No inventory records found.",
+          key: "inventory",
+          title: "Stock Position",
+          emptyText: "No inventory records are currently available.",
           maxRows: 10,
           columns: [
-            { header: "Product", render: (r) => <strong style={{ color: "#0891b2" }}>{r.productCode}</strong> },
-            { header: "Name", render: (r) => <span style={{ fontWeight: 600 }}>{r.productName}</span> },
+            { header: "Product", accessor: "productName" },
             { header: "Warehouse", accessor: "warehouseName" },
-            { header: "Available", render: (r) => <strong>{formatINR(r.availableQuantity, { symbol: false })}</strong> },
-            { header: "Reserved", render: (r) => <span>{formatINR(r.reservedQuantity, { symbol: false })}</span> },
-            { header: "Damaged", render: (r) => <span style={{ color: r.damagedQuantity > 0 ? "#dc2626" : "#7a8999" }}>{formatINR(r.damagedQuantity, { symbol: false })}</span> },
+            { header: "Available", render: (r) => <strong>{Number(r.availableQuantity)}</strong> },
+            { header: "Reserved", render: (r) => <span>{Number(r.reservedQuantity)}</span> },
+            { header: "Value", render: (r) => <strong>{formatINR(r.inventoryValue)}</strong> },
+            { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.status === "LOW_STOCK" || r.status === "OUT_OF_STOCK" ? "rgba(220,38,38,.12)" : "rgba(5,150,105,.12)", color: r.status === "LOW_STOCK" || r.status === "OUT_OF_STOCK" ? "#dc2626" : "#059669" }}>{r.status}</span> },
           ],
         },
         {
           key: "grns",
-          title: "Goods Receipt Notes",
-          emptyText: "No goods receipts have been recorded yet.",
+          title: "Recent GRNs",
+          emptyText: "No GRNs are currently pending.",
           maxRows: 8,
           columns: [
-            { header: "GRN No.", render: (r) => <strong style={{ color: "#0891b2" }}>{r.grnNumber}</strong> },
+            { header: "GRN", render: (r) => <strong style={{ color: "#d97706" }}>{r.grnNumber}</strong> },
             { header: "PO", accessor: "poNumber" },
             { header: "Vendor", accessor: "vendorName" },
             { header: "Warehouse", accessor: "warehouseName" },
-            { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.status === "COMPLETED" ? "rgba(5,150,105,.12)" : r.status === "CANCELLED" || r.status === "REJECTED" ? "rgba(220,38,38,.12)" : "rgba(217,119,6,.12)", color: r.status === "COMPLETED" ? "#059669" : r.status === "CANCELLED" || r.status === "REJECTED" ? "#dc2626" : "#d97706" }}>{r.status}</span> },
-            { header: "Receipt Date", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.receiptDate, { withTime: false })}</span> },
+            { header: "Date", render: (r) => <span style={{ color: "#7a8999", fontSize: "12.5px" }}>{formatDateIN(r.receiptDate, { withTime: false })}</span> },
+            { header: "Status", render: (r) => <span className="lro-badge" style={{ background: r.status === "COMPLETED" || r.status === "RECEIVED" ? "rgba(5,150,105,.12)" : "rgba(217,119,6,.12)", color: r.status === "COMPLETED" || r.status === "RECEIVED" ? "#059669" : "#d97706" }}>{r.status}</span> },
           ],
         },
       ]}

@@ -13,7 +13,7 @@ import {
   Filter,
   ShieldCheck,
   Award,
-  DollarSign,
+  IndianRupee,
   Plus,
   Trash2,
   Upload,
@@ -87,9 +87,9 @@ const availableVendorsList = [
 ];
 
 const mockPurchaseRequests = [
-  { id: "REQ-2026-8921", title: "MacBook Pro M3 Max Workstations", dept: "Engineering & IT", qty: 10, budget: "$38,990.00" },
-  { id: "REQ-2026-8945", title: "Datadog Enterprise APM License", dept: "Engineering & IT", qty: 1, budget: "$8,500.00" },
-  { id: "REQ-2026-8972", title: "Cisco Catalyst 9300 Switches", dept: "Engineering & IT", qty: 2, budget: "$6,200.00" },
+  { id: "REQ-2026-8921", title: "MacBook Pro M3 Max Workstations", dept: "Engineering & IT", qty: 10, budget: "₹38,990.00" },
+  { id: "REQ-2026-8945", title: "Datadog Enterprise APM License", dept: "Engineering & IT", qty: 1, budget: "₹8,500.00" },
+  { id: "REQ-2026-8972", title: "Cisco Catalyst 9300 Switches", dept: "Engineering & IT", qty: 2, budget: "₹6,200.00" },
 ];
 
 const CreateRfqWizardModal = ({ onClose, onRfqCreated, initialReqData }) => {
@@ -115,7 +115,7 @@ const CreateRfqWizardModal = ({ onClose, onRfqCreated, initialReqData }) => {
       unitOfMeasurement: "Units",
       productSpecifications: initialReqData?.justification || "Apple M3 Max 16-Core CPU, 40-Core GPU, 64GB Memory, 1TB SSD Space Gray",
       expectedDeliveryDate: "2026-08-12",
-      estimatedBudget: initialReqData?.targetCost || initialReqData?.estimatedCost || "$38,990.00",
+      estimatedBudget: initialReqData?.targetCost || initialReqData?.estimatedCost || "₹38,990.00",
     },
   ]);
 
@@ -143,7 +143,7 @@ const CreateRfqWizardModal = ({ onClose, onRfqCreated, initialReqData }) => {
     "Technical Compliance Sheet",
     "GST / Tax Verification",
   ]);
-  const [currencySelection, setCurrencySelection] = useState("USD ($)");
+  const [currencySelection, setCurrencySelection] = useState("INR (₹)");
   const [taxInformation, setTaxInformation] = useState("GST Included");
   const [specialProcurementReqs, setSpecialProcurementReqs] = useState("Vendor must provide proof of authorized OEM direct reseller status.");
   const [additionalNotes, setAdditionalNotes] = useState("Bids must remain valid for minimum 30 calendar days.");
@@ -612,7 +612,7 @@ const CreateRfqWizardModal = ({ onClose, onRfqCreated, initialReqData }) => {
                           className="pe-form-input"
                           value={prod.estimatedBudget}
                           onChange={(e) => handleUpdateProduct(prod.id, "estimatedBudget", e.target.value)}
-                          placeholder="e.g. $38,990.00"
+                          placeholder="e.g. ₹38,990.00"
                         />
                       </div>
                     </div>
@@ -824,7 +824,6 @@ const CreateRfqWizardModal = ({ onClose, onRfqCreated, initialReqData }) => {
                     value={currencySelection}
                     onChange={(e) => setCurrencySelection(e.target.value)}
                   >
-                    <option value="USD ($)">USD ($)</option>
                     <option value="INR (₹)">INR (₹)</option>
                     <option value="EUR (€)">EUR (€)</option>
                     <option value="GBP (£)">GBP (£)</option>

@@ -29,8 +29,12 @@ import {
   User,
   KeyRound,
   TrendingUp,
+  ClipboardList,
+  History,
+  Clock,
 } from "lucide-react";
 import { apiGet, apiPost, apiPut } from "../../../../services/apiClient";
+import { hasPermission } from "../../../../utils/permissions";
 import RoleShell from "../shared_ui/RoleShell";
 
 const countFormat = new Intl.NumberFormat("en-IN");
@@ -46,6 +50,7 @@ const NAV_ITEMS = [
   { id: "departments", label: "Departments", icon: Building2 },
   { id: "structure", label: "Reporting Structure", icon: GitBranch },
   { id: "accounts", label: "Employee Accounts", icon: UserCog },
+  { id: "tracking", label: "Procurement Tracking", icon: ClipboardList },
   { id: "reports", label: "HR Reports", icon: BarChart3 },
   { id: "notifications", label: "Notifications", icon: Bell },
 ];
@@ -171,6 +176,9 @@ export default function HrDashboard() {
       {activeTab === "departments" && <DepartmentsView departments={departments} dash={dash} />}
       {activeTab === "structure" && <StructureView />}
       {activeTab === "accounts" && <AccountsView />}
+      {activeTab === "tracking" && (
+        <ProcurementTrackingView departments={departments} />
+      )}
       {activeTab === "reports" && (
         <ReportsView departments={departments} costCenters={costCenters} dash={dash} />
       )}
@@ -456,7 +464,7 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
             {departments.map((d) => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
           </FilterSelect>
           <FilterSelect value={filters.roleId} onChange={(v) => { setFilters((f) => ({ ...f, roleId: v })); resetPage(); }} placeholder="Designation / Role">
-            {roles.filter((r) => r.active !== false).map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
+            {roles.filter((r) => r.active !== false && !["ADMIN", "SUPER_ADMIN"].includes(r.roleCode)).map((r) => <option key={r.id} value={r.id}>{r.roleName}</option>)}
           </FilterSelect>
           <FilterSelect value={filters.managerId} onChange={(v) => { setFilters((f) => ({ ...f, managerId: v })); resetPage(); }} placeholder="All managers">
             {managers.map((m) => <option key={m.id} value={m.id}>{fullName(m)}</option>)}
@@ -507,11 +515,26 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
                   <td style={{ padding: "12px 10px", color: "#64748b" }}>{employee.email}</td>
                   <td style={{ padding: "12px 10px" }}><StatusChip active={employee.active} /></td>
                   <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
-                    <IconBtn title="View profile" onClick={() => setProfileEmployee(employee)}><Eye size={15} /></IconBtn>
-                    <IconBtn title="Edit" onClick={() => { setEditing(employee); setFormOpen(true); }}><Edit size={15} /></IconBtn>
-                    <IconBtn title={employee.active ? "Deactivate" : "Activate"} onClick={() => (employee.active ? setConfirmTarget(employee) : toggleActive(employee))} danger={employee.active}>
-                      {employee.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
-                    </IconBtn>
+                    {(() => {
+                      const isAdmin = ["ADMIN", "SUPER_ADMIN"].includes(employee.roleCode);
+                      if (isAdmin) {
+                        return (
+                          <>
+                            <IconBtn title="View profile" onClick={() => setProfileEmployee(employee)}><Eye size={15} /></IconBtn>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", padding: "3px 8px", borderRadius: 20 }} title="Protected — HR cannot modify administrator records">Protected</span>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          <IconBtn title="View profile" onClick={() => setProfileEmployee(employee)}><Eye size={15} /></IconBtn>
+                          <IconBtn title="Edit" onClick={() => { setEditing(employee); setFormOpen(true); }}><Edit size={15} /></IconBtn>
+                          <IconBtn title={employee.active ? "Deactivate" : "Activate"} onClick={() => (employee.active ? setConfirmTarget(employee) : toggleActive(employee))} danger={employee.active}>
+                            {employee.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
+                          </IconBtn>
+                        </>
+                      );
+                    })()}
                   </td>
                 </tr>
               ))}
@@ -705,7 +728,7 @@ function EmployeeFormModal({ departments, roles, employee, onClose, onSaved }) {
         <Field label="Designation / Role *" error={fieldErrors.roleId}>
           <select value={form.roleId} onChange={(e) => setForm({ ...form, roleId: e.target.value })} style={inputStyle(!!fieldErrors.roleId)}>
             <option value="">Select designation</option>
-            {roles.filter((r) => r.active !== false).map((r) => (
+            {roles.filter((r) => r.active !== false && !["ADMIN", "SUPER_ADMIN"].includes(r.roleCode)).map((r) => (
               <option key={r.id} value={r.id}>{r.roleName}</option>
             ))}
           </select>
@@ -880,6 +903,419 @@ function EmployeeProfileDrawer({ employee, onClose }) {
     </div>
   );
 }
+
+/* ------------------------------------------------------------------ */
+/*  Procurement Tracking (All Active PRs monitoring)                   */
+/* ------------------------------------------------------------------ */
+function ProcurementTrackingView({ departments }) {
+  const canViewAll = hasPermission("CAN_VIEW_ALL_EMPLOYEE_PR");
+  const canTimeline = hasPermission("CAN_VIEW_PR_TIMELINE");
+  const canApprovalHistory = hasPermission("CAN_VIEW_APPROVAL_HISTORY");
+
+  const [rows, setRows] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
+  const [size] = useState(15);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [keyword, setKeyword] = useState("");
+  const [debouncedKeyword, setDebouncedKeyword] = useState("");
+  const [filters, setFilters] = useState({
+    departmentId: "",
+    requesterId: "",
+    status: "",
+    approvalStatus: "",
+    createdDateFrom: "",
+    createdDateTo: "",
+  });
+  const [employees, setEmployees] = useState([]);
+  const [selectedPr, setSelectedPr] = useState(null);
+  const [prDetail, setPrDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [timeline, setTimeline] = useState(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const triggerToast = (msg, tone = "ok") => {
+    setToast({ msg, tone });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  // Employees for the searchable requester dropdown.
+  useEffect(() => {
+    let mounted = true;
+    apiGet("/api/employees?page=0&size=500&sort=firstName&direction=asc")
+      .then((pageData) => mounted && setEmployees(pageData?.content || []))
+      .catch(() => mounted && setEmployees([]));
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(keyword), 350);
+    return () => clearTimeout(timer);
+  }, [keyword]);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams({ page: String(page), size: String(size), sort: "createdAt", direction: "desc" });
+      if (debouncedKeyword.trim()) params.set("keyword", debouncedKeyword.trim());
+      if (filters.departmentId) params.set("departmentId", filters.departmentId);
+      if (filters.requesterId) params.set("requesterId", filters.requesterId);
+      if (filters.status) params.set("status", filters.status);
+      if (filters.approvalStatus) params.set("approvalStatus", filters.approvalStatus);
+      if (filters.createdDateFrom) params.set("createdDateFrom", filters.createdDateFrom);
+      if (filters.createdDateTo) params.set("createdDateTo", filters.createdDateTo);
+      const data = await apiGet(`/api/hr/purchase-requests?${params.toString()}`);
+      setRows(data?.content || []);
+      setTotal(data?.totalElements || 0);
+    } catch (err) {
+      setError(err.message || "Failed to load active purchase requests.");
+    } finally {
+      setLoading(false);
+    }
+  }, [page, size, debouncedKeyword, filters]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const resetPage = () => setPage(0);
+
+  const openPr = async (pr) => {
+    setSelectedPr(pr);
+    setPrDetail(null);
+    setTimeline(null);
+    setDetailLoading(true);
+    try {
+      const detail = await apiGet(`/api/hr/purchase-requests/${pr.id}`);
+      setPrDetail(detail);
+    } catch (err) {
+      triggerToast(err.message || "Failed to load PR detail.", "error");
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const openTimeline = async (pr) => {
+    if (!canTimeline) {
+      triggerToast("You do not have permission to view PR timelines.", "warn");
+      return;
+    }
+    setTimeline(null);
+    setTimelineLoading(true);
+    try {
+      const events = await apiGet(`/api/hr/purchase-requests/${pr.id}/timeline`);
+      setTimeline(events || []);
+    } catch (err) {
+      triggerToast(err.message || "Failed to load the PR timeline.", "error");
+    } finally {
+      setTimelineLoading(false);
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / size));
+
+  return (
+    <section style={{ background: "#fff", borderRadius: 12, padding: 22, marginTop: 20, border: "1px solid #e7ebf0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 6 }}>
+        <h2 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: "#111" }}>
+          <ClipboardList size={17} style={{ verticalAlign: "-2px", marginRight: 6, color: ACCENT }} />
+          Active Purchase Requests <span style={{ color: "#68778a", fontSize: 13, fontWeight: 600 }}>({countFormat.format(total)})</span>
+        </h2>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {!canViewAll && (
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", padding: "5px 11px", borderRadius: 20 }}>
+              Scoped to your department
+            </span>
+          )}
+          {canViewAll && (
+            <span style={{ fontSize: 11.5, fontWeight: 700, color: "#047857", background: "#ecfdf5", border: "1px solid #a7f3d0", padding: "5px 11px", borderRadius: 20 }}>
+              Organisation-wide scope
+            </span>
+          )}
+        </div>
+      </div>
+      <p style={{ margin: "0 0 14px", color: "#68778a", fontSize: 13 }}>
+        Every employee purchase request in progress, live from the database — with the current stage, owner and approval history.
+      </p>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", border: "1px solid #dbe2ea", borderRadius: 9, padding: "8px 12px", background: "#f8f9fb" }}>
+          <Search size={15} color="#68778a" />
+          <input
+            value={keyword}
+            onChange={(e) => { setKeyword(e.target.value); resetPage(); }}
+            placeholder="Search PR number, purpose"
+            style={{ border: 0, outline: 0, background: "transparent", fontSize: 13.5, minWidth: 170 }}
+          />
+          {keyword && <X size={14} onClick={() => { setKeyword(""); resetPage(); }} style={{ cursor: "pointer" }} />}
+        </div>
+        <FilterSelect value={filters.status} onChange={(v) => { setFilters((f) => ({ ...f, status: v })); resetPage(); }} placeholder="All statuses">
+          {["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "RFQ_CREATED", "REJECTED", "CANCELLED"].map((s) => (
+            <option key={s} value={s}>{s.replace(/_/g, " ")}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect value={filters.approvalStatus} onChange={(v) => { setFilters((f) => ({ ...f, approvalStatus: v })); resetPage(); }} placeholder="Approval status">
+          {["PENDING", "APPROVED", "REJECTED", "RETURNED"].map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </FilterSelect>
+        <FilterSelect value={filters.departmentId} onChange={(v) => { setFilters((f) => ({ ...f, departmentId: v })); resetPage(); }} placeholder="All departments">
+          {departments.map((d) => <option key={d.id} value={d.id}>{d.departmentName}</option>)}
+        </FilterSelect>
+        <FilterSelect value={filters.requesterId} onChange={(v) => { setFilters((f) => ({ ...f, requesterId: v })); resetPage(); }} placeholder="All employees">
+          {employees.map((e) => <option key={e.id} value={e.id}>{fullName(e)} ({e.employeeCode})</option>)}
+        </FilterSelect>
+        <input type="date" value={filters.createdDateFrom} onChange={(e) => { setFilters((f) => ({ ...f, createdDateFrom: e.target.value })); resetPage(); }} style={dateInputStyle()} title="From date" />
+        <input type="date" value={filters.createdDateTo} onChange={(e) => { setFilters((f) => ({ ...f, createdDateTo: e.target.value })); resetPage(); }} style={dateInputStyle()} title="To date" />
+        <button
+          onClick={load}
+          style={{ border: "1px solid #d9d9d9", background: "#f8f9fb", borderRadius: 9, padding: "9px 14px", cursor: "pointer", fontWeight: 700, fontSize: 13, color: "#111", display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          <RefreshCw size={14} /> Refresh
+        </button>
+      </div>
+
+      {error && <div style={{ marginBottom: 12, padding: 12, background: "#fff1f2", color: "#be123c", borderRadius: 9, fontWeight: 600 }}>{error}</div>}
+
+      {loading ? (
+        <LoadingRow text="Loading active purchase requests..." />
+      ) : rows.length === 0 ? (
+        <EmptyState text="No active purchase requests match the current filters." />
+      ) : (
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 6 }}>
+            <thead>
+              <tr>
+                {["PR Number", "Requester", "Department", "Purpose", "Amount", "Status", "Approval", "Stage / Owner", "Age", "Actions"].map((heading) => (
+                  <th key={heading} style={{ textAlign: "left", color: "#68778a", fontSize: 11.5, textTransform: "uppercase", letterSpacing: ".4px", padding: "12px 10px", borderBottom: "1px solid #e7edf3", whiteSpace: "nowrap" }}>{heading}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((pr) => (
+                <tr key={pr.id} style={{ borderBottom: "1px solid #eef2f6" }}>
+                  <td style={{ padding: "12px 10px", fontWeight: 700, color: "#111", whiteSpace: "nowrap" }}>{pr.requestNumber}</td>
+                  <td style={{ padding: "12px 10px" }}>
+                    <strong style={{ fontSize: 13, color: "#111" }}>{pr.requesterName}</strong>
+                    <div style={{ fontSize: 12, color: "#68778a" }}>{pr.employeeCode}</div>
+                  </td>
+                  <td style={{ padding: "12px 10px", color: "#334155" }}>{pr.departmentName || "—"}</td>
+                  <td style={{ padding: "12px 10px", maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#334155" }} title={pr.purpose}>{pr.purpose || "—"}</td>
+                  <td style={{ padding: "12px 10px", fontWeight: 700, color: "#111", whiteSpace: "nowrap" }}>{pr.estimatedAmount != null ? moneyFormat.format(pr.estimatedAmount) : "—"}</td>
+                  <td style={{ padding: "12px 10px" }}><StatusChip active={pr.status === "APPROVED" || pr.status === "RFQ_CREATED"} label={pr.status} /></td>
+                  <td style={{ padding: "12px 10px" }}><ApprovalChip status={pr.approvalStatus} /></td>
+                  <td style={{ padding: "12px 10px" }}>
+                    {pr.currentStage && <div style={{ fontSize: 12.5, fontWeight: 700, color: "#111" }}>{pr.currentStage}</div>}
+                    {pr.currentOwner && <div style={{ fontSize: 12, color: "#68778a" }}>{pr.currentOwner}</div>}
+                    {!pr.currentStage && <span style={{ color: "#94a3b8" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "12px 10px", color: pr.ageDays >= 7 ? "#dc2626" : "#64748b", fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {pr.ageDays}d
+                  </td>
+                  <td style={{ padding: "12px 10px", whiteSpace: "nowrap" }}>
+                    <IconBtn title="View detail" onClick={() => openPr(pr)}><Eye size={15} /></IconBtn>
+                    {canTimeline && (
+                      <IconBtn title="View full process" onClick={() => openTimeline(pr)}><History size={15} /></IconBtn>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Pagination */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16, flexWrap: "wrap", gap: 10 }}>
+        <span style={{ color: "#68778a", fontSize: 13 }}>
+          Page {page + 1} of {totalPages} · {countFormat.format(total)} requests
+        </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))} style={pageBtn(page === 0)}><ChevronLeft size={15} /> Prev</button>
+          <button disabled={page >= totalPages - 1} onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} style={pageBtn(page >= totalPages - 1)}>Next <ChevronRight size={15} /></button>
+        </div>
+      </div>
+
+      {/* PR detail drawer */}
+      {selectedPr && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,27,45,.45)", backdropFilter: "blur(3px)", zIndex: 400, display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ background: "#fff", width: "min(620px, 100%)", height: "100%", overflowY: "auto", padding: "26px 26px 40px", boxShadow: "-8px 0 30px rgba(0,0,0,.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+              <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, color: "#111" }}>Purchase Request Detail</h2>
+              <button onClick={() => { setSelectedPr(null); setPrDetail(null); setTimeline(null); }} style={{ border: "none", background: "#f1f3f5", width: 32, height: 32, borderRadius: 8, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X size={16} /></button>
+            </div>
+            <p style={{ color: "#68778a", fontSize: 13, margin: "0 0 18px" }}>{selectedPr.requestNumber} · live from the database</p>
+
+            {detailLoading ? (
+              <LoadingRow text="Loading request detail..." />
+            ) : prDetail ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <InfoBox label="Requester" value={prDetail.requesterName} />
+                  <InfoBox label="Employee ID" value={prDetail.employeeCode} />
+                  <InfoBox label="Department" value={prDetail.departmentName} />
+                  <InfoBox label="Cost Center" value={prDetail.costCenterName} />
+                  <InfoBox label="Manager" value={prDetail.managerName} />
+                  <InfoBox label="Priority" value={prDetail.priority} />
+                  <InfoBox label="Status" value={prDetail.status} />
+                  <InfoBox label="Approval Status" value={prDetail.approvalStatus} />
+                  <InfoBox label="Estimated Amount" value={prDetail.estimatedAmount != null ? moneyFormat.format(prDetail.estimatedAmount) : "—"} />
+                  <InfoBox label="Request Date" value={formatDate(prDetail.requestDate)} />
+                  <InfoBox label="Required Date" value={formatDate(prDetail.requiredDate)} />
+                  <InfoBox label="Age" value={`${prDetail.ageDays} day(s)`} />
+                  <InfoBox label="Current Stage" value={prDetail.currentStage} />
+                  <InfoBox label="Current Owner" value={prDetail.currentOwner} />
+                </div>
+                {prDetail.nextAction && (
+                  <div style={{ marginTop: 12, padding: "11px 14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 9, fontSize: 13, color: "#92400e", fontWeight: 600 }}>
+                    Next: {prDetail.nextAction}
+                  </div>
+                )}
+                {prDetail.purpose && (
+                  <div style={{ marginTop: 12, fontSize: 13.5, color: "#334155", lineHeight: 1.6 }}>
+                    <SectionTitle>Purpose</SectionTitle>
+                    {prDetail.purpose}
+                  </div>
+                )}
+
+                {/* Approval history */}
+                {canApprovalHistory && (
+                  <>
+                    <SectionTitle>Approval History</SectionTitle>
+                    {!prDetail.approvalHistory || prDetail.approvalHistory.length === 0 ? (
+                      <p style={{ color: "#68778a", fontSize: 13 }}>No approval decisions recorded yet.</p>
+                    ) : (
+                      <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                          <thead>
+                            <tr>
+                              {["Stage", "Approver", "Role", "Decision", "Comments", "Date"].map((h) => (
+                                <th key={h} style={{ textAlign: "left", color: "#68778a", fontSize: 11, textTransform: "uppercase", letterSpacing: ".3px", padding: "8px 6px", borderBottom: "1px solid #e7edf3" }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {prDetail.approvalHistory.map((task) => (
+                              <tr key={task.taskId}>
+                                <td style={{ padding: "9px 6px", fontWeight: 700, color: "#111", fontSize: 12.5 }}>{task.stageName}</td>
+                                <td style={{ padding: "9px 6px", fontSize: 12.5 }}>
+                                  <div style={{ fontWeight: 700, color: "#111" }}>{task.approverName}</div>
+                                  <div style={{ fontSize: 11.5, color: "#68778a" }}>{task.approverEmployeeCode}</div>
+                                </td>
+                                <td style={{ padding: "9px 6px", fontSize: 12.5 }}>{task.approverRole}</td>
+                                <td style={{ padding: "9px 6px" }}><ApprovalChip status={task.status} /></td>
+                                <td style={{ padding: "9px 6px", fontSize: 12.5, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={task.comments || ""}>{task.comments || "—"}</td>
+                                <td style={{ padding: "9px 6px", fontSize: 12.5, whiteSpace: "nowrap" }}>{task.completedDate ? formatDateTime(task.completedDate) : formatDateTime(task.assignedDate)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+                  {canTimeline && (
+                    <button
+                      onClick={() => openTimeline(selectedPr)}
+                      style={{ border: 0, borderRadius: 9, background: ACCENT, color: "#111", padding: "11px 18px", cursor: "pointer", fontWeight: 800, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 7, boxShadow: "0 4px 14px rgba(248,180,0,.35)" }}
+                    >
+                      <History size={15} /> View Full Process
+                    </button>
+                  )}
+                  {!canTimeline && (
+                    <span style={{ fontSize: 12.5, color: "#94a3b8" }}>PR timeline access is restricted for your role.</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <p style={{ color: "#be123c", fontWeight: 600 }}>Unable to load request detail.</p>
+            )}
+
+            {/* Timeline */}
+            {timeline && (
+              <div style={{ marginTop: 26 }}>
+                <SectionTitle>Full Process Timeline</SectionTitle>
+                <p style={{ fontSize: 12.5, color: "#68778a", margin: "0 0 12px" }}>
+                  Who handled this request, when — from approval tasks and audit events.
+                </p>
+                {timeline.length === 0 ? (
+                  <p style={{ color: "#68778a", fontSize: 13 }}>No timeline events recorded yet.</p>
+                ) : (
+                  timeline.map((event, index) => (
+                    <div key={index} style={{ display: "flex", gap: 12, position: "relative", paddingBottom: 16 }}>
+                      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: index === timeline.length - 1 ? "#059669" : "#f8b4001a", color: index === timeline.length - 1 ? "#fff" : "#d97706", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>
+                          <CheckCircle2 size={14} />
+                        </div>
+                        {index < timeline.length - 1 && <div style={{ width: 2, flex: 1, background: "#e7ebf0" }} />}
+                      </div>
+                      <div style={{ paddingBottom: 8, minWidth: 0 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                          <strong style={{ fontSize: 13.5, color: "#111" }}>{event.action}</strong>
+                          <span style={{ fontSize: 12, color: "#94a3b8", whiteSpace: "nowrap" }}>{formatDateTime(event.timestamp)}</span>
+                        </div>
+                        {event.person && (
+                          <div style={{ fontSize: 12.5, color: "#475569", marginTop: 2 }}>
+                            {event.person}
+                            {event.employeeCode ? ` (${event.employeeCode})` : ""}
+                            {event.role ? ` · ${event.role}` : ""}
+                          </div>
+                        )}
+                        {event.comment && <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 3 }}>{event.comment}</div>}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+            {timelineLoading && <LoadingRow text="Loading full process timeline..." />}
+          </div>
+        </div>
+      )}
+
+      {toast && <Toast toast={toast} />}
+    </section>
+  );
+}
+
+function InfoBox({ label, value }) {
+  return (
+    <div style={{ background: "#fafbfc", border: "1px solid #e7ebf0", borderRadius: 9, padding: "10px 12px" }}>
+      <div style={{ fontSize: 11, fontWeight: 800, textTransform: "uppercase", letterSpacing: ".4px", color: "#68778a", marginBottom: 3 }}>{label}</div>
+      <div style={{ fontSize: 13.5, fontWeight: 700, color: "#111" }}>{value || "—"}</div>
+    </div>
+  );
+}
+
+function ApprovalChip({ status }) {
+  const s = String(status || "").toUpperCase();
+  const isOk = s === "APPROVED";
+  const isBad = s === "REJECTED" || s === "RETURNED";
+  return (
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 800, padding: "4px 10px", borderRadius: 20, background: isBad ? "#fff1f2" : isOk ? "#ecfdf5" : "#fffbeb", color: isBad ? "#be123c" : isOk ? "#047857" : "#b45309" }}>
+      {s || "PENDING"}
+    </span>
+  );
+}
+
+const dateInputStyle = () => ({
+  border: "1px solid #dbe2ea",
+  borderRadius: 9,
+  padding: "8px 10px",
+  background: "#f8f9fb",
+  fontSize: 12.5,
+  color: "#334155",
+  outline: "none",
+  cursor: "pointer",
+});
 
 /* ------------------------------------------------------------------ */
 /*  Departments view                                                   */
@@ -1488,11 +1924,15 @@ function MiniBars({ points }) {
   );
 }
 
-function StatusChip({ active }) {
+function StatusChip({ active, label }) {
+  const text = label ?? (active ? "Active" : "Inactive");
+  const green = active === true;
+  const red = active === false;
+  const amber = active === undefined && label;
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, padding: "4px 11px", borderRadius: 20, background: active ? "#ecfdf5" : "#fff1f2", color: active ? "#047857" : "#be123c" }}>
-      <span style={{ width: 6, height: 6, borderRadius: "50%", background: active ? "#059669" : "#dc2626" }} />
-      {active ? "Active" : "Inactive"}
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 800, padding: "4px 11px", borderRadius: 20, background: amber ? "#fffbeb" : green ? "#ecfdf5" : "#fff1f2", color: amber ? "#b45309" : green ? "#047857" : "#be123c" }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: amber ? "#d97706" : green ? "#059669" : "#dc2626" }} />
+      {text.replace(/_/g, " ")}
     </span>
   );
 }

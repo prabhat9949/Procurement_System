@@ -5,7 +5,7 @@ import "./OrgAdminDashboard.css";
 import {
   Building2,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   Boxes,
   Database,
   Truck,
@@ -68,7 +68,7 @@ const OrgAdminDashboard = () => {
     { id: "audit-logs", label: "Audit Logs", icon: FileText },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "procurement-analytics", label: "Procurement Analytics", icon: ShoppingBag },
-    { id: "financial-analytics", label: "Financial Analytics", icon: DollarSign },
+    { id: "financial-analytics", label: "Financial Analytics", icon: IndianRupee },
     { id: "inventory-analytics", label: "Inventory Analytics", icon: Boxes },
     { id: "vendor-analytics", label: "Vendor Analytics", icon: Activity },
     { id: "department-analytics", label: "Department Analytics", icon: BarChart2 },

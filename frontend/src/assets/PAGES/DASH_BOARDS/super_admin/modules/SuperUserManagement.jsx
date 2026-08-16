@@ -18,6 +18,8 @@ import {
   Building2,
   Banknote,
   AlertTriangle,
+  KeyRound,
+  ArrowRight,
 } from "lucide-react";
 import { apiGet, apiPost, apiPut } from "../../../../../services/apiClient";
 
@@ -42,6 +44,8 @@ const SuperUserManagement = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [creatingUser, setCreatingUser] = useState(false);
+  const [permTarget, setPermTarget] = useState(null);
+  const [roleConfirm, setRoleConfirm] = useState(null);
   const [toast, setToast] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -111,7 +115,7 @@ const SuperUserManagement = () => {
     return { total, active, disabled, locked };
   }, [users]);
 
-  const handleSaveUser = async (form, isCreate) => {
+  const doSaveUser = async (form, isCreate) => {
     setSaving(true);
     setError("");
     try {
@@ -138,12 +142,38 @@ const SuperUserManagement = () => {
       }
       setEditingUser(null);
       setCreatingUser(false);
+      setRoleConfirm(null);
       loadUsers();
       loadLookups();
     } catch (err) {
       triggerToast(err.message || "Failed to save user.", "error");
+      throw err;
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveUser = async (form, isCreate) => {
+    // Role changes require an explicit confirmation showing the old and new role.
+    if (!isCreate && editingUser && Number(form.roleId) !== Number(editingUser.roleId)) {
+      setRoleConfirm({
+        user: editingUser,
+        newRoleId: form.roleId,
+        newRoleName: roleName(form.roleId),
+        form,
+      });
+      return;
+    }
+    await doSaveUser(form, isCreate);
+  };
+
+  const handleSaveOverrides = async (user, items) => {
+    try {
+      await apiPut(`/api/users/${user.id}/permission-overrides`, items);
+      triggerToast(`Permissions updated for ${user.displayName || user.username}.`);
+      setPermTarget(null);
+    } catch (err) {
+      triggerToast(err.message || "Unable to update permissions.", "error");
     }
   };
 
@@ -308,6 +338,9 @@ const SuperUserManagement = () => {
                         <button title="Edit profile & role" onClick={() => setEditingUser({ ...u })} style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "#111", color: "#f8b400", border: "none", borderRadius: "6px", cursor: "pointer", marginRight: "6px" }}>
                           <Pencil size={14} />
                         </button>
+                        <button title="Manage permissions" onClick={() => setPermTarget(u)} style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: "rgba(37,99,235,.1)", color: "#2563eb", border: "none", borderRadius: "6px", cursor: "pointer", marginRight: "6px" }}>
+                          <KeyRound size={14} />
+                        </button>
                         <button title={u.enabled ? "Deactivate" : "Activate"} onClick={() => handleToggleStatus(u)} style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", background: u.enabled ? "rgba(220,38,38,.1)" : "rgba(5,150,105,.1)", color: u.enabled ? "#dc2626" : "#059669", border: "none", borderRadius: "6px", cursor: "pointer" }}>
                           {u.enabled ? <Lock size={14} /> : <Unlock size={14} />}
                         </button>
@@ -346,7 +379,10 @@ const SuperUserManagement = () => {
               <DetailRow label="Created" value={formatDateTime(selectedUser.createdAt)} />
               <DetailRow label="Updated" value={formatDateTime(selectedUser.updatedAt)} />
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec", flexWrap: "wrap" }}>
+              <button onClick={() => setSelectedUser({ ...selectedUser, showEffective: true })} style={{ padding: "9px 18px", borderRadius: "8px", background: "rgba(37,99,235,.1)", color: "#2563eb", border: "none", fontWeight: "700", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <KeyRound size={14} /> Effective Permissions
+              </button>
               <button onClick={() => { setEditingUser({ ...selectedUser }); setSelectedUser(null); }} style={{ padding: "9px 18px", borderRadius: "8px", background: "#111", color: "#f8b400", border: "none", fontWeight: "700", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
                 <Pencil size={14} /> Edit Profile
               </button>
@@ -369,6 +405,64 @@ const SuperUserManagement = () => {
           onSave={handleSaveUser}
           onClose={() => { setCreatingUser(false); setEditingUser(null); }}
         />
+      )}
+
+      {/* Role change confirmation */}
+      {roleConfirm && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1200, padding: "16px" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "480px", boxShadow: "0 12px 36px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec" }}>
+              <div>
+                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>CONFIRM ROLE CHANGE</span>
+                <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#111", margin: 0 }}>{roleConfirm.user.displayName || roleConfirm.user.username}</h3>
+              </div>
+              <button onClick={() => setRoleConfirm(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <div style={{ padding: "24px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: "14px", marginBottom: "16px" }}>
+                <div style={{ flex: 1, padding: "14px", background: "#f8f9fb", border: "1px solid #ececec", borderRadius: "10px" }}>
+                  <div style={{ fontSize: "11px", color: "#888", textTransform: "uppercase", fontWeight: "700" }}>Current Role</div>
+                  <div style={{ fontWeight: "800", color: "#111", marginTop: 4 }}>{roleConfirm.user.roleName || roleConfirm.user.roleCode}</div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", color: "#d97706" }}><ArrowRight size={18} /></div>
+                <div style={{ flex: 1, padding: "14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "10px" }}>
+                  <div style={{ fontSize: "11px", color: "#b45309", textTransform: "uppercase", fontWeight: "700" }}>New Role</div>
+                  <div style={{ fontWeight: "800", color: "#b45309", marginTop: 4 }}>{roleConfirm.newRoleName}</div>
+                </div>
+              </div>
+              <p style={{ margin: 0, fontSize: "13.5px", color: "#666", lineHeight: 1.6 }}>
+                The role is stored in the database. After this change the user's effective permissions and
+                dashboard will change on their next login, and the Dev Login panel will move the account to the
+                new role group. An audit record (USER_ROLE_CHANGED) is created automatically.
+              </p>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
+              <button onClick={() => setRoleConfirm(null)} style={{ padding: "10px 20px", borderRadius: "8px", background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
+              <button
+                disabled={saving}
+                onClick={async () => { try { await doSaveUser(roleConfirm.form, false); } catch (e) { /* toast already shown */ } }}
+                style={{ padding: "10px 22px", borderRadius: "8px", background: "linear-gradient(135deg,#f8b400,#d97706)", color: "#111", border: "none", fontWeight: "800", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+              >
+                {saving ? <Loader2 size={15} className="sadmin-spin" /> : <CheckCircle2 size={15} />} Confirm Change
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User-specific permission overrides */}
+      {permTarget && (
+        <PermissionOverridesModal
+          user={permTarget}
+          onSave={(items) => handleSaveOverrides(permTarget, items)}
+          onClose={() => setPermTarget(null)}
+          onError={(msg) => triggerToast(msg, "error")}
+        />
+      )}
+
+      {/* Effective permissions modal */}
+      {selectedUser?.showEffective && (
+        <EffectivePermissionsModal user={selectedUser} onClose={() => setSelectedUser((s) => (s ? { ...s, showEffective: false } : null))} />
       )}
 
       <style>{`
@@ -530,5 +624,240 @@ const ToggleChip = ({ active, onToggle, activeLabel, inactiveLabel, activeIcon, 
     {active ? activeLabel : inactiveLabel}
   </button>
 );
+
+/**
+ * Resolved effective permissions for one user: role defaults plus any
+ * user-specific ALLOW/DENY overrides, each showing its source.
+ */
+const EffectivePermissionsModal = ({ user, onClose }) => {
+  const [permissions, setPermissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    apiGet(`/api/users/${user.id}/effective-permissions`)
+      .then((list) => setPermissions(list || []))
+      .catch((err) => setError(err.message || "Could not load effective permissions."))
+      .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+
+  const grouped = permissions.reduce((acc, p) => {
+    const mod = p.moduleName || "General";
+    if (!acc[mod]) acc[mod] = [];
+    acc[mod].push(p);
+    return acc;
+  }, {});
+
+  const allowedCount = permissions.filter((p) => p.allowed).length;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1300, padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "760px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 12px 36px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec" }}>
+          <div>
+            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>EFFECTIVE PERMISSIONS</span>
+            <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#111", margin: 0 }}>{user.displayName || user.username} · {user.roleName || user.roleCode}</h3>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: "16px 20px", borderBottom: "1px solid #ececec", display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <span style={{ fontSize: "12px", fontWeight: "800", padding: "4px 12px", borderRadius: "999px", background: "rgba(5,150,105,.12)", color: "#059669" }}>{allowedCount} allowed</span>
+          <span style={{ fontSize: "12px", fontWeight: "800", padding: "4px 12px", borderRadius: "999px", background: "rgba(220,38,38,.12)", color: "#dc2626" }}>{permissions.length - allowedCount} denied</span>
+          <span style={{ fontSize: "12px", color: "#888", alignSelf: "center" }}>Source shown per permission: ROLE or USER OVERRIDE.</span>
+        </div>
+
+        <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+          {error ? (
+            <div style={{ color: "#dc2626", fontSize: "13.5px", display: "flex", gap: "8px", alignItems: "center" }}><AlertTriangle size={16} /> {error}</div>
+          ) : loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "40px 0", color: "#888", fontWeight: "600" }}>
+              <Loader2 size={20} className="sadmin-spin" /> Resolving effective permissions...
+            </div>
+          ) : (
+            Object.entries(grouped).map(([module, perms]) => (
+              <div key={module} style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "800", color: "#d97706", textTransform: "uppercase", letterSpacing: ".4px", marginBottom: "6px" }}>{module}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "4px 12px" }}>
+                  {perms.map((p) => (
+                    <div key={p.permissionCode} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", padding: "5px 6px", borderRadius: "6px", background: p.allowed ? "rgba(5,150,105,.06)" : "transparent" }}>
+                      <span style={{ width: "18px", textAlign: "center", fontWeight: 800, color: p.allowed ? "#059669" : "#dc2626" }}>{p.allowed ? "✓" : "✗"}</span>
+                      <span style={{ fontWeight: 600, color: "#333" }}>{p.permissionName}</span>
+                      <span style={{ marginLeft: "auto", fontSize: "10.5px", fontWeight: 800, padding: "2px 8px", borderRadius: "999px", background: p.overridden ? "rgba(37,99,235,.12)" : "rgba(100,116,139,.12)", color: p.overridden ? "#2563eb" : "#64748b" }}>
+                        {p.overridden ? "USER OVERRIDE" : "ROLE"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
+          <button onClick={onClose} style={{ padding: "9px 18px", borderRadius: "8px", background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", fontWeight: "700", cursor: "pointer" }}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Per-user permission overrides. Every active permission gets a dropdown:
+ * Inherited (default), Allowed (ALLOW) or Denied (DENY). Only explicit
+ * overrides are saved — everything else stays inherited from the role.
+ */
+const PermissionOverridesModal = ({ user, onSave, onClose, onError }) => {
+  const [permissions, setPermissions] = useState([]);
+  const [overrides, setOverrides] = useState({}); // permissionId → ALLOW | DENY
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [moduleFilter, setModuleFilter] = useState("All");
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [all, existing] = await Promise.all([
+          apiGet("/api/permissions/all"),
+          apiGet(`/api/users/${user.id}/permission-overrides`),
+        ]);
+        setPermissions((all || []).filter((p) => p.active !== false));
+        const map = {};
+        (existing || []).forEach((o) => { map[o.permissionId] = o.access; });
+        setOverrides(map);
+      } catch (err) {
+        onError(err.message || "Could not load permissions.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.id]);
+
+  const modules = ["All", ...Array.from(new Set(permissions.map((p) => p.moduleName || "General")))];
+  const q = searchTerm.trim().toLowerCase();
+  const filtered = permissions.filter((p) => {
+    const matchesModule = moduleFilter === "All" || (p.moduleName || "General") === moduleFilter;
+    const matchesSearch =
+      !q ||
+      (p.permissionCode || "").toLowerCase().includes(q) ||
+      (p.permissionName || "").toLowerCase().includes(q);
+    return matchesModule && matchesSearch;
+  });
+  const grouped = filtered.reduce((acc, p) => {
+    const mod = p.moduleName || "General";
+    if (!acc[mod]) acc[mod] = [];
+    acc[mod].push(p);
+    return acc;
+  }, {});
+
+  const save = () => {
+    const items = Object.entries(overrides)
+      .filter(([, access]) => access === "ALLOW" || access === "DENY")
+      .map(([permissionId, access]) => ({ permissionId: Number(permissionId), access }));
+    setSaving(true);
+    onSave(items);
+    // onSave triggers the toast + closes on success via the parent handler
+    setTimeout(() => setSaving(false), 1200);
+  };
+
+  const selectStyle = {
+    padding: "5px 8px",
+    borderRadius: "7px",
+    border: "1px solid #d9d9d9",
+    fontSize: "12.5px",
+    background: "#fff",
+    cursor: "pointer",
+  };
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1400, padding: "16px" }}>
+      <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "820px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 12px 36px rgba(0,0,0,0.15)", overflow: "hidden" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec" }}>
+          <div>
+            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>USER-SPECIFIC PERMISSIONS</span>
+            <h3 style={{ fontSize: "18px", fontWeight: "800", color: "#111", margin: 0 }}>{user.displayName || user.username}</h3>
+            <p style={{ margin: "2px 0 0", fontSize: "12.5px", color: "#666" }}>
+              Role: {user.roleName || user.roleCode} — overrides apply on top of the role defaults.
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+
+        <div style={{ padding: "14px 20px", borderBottom: "1px solid #ececec", display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", flex: "1 1 260px" }}>
+            <Search size={15} color="#666" style={{ position: "absolute", left: "11px", top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="text"
+              placeholder="Search permission..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              style={{ width: "100%", padding: "9px 12px 9px 34px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "13.5px", boxSizing: "border-box" }}
+            />
+          </div>
+          <select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)} style={{ padding: "9px 12px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "13px", background: "#fff", cursor: "pointer" }}>
+            {modules.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+
+        <div style={{ padding: "20px", overflowY: "auto", flex: 1 }}>
+          {loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "40px 0", color: "#888", fontWeight: "600" }}>
+              <Loader2 size={20} className="sadmin-spin" /> Loading permissions...
+            </div>
+          ) : Object.keys(grouped).length === 0 ? (
+            <div style={{ padding: "40px", textAlign: "center", color: "#999" }}>No permissions match your filters.</div>
+          ) : (
+            Object.entries(grouped).map(([module, perms]) => (
+              <div key={module} style={{ marginBottom: "18px" }}>
+                <div style={{ fontSize: "12px", fontWeight: "800", color: "#d97706", textTransform: "uppercase", letterSpacing: ".4px", marginBottom: "6px" }}>{module}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "4px" }}>
+                  {perms.map((p) => (
+                    <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", padding: "6px 8px", borderRadius: "6px", background: overrides[p.id] ? "rgba(37,99,235,.05)" : "transparent" }}>
+                      <span style={{ flex: 1, fontWeight: 600, color: "#333" }}>
+                        {p.permissionName}
+                        <span style={{ marginLeft: 8, fontSize: "11px", color: "#9aa8b8", fontWeight: 600 }}>{p.permissionCode}</span>
+                      </span>
+                      <select
+                        value={overrides[p.id] || "INHERITED"}
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          setOverrides((o) => {
+                            const next = { ...o };
+                            if (v === "INHERITED") delete next[p.id];
+                            else next[p.id] = v;
+                            return next;
+                          });
+                        }}
+                        style={selectStyle}
+                      >
+                        <option value="INHERITED">Inherited</option>
+                        <option value="ALLOW">Allowed</option>
+                        <option value="DENY">Denied</option>
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", padding: "16px 20px", background: "#f8f9fb", borderTop: "1px solid #ececec" }}>
+          <span style={{ marginRight: "auto", fontSize: "12px", color: "#888", alignSelf: "center" }}>
+            {Object.values(overrides).filter((a) => a === "ALLOW" || a === "DENY").length} override(s) — saved to the database and audited.
+          </span>
+          <button onClick={onClose} disabled={saving} style={{ padding: "10px 20px", borderRadius: "8px", background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", fontWeight: "700", cursor: "pointer" }}>Cancel</button>
+          <button onClick={save} disabled={saving} style={{ padding: "10px 22px", borderRadius: "8px", background: "linear-gradient(135deg,#f8b400,#d97706)", color: "#111", border: "none", fontWeight: "800", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            {saving ? <Loader2 size={15} className="sadmin-spin" /> : <CheckCircle2 size={15} />} Save Overrides
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 export default SuperUserManagement;

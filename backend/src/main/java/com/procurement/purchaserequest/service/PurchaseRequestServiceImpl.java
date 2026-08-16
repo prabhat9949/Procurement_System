@@ -50,6 +50,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     private final PurchaseRequestValidator purchaseRequestValidator;
     private final ApprovalTaskService approvalTaskService;
     private final BusinessEventPublisher eventPublisher;
+    private final com.procurement.procurement.scope.service.ProcurementScopeService procurementScopeService;
 
     public PurchaseRequestServiceImpl(PurchaseRequestRepository purchaseRequestRepository,
                                       EmployeeRepository employeeRepository,
@@ -59,7 +60,8 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
                                       PurchaseRequestMapper purchaseRequestMapper,
                                       PurchaseRequestValidator purchaseRequestValidator,
                                       ApprovalTaskService approvalTaskService,
-                                      BusinessEventPublisher eventPublisher) {
+                                      BusinessEventPublisher eventPublisher,
+                                      com.procurement.procurement.scope.service.ProcurementScopeService procurementScopeService) {
         this.purchaseRequestRepository = purchaseRequestRepository;
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
@@ -69,6 +71,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         this.purchaseRequestValidator = purchaseRequestValidator;
         this.approvalTaskService = approvalTaskService;
         this.eventPublisher = eventPublisher;
+        this.procurementScopeService = procurementScopeService;
     }
 
     @Override
@@ -118,10 +121,15 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         if (isEmployeeOnly()) {
             requesterId = currentEmployee().getId();
         }
-        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(
-                        PurchaseRequestSpecification.search(keyword, requesterId, departmentId,
-                                costCenterId, priority, status, approvalStatus, requiredDateFrom,
-                                requiredDateTo, createdDateFrom, createdDateTo), pageable)
+        // Server-side per-officer category scoping: procurement officers with a
+        // configured scope only ever see PRs belonging to their categories.
+        org.springframework.data.jpa.domain.Specification<PurchaseRequest> spec =
+                PurchaseRequestSpecification.search(keyword, requesterId, departmentId,
+                        costCenterId, priority, status, approvalStatus, requiredDateFrom,
+                        requiredDateTo, createdDateFrom, createdDateTo);
+        var categorySpec = PurchaseRequestSpecification.categoryIn(procurementScopeService.myCategoryIds());
+        if (categorySpec != null) spec = spec.and(categorySpec);
+        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(spec, pageable)
                 .map(purchaseRequestMapper::toResponse);
         return new PageResponse<>(page.getContent(), page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.isLast());

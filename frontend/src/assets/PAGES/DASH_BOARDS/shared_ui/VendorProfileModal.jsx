@@ -9,7 +9,7 @@ import {
   Star,
   CheckCircle2,
   Package,
-  DollarSign,
+  IndianRupee,
   Truck,
   Award,
   Clock,
@@ -354,7 +354,7 @@ const VendorProfileModal = ({ vendor = defaultVendorProfile, onClose, onAction }
             {/* Pricing Information */}
             <div style={{ background: "#ffffff", border: "1px solid #ececec", padding: "16px", borderRadius: "12px" }}>
               <h4 style={{ fontSize: "14px", color: "#111", fontWeight: "800", marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <DollarSign size={16} color="#059669" /> Pricing Information
+                <IndianRupee size={16} color="#059669" /> Pricing Information
               </h4>
               <ul style={{ paddingLeft: "18px", margin: 0, fontSize: "13px", color: "#444", display: "flex", flexDirection: "column", gap: "6px" }}>
                 {(data.pricingInfo || []).map((p, i) => (

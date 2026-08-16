@@ -440,7 +440,7 @@ export const fetchPurchaseOrders = async () => {
           rfqId: rfq.id,
           vendor: winner,
           item: rfq.item || "Equipment Sourcing",
-          totalAmount: rfq.awardedAmount || rfq.submittedAmount || "$36,990.00",
+          totalAmount: rfq.awardedAmount || rfq.submittedAmount || "₹36,990.00",
           terms: "Net 30 Days",
           status: "Issued & Dispatched",
           date: new Date().toISOString().split("T")[0],
@@ -534,7 +534,7 @@ export const createPurchaseOrder = async (poData) => {
     rfqId: poData.rfqId || "RFQ-2026-901",
     vendor: poData.vendor || "Apple Business Direct",
     item: poData.item || "Equipment Sourcing",
-    totalAmount: poData.totalAmount || "$36,990.00",
+    totalAmount: poData.totalAmount || "₹36,990.00",
     terms: poData.terms || "Net 30 Days",
     status: poData.status || "Issued & Dispatched",
     date: new Date().toISOString().split("T")[0],
@@ -702,7 +702,7 @@ export const submitVendorQuote = async (rfqId, quoteData) => {
       const targetVendor = quoteData.vendorName || "Apple Business Direct";
       const newBid = {
         vendor: targetVendor,
-        amount: quoteData.submittedAmount || `$${totalPrice.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+        amount: quoteData.submittedAmount || `₹${totalPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
         leadTime: quoteData.leadTime || "3 Business Days",
         status: "Submitted"
       };
@@ -795,7 +795,7 @@ export const awardVendorContract = async (rfqId, vendorName, finalAmount) => {
     reqId: matchedReqId || "REQ-2026-8921",
     vendor: vendorName,
     item: matchedItem,
-    totalAmount: finalAmount || "$36,990.00",
+    totalAmount: finalAmount || "₹36,990.00",
     status: "Issued & Dispatched"
   });
 
@@ -905,7 +905,7 @@ export const createEmployeeRequest = async (newReqData) => {
     category: newReqData.category || "General Equipment",
     vendor: newReqData.vendorPreference || "Pending Vendor Selection",
     qty: parseInt(newReqData.quantity) || 1,
-    cost: `$${rawCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+    cost: `₹${rawCost.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
     rawCost: rawCost,
     priority: newReqData.priority || "Medium",
     status: "pending",

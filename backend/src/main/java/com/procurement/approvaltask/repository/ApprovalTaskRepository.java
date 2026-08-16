@@ -4,5 +4,6 @@ import com.procurement.approvaltask.entity.*; import org.springframework.data.do
  Optional<ApprovalTask> findFirstByPurchaseRequestIdAndStatusOrderByApprovalStageSequenceAsc(Long id,ApprovalTaskStatus status);
  List<ApprovalTask> findByPurchaseRequestIdOrderByApprovalStageSequenceAsc(Long id);
  Page<ApprovalTask> findByPurchaseRequest_Requester_Id(Long requesterId, Pageable pageable);
+ List<ApprovalTask> findByAssignedEmployeeIdAndStatus(Long assignedEmployeeId, ApprovalTaskStatus status);
  boolean existsByPurchaseRequestIdAndApprovalStageId(Long requestId,Long stageId);
 }

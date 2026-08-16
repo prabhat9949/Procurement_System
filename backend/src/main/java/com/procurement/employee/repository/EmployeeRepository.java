@@ -25,6 +25,8 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long>,
 
     Optional<Employee> findFirstByRoleIdAndActiveTrue(Long roleId);
 
+    Optional<Employee> findFirstByRoleIdAndActiveTrueAndIdNot(Long roleId, Long excludeId);
+
     long countByDepartmentId(Long departmentId);
 
     long countByCostCenterId(Long costCenterId);

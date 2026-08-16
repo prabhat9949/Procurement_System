@@ -1,5 +1,5 @@
 import React from "react";
-import { DollarSign, Landmark, IndianRupee, Receipt, CreditCard } from "lucide-react";
+import { IndianRupee, Landmark, Receipt, CreditCard } from "lucide-react";
 import RealReportsView from "../../shared_ui/RealReportsView";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 
@@ -10,7 +10,7 @@ const SuperFinancialMonitoring = () => (
       title: "Financial Monitoring",
       subtitle: "Invoices, payments and spend — every number is a real aggregate from the financial tables.",
       badge: "FINANCE & TREASURY",
-      icon: DollarSign,
+      icon: IndianRupee,
     }}
     kpis={[
       { label: "Total Procurement Spend", key: "totalProcurementSpend", icon: IndianRupee, color: "#059669", format: "inr" },

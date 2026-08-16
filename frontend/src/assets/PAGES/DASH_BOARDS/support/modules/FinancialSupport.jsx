@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  DollarSign,
+  IndianRupee,
   Search,
   Eye,
   CheckCircle2,
@@ -70,7 +70,7 @@ const FinancialSupport = () => {
       <div className="sup-page-header" style={{ marginBottom: "24px" }}>
         <div>
           <h1 className="sup-page-title" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "700", color: "#111" }}>
-            <DollarSign color="#f8b400" size={28} /> Financial & Payment Support
+            <IndianRupee color="#f8b400" size={28} /> Financial & Payment Support
           </h1>
           <p className="sup-page-subtitle" style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>
             Help Finance Managers, CFO desk, and suppliers resolve issues related to invoices matching, bank wire clearances, budget allocations, and tax reports.

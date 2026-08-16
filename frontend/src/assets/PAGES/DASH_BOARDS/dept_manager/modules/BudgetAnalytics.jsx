@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import {
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   BarChart3,
   PieChart as PieIcon,
   Download,
@@ -93,14 +93,14 @@ const BudgetAnalytics = () => {
           <div className="dm-kpi-info">
             <span className="dm-kpi-label">Annual Budget Allocated</span>
             <span className="dm-kpi-value" style={{ color: "#111111" }}>
-              $1,440,000
+              ₹14,40,000
             </span>
             <span className="dm-kpi-change positive">
-              <DollarSign size={14} /> $120,000 / Month Cap
+              <IndianRupee size={14} /> ₹1,20,000 / Month Cap
             </span>
           </div>
           <div className="dm-kpi-icon-wrapper" style={{ color: "#f8b400" }}>
-            <DollarSign size={24} />
+            <IndianRupee size={24} />
           </div>
         </div>
 
@@ -108,7 +108,7 @@ const BudgetAnalytics = () => {
           <div className="dm-kpi-info">
             <span className="dm-kpi-label">YTD Actual Expenditure</span>
             <span className="dm-kpi-value" style={{ color: "#d97706" }}>
-              $610,600
+              ₹6,10,600
             </span>
             <span className="dm-kpi-change positive">
               <TrendingUp size={14} /> 8.4% Below Forecasted Ceiling
@@ -123,7 +123,7 @@ const BudgetAnalytics = () => {
           <div className="dm-kpi-info">
             <span className="dm-kpi-label">July Remaining Budget</span>
             <span className="dm-kpi-value" style={{ color: "#059669" }}>
-              $35,800
+              ₹35,800
             </span>
             <span className="dm-kpi-change positive">
               <Award size={14} /> 29.8% Available for Q3
@@ -154,7 +154,7 @@ const BudgetAnalytics = () => {
               marginBottom: "16px",
             }}
           >
-            July Spend Breakdown by Sub-Team ($USD)
+            July Spend Breakdown by Sub-Team (INR)
           </h3>
 
           <div style={{ width: "100%", height: 280 }}>

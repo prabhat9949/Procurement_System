@@ -1,15 +1,14 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import {
-  TrendingUp,
-  DollarSign,
-  PieChart as PieIcon,
-  Download,
   BarChart3,
-  Award,
-  Send,
+  TrendingUp,
+  IndianRupee,
+  Download,
   ShoppingBag,
-  Users,
-  CheckCircle2
+  Send,
+  FileCheck2,
+  Loader2,
+  WifiOff,
 } from "lucide-react";
 import {
   BarChart,
@@ -23,258 +22,228 @@ import {
   Tooltip,
   ResponsiveContainer,
   Legend,
-  LineChart,
-  Line
+  AreaChart,
+  Area,
 } from "recharts";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR } from "../../../../../utils/format";
 
-const analyticsData = [
-  { month: "Jan", rfqsCreated: 14, posIssued: 12, spend: 92000, baselineBudget: 98000 },
-  { month: "Feb", rfqsCreated: 18, posIssued: 15, spend: 118000, baselineBudget: 125000 },
-  { month: "Mar", rfqsCreated: 22, posIssued: 19, spend: 142000, baselineBudget: 150000 },
-  { month: "Apr", rfqsCreated: 19, posIssued: 16, spend: 129000, baselineBudget: 135000 },
-  { month: "May", rfqsCreated: 28, posIssued: 24, spend: 179000, baselineBudget: 188000 },
-  { month: "Jun", rfqsCreated: 24, posIssued: 21, spend: 163200, baselineBudget: 170000 },
-  { month: "Jul", rfqsCreated: 38, posIssued: 32, spend: 236000, baselineBudget: 245000 },
-];
-
-const vendorPerformanceSummary = [
-  {
-    name: "Apple Business Direct",
-    category: "Hardware & IT",
-    onTimeDelivery: "99.2%",
-    qualityScore: "4.9 ⭐",
-    totalSpendAwarded: "$185,000.00",
-    bidWinRate: "78%",
-    complianceGrade: "A+ Tier 1",
-  },
-  {
-    name: "CDW Direct",
-    category: "Hardware & IT",
-    onTimeDelivery: "97.5%",
-    qualityScore: "4.7 ⭐",
-    totalSpendAwarded: "$115,000.00",
-    bidWinRate: "64%",
-    complianceGrade: "A Tier 1",
-  },
-  {
-    name: "Datadog Inc.",
-    category: "Software & SaaS",
-    onTimeDelivery: "100.0%",
-    qualityScore: "5.0 ⭐",
-    totalSpendAwarded: "$68,500.00",
-    bidWinRate: "90%",
-    complianceGrade: "A+ SaaS",
-  },
-  {
-    name: "Cisco Systems Direct",
-    category: "Networking",
-    onTimeDelivery: "95.8%",
-    qualityScore: "4.9 ⭐",
-    totalSpendAwarded: "$55,200.00",
-    bidWinRate: "82%",
-    complianceGrade: "A Primary OEM",
-  },
-];
-
-const vendorMarketShare = [
-  { name: "Apple Business Direct", value: 40, color: "#f8b400" },
-  { name: "CDW Direct", value: 25, color: "#059669" },
-  { name: "Datadog Inc.", value: 15, color: "#3b82f6" },
-  { name: "Cisco Systems", value: 12, color: "#7c3aed" },
-  { name: "Others", value: 8, color: "#dc2626" },
-];
+const PO_STATUS_COLORS = {
+  DRAFT: "#64748b",
+  GENERATED: "#d97706",
+  SENT: "#2563eb",
+  ACKNOWLEDGED: "#7c3aed",
+  PARTIALLY_RECEIVED: "#0891b2",
+  FULLY_RECEIVED: "#059669",
+  CANCELLED: "#dc2626",
+  CLOSED: "#059669",
+};
 
 const ProcurementAnalytics = () => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [kpis, setKpis] = useState({});
+  const [spendChart, setSpendChart] = useState([]);
+  const [prChart, setPrChart] = useState([]);
+  const [rfqChart, setRfqChart] = useState([]);
+  const [poChart, setPoChart] = useState([]);
+  const [poValue, setPoValue] = useState(0);
+  const [poStatusDist, setPoStatusDist] = useState([]);
+  const [toastMsg, setToastMsg] = useState("");
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        const [dash, spend, pr, rfq, po, pos] = await Promise.all([
+          apiGet("/api/dashboard/procurement").catch(() => null),
+          apiGet("/api/dashboard/charts/spend").catch(() => null),
+          apiGet("/api/dashboard/charts/pr").catch(() => null),
+          apiGet("/api/dashboard/charts/rfq").catch(() => null),
+          apiGet("/api/dashboard/charts/po").catch(() => null),
+          apiGet("/api/purchase-orders?page=0&size=500&sort=orderDate&direction=desc").catch(() => null),
+        ]);
+        const kpiMap = {};
+        (dash?.kpis || []).forEach((k) => { kpiMap[k.code] = k.count ?? k.value ?? 0; });
+        setKpis(kpiMap);
+        setSpendChart(spend?.points || []);
+        setPrChart(pr?.points || []);
+        setRfqChart(rfq?.points || []);
+        setPoChart(po?.points || []);
+        const poRows = pos?.content || [];
+        setPoValue(poRows.reduce((s, p) => s + Number(p.grandTotal || 0), 0));
+        const dist = {};
+        poRows.forEach((p) => { dist[p.status] = (dist[p.status] || 0) + 1; });
+        setPoStatusDist(Object.entries(dist).map(([name, value]) => ({ name, value })));
+      } catch (err) {
+        setError(err.message || "Unable to load procurement analytics.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const exportCsv = () => {
+    const rows = spendChart.map((p) => [p.label, p.value]);
+    const csv = [["Month", "Spend (INR)"], ...rows].map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `procurement-analytics-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setToastMsg("Analytics CSV exported.");
+    setTimeout(() => setToastMsg(""), 4000);
+  };
+
+  const chartData = (points) => points.map((p) => ({ label: p.label, value: Number(p.value || 0) }));
+
+  if (loading) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "80px 0", gap: "12px", color: "#666" }}>
+        <Loader2 size={22} className="login-spin" /> Loading procurement analytics…
+      </div>
+    );
+  }
+
+  const card = { background: "#fff", borderRadius: "12px", border: "1px solid #ececec", padding: "20px" };
+
   return (
-    <div className="pe-analytics-container">
-      {/* Header */}
-      <div className="pe-page-header">
+    <div className="pe-analytics-container" style={{ padding: "20px" }}>
+      {toastMsg && (
+        <div style={{ background: "#ecfdf5", color: "#065f46", padding: "12px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", fontWeight: 600, border: "1px solid #a7f3d0" }}>
+          {toastMsg}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: "#fef2f2", color: "#991b1b", padding: "14px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", border: "1px solid #fecaca", display: "flex", gap: "10px", alignItems: "center" }}>
+          <WifiOff size={18} /> {error}
+        </div>
+      )}
+
+      <div className="pe-page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
-          <h1 className="pe-page-title">
-            <BarChart3 color="#f8b400" /> Sourcing Performance & Procurement Analytics
+          <h1 className="pe-page-title" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "800", color: "#111111" }}>
+            <BarChart3 color="#f8b400" size={28} /> Procurement Analytics
           </h1>
-          <p className="pe-page-subtitle">
-            Executive analytics tracking RFQ volumes, Purchase Order trends, total spending, and vendor performance.
+          <p className="pe-page-subtitle" style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>
+            Live spend, request, RFQ and PO trends computed from the database.
           </p>
         </div>
-
-        <button
-          className="pe-btn-primary-sm"
-          onClick={() => alert("Exporting Sourcing Analytics Briefing PDF...")}
-        >
-          <Download size={16} /> Export Executive Briefing (PDF)
+        <button className="pe-btn-primary-sm" onClick={exportCsv}>
+          <Download size={15} /> Export CSV
         </button>
       </div>
 
-      {/* 4 REQUIRED ANALYTICS KPI CARDS */}
-      <div className="pe-kpi-grid" style={{ marginBottom: "28px" }}>
-        {/* 1. Total RFQs Created */}
-        <div className="pe-kpi-card">
-          <div className="pe-kpi-info">
-            <span className="pe-kpi-label">Total RFQs Created</span>
-            <span className="pe-kpi-value" style={{ color: "#f8b400" }}>
-              163
-            </span>
-            <span className="pe-kpi-change positive">
-              <Send size={14} /> +24% YTD Growth
-            </span>
+      {/* KPI Cards */}
+      <div className="pe-kpi-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+        {[
+          { label: "Open RFQs", value: kpis.OPEN_RFQS || 0, icon: <Send size={22} />, color: "#7c3aed" },
+          { label: "Purchase Requests", value: kpis.PURCHASE_REQUESTS || 0, icon: <FileCheck2 size={22} />, color: "#2563eb" },
+          { label: "Quotations for Comparison", value: kpis.QUOTATIONS_AWAITING_COMPARISON || 0, icon: <BarChart3 size={22} />, color: "#0891b2" },
+          { label: "PO Value", value: formatINR(poValue), icon: <IndianRupee size={22} />, color: "#059669" },
+          { label: "POs Awaiting Delivery", value: kpis.POS_AWAITING_DELIVERY || 0, icon: <ShoppingBag size={22} />, color: "#d97706" },
+        ].map((k) => (
+          <div key={k.label} className="pe-kpi-card" style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "12px", padding: "18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div className="pe-kpi-info">
+              <span className="pe-kpi-label" style={{ display: "block", fontSize: "12px", color: "#666", fontWeight: 700 }}>{k.label}</span>
+              <span className="pe-kpi-value" style={{ display: "block", fontSize: "22px", fontWeight: "800", color: "#111", marginTop: "4px" }}>{k.value}</span>
+            </div>
+            <div className="pe-kpi-icon-wrapper" style={{ width: "42px", height: "42px", borderRadius: "10px", background: `${k.color}14`, color: k.color, display: "flex", alignItems: "center", justifyContent: "center" }}>
+              {k.icon}
+            </div>
           </div>
-          <div className="pe-kpi-icon-wrapper" style={{ color: "#f8b400" }}>
-            <Send size={24} />
-          </div>
-        </div>
-
-        {/* 2. Total Purchase Orders */}
-        <div className="pe-kpi-card">
-          <div className="pe-kpi-info">
-            <span className="pe-kpi-label">Total Purchase Orders</span>
-            <span className="pe-kpi-value" style={{ color: "#d97706" }}>
-              139
-            </span>
-            <span className="pe-kpi-change positive">
-              <ShoppingBag size={14} /> 85.2% PO Issue Rate
-            </span>
-          </div>
-          <div className="pe-kpi-icon-wrapper" style={{ color: "#d97706" }}>
-            <ShoppingBag size={24} />
-          </div>
-        </div>
-
-        {/* 3. Procurement Spending */}
-        <div className="pe-kpi-card">
-          <div className="pe-kpi-info">
-            <span className="pe-kpi-label">Procurement Spending</span>
-            <span className="pe-kpi-value" style={{ color: "#059669" }}>
-              $1,058,200
-            </span>
-            <span className="pe-kpi-change positive">
-              <TrendingUp size={14} /> $51,800 Savings Negotiated
-            </span>
-          </div>
-          <div className="pe-kpi-icon-wrapper" style={{ color: "#059669" }}>
-            <DollarSign size={24} />
-          </div>
-        </div>
-
-        {/* 4. Vendor Performance Summary Rating */}
-        <div className="pe-kpi-card">
-          <div className="pe-kpi-info">
-            <span className="pe-kpi-label">Vendor Performance Score</span>
-            <span className="pe-kpi-value" style={{ color: "#3b82f6" }}>
-              97.4%
-            </span>
-            <span className="pe-kpi-change positive">
-              <Award size={14} /> Top SLA Compliance Grade
-            </span>
-          </div>
-          <div className="pe-kpi-icon-wrapper" style={{ color: "#3b82f6" }}>
-            <Award size={24} />
-          </div>
-        </div>
+        ))}
       </div>
 
-      {/* CHARTS ROW: RFQ Volume & Spend Trends */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "24px",
-          marginBottom: "28px",
-        }}
-      >
-        {/* RFQs vs POs Trend Chart */}
-        <div className="pe-card">
-          <h3 style={{ color: "#111111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>
-            Total RFQs Created vs Total Purchase Orders Issued
-          </h3>
-
+      {/* Charts */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "24px" }}>
+        <div style={card}>
+          <h3 style={{ color: "#111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>Monthly Procurement Spend (₹)</h3>
           <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
-                <XAxis dataKey="month" stroke="#666666" fontSize={12} />
-                <YAxis stroke="#666666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #f8b400",
-                    borderRadius: "8px",
-                    color: "#111111",
-                    boxShadow: "0 4px 14px rgba(0,0,0,0.1)",
-                  }}
-                />
-                <Legend />
-                <Bar dataKey="rfqsCreated" name="RFQs Created" fill="#f8b400" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="posIssued" name="POs Issued" fill="#059669" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            {spendChart.length === 0 ? (
+              <p style={{ color: "#888", textAlign: "center", paddingTop: 80 }}>No spend data available yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData(spendChart)}>
+                  <defs>
+                    <linearGradient id="peSpendGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#059669" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
+                  <XAxis dataKey="label" stroke="#666666" fontSize={11} />
+                  <YAxis stroke="#666666" fontSize={12} />
+                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
+                  <Area type="monotone" dataKey="value" stroke="#059669" fill="url(#peSpendGrad)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* Procurement Spend Breakdown */}
-        <div className="pe-card">
-          <h3 style={{ color: "#111111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>
-            Procurement Spending Baseline vs Actual Spend ($USD)
-          </h3>
-
+        <div style={card}>
+          <h3 style={{ color: "#111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>Purchase Request Trend</h3>
           <div style={{ width: "100%", height: 260 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analyticsData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
-                <XAxis dataKey="month" stroke="#666666" fontSize={12} />
-                <YAxis stroke="#666666" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    background: "#ffffff",
-                    border: "1px solid #f8b400",
-                    borderRadius: "8px",
-                    color: "#111111",
-                  }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="baselineBudget" name="Budget Baseline" stroke="#d97706" strokeWidth={2} />
-                <Line type="monotone" dataKey="spend" name="Actual Spend" stroke="#059669" strokeWidth={3} />
-              </LineChart>
-            </ResponsiveContainer>
+            {prChart.length === 0 ? (
+              <p style={{ color: "#888", textAlign: "center", paddingTop: 80 }}>No purchase request data available yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData(prChart)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
+                  <XAxis dataKey="label" stroke="#666666" fontSize={11} />
+                  <YAxis stroke="#666666" fontSize={12} />
+                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
+                  <Bar dataKey="value" fill="#f8b400" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
-      </div>
 
-      {/* VENDOR PERFORMANCE SUMMARY TABLE */}
-      <div className="pe-card">
-        <h3 style={{ color: "#111111", fontSize: "18px", fontWeight: "800", marginBottom: "18px", display: "flex", alignItems: "center", gap: "10px" }}>
-          <Users color="#f8b400" size={20} /> Vendor Performance Summary Scorecards
-        </h3>
+        <div style={card}>
+          <h3 style={{ color: "#111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>RFQ Trend</h3>
+          <div style={{ width: "100%", height: 260 }}>
+            {rfqChart.length === 0 ? (
+              <p style={{ color: "#888", textAlign: "center", paddingTop: 80 }}>No RFQ data available yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData(rfqChart)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
+                  <XAxis dataKey="label" stroke="#666666" fontSize={11} />
+                  <YAxis stroke="#666666" fontSize={12} />
+                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
+                  <Bar dataKey="value" fill="#7c3aed" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
 
-        <div className="pe-table-container">
-          <table className="pe-table">
-            <thead>
-              <tr>
-                <th>Vendor / Supplier Name</th>
-                <th>Category</th>
-                <th>On-Time Delivery %</th>
-                <th>Quality Rating</th>
-                <th>Total Spend Awarded</th>
-                <th>Bid Win Rate</th>
-                <th>SLA Tier Grade</th>
-              </tr>
-            </thead>
-            <tbody>
-              {vendorPerformanceSummary.map((v, idx) => (
-                <tr key={idx}>
-                  <td style={{ fontWeight: "700", color: "#111111" }}>{v.name}</td>
-                  <td style={{ color: "#555555" }}>{v.category}</td>
-                  <td style={{ fontWeight: "700", color: "#059669" }}>{v.onTimeDelivery}</td>
-                  <td style={{ fontWeight: "700", color: "#d97706" }}>{v.qualityScore}</td>
-                  <td style={{ fontWeight: "800", color: "#111111" }}>{v.totalSpendAwarded}</td>
-                  <td style={{ fontWeight: "700", color: "#3b82f6" }}>{v.bidWinRate}</td>
-                  <td>
-                    <span className="pe-badge approved">{v.complianceGrade}</span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div style={card}>
+          <h3 style={{ color: "#111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>Purchase Order Status Distribution</h3>
+          <div style={{ width: "100%", height: 260 }}>
+            {poStatusDist.length === 0 ? (
+              <p style={{ color: "#888", textAlign: "center", paddingTop: 80 }}>No purchase orders available yet.</p>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={poStatusDist} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={4} label>
+                    {poStatusDist.map((entry, i) => (
+                      <Cell key={i} fill={PO_STATUS_COLORS[entry.name] || "#64748b"} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
+                  <Legend formatter={(value) => <span style={{ color: "#111", fontSize: 12 }}>{value}</span>} />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </div>
         </div>
       </div>
     </div>

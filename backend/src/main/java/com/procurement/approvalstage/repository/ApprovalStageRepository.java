@@ -3,5 +3,6 @@ import com.procurement.approvalstage.entity.ApprovalStage;
 import org.springframework.data.jpa.repository.*; import org.springframework.stereotype.Repository; import java.util.*;
 @Repository public interface ApprovalStageRepository extends JpaRepository<ApprovalStage,Long>,JpaSpecificationExecutor<ApprovalStage>{
  List<ApprovalStage> findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(Long ruleId);
+ List<ApprovalStage> findByApproverRoleIdAndActiveTrue(Long roleId);
  boolean existsByApprovalRuleIdAndSequence(Long ruleId,Integer sequence);
 }

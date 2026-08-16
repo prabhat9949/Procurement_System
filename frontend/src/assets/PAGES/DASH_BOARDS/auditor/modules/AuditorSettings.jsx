@@ -129,7 +129,7 @@ const AuditorSettings = () => {
               }}
             >
               <span style={{ fontSize: "14px", color: "#111", fontWeight: "600" }}>
-                Alert on High-Value Transaction Audit Logs (&gt; $25k)
+                Alert on High-Value Transaction Audit Logs (&gt; ₹25,000)
               </span>
               <input
                 type="checkbox"

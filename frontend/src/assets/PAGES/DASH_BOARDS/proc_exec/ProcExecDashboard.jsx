@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ProcExecDashboard.css";
+import { apiGet } from "../../../../services/apiClient";
 
 import {
   LayoutDashboard,
@@ -39,6 +40,15 @@ const ProcExecDashboard = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [scope, setScope] = useState(null);
+
+  // The backend enforces per-officer category scoping on every list (PRs, RFQs,
+  // POs); this banner just surfaces the current officer's configured scope.
+  useEffect(() => {
+    apiGet("/api/procurement/my-scope")
+      .then((s) => setScope(s))
+      .catch(() => setScope(null));
+  }, []);
 
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -201,7 +211,47 @@ const ProcExecDashboard = () => {
         </div>
 
         {/* Page Content Body */}
-        <main className="pe-page-content">{renderActiveModule()}</main>
+        <main className="pe-page-content">
+          {scope && scope.scoped && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flexWrap: "wrap",
+                marginBottom: "14px",
+                padding: "9px 14px",
+                borderRadius: "10px",
+                border: "1px solid rgba(37,99,235,.18)",
+                background: "rgba(37,99,235,.06)",
+                fontSize: "12.5px",
+                color: "#1e3a8a",
+                fontWeight: "600",
+              }}
+            >
+              <span>🎯 My Category Scope</span>
+              {scope.categoryNames.map((c) => (
+                <span
+                  key={c}
+                  style={{
+                    background: "#2563eb",
+                    color: "#fff",
+                    borderRadius: "999px",
+                    padding: "2px 10px",
+                    fontSize: "11.5px",
+                    fontWeight: "700",
+                  }}
+                >
+                  {c}
+                </span>
+              ))}
+              <span style={{ fontWeight: "500", color: "#4b5b6c", marginLeft: "auto" }}>
+                You only see requests, RFQs and POs in these categories.
+              </span>
+            </div>
+          )}
+          {renderActiveModule()}
+        </main>
       </div>
 
       {/* Logout Confirm Modal */}

@@ -42,6 +42,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final EmployeeMapper employeeMapper;
     private final EmployeeValidator employeeValidator;
     private final AuditLogService auditLogService;
+    private final com.procurement.workflow.service.RoleChangeTaskService roleChangeTaskService;
 
     public EmployeeServiceImpl(EmployeeRepository employeeRepository,
                                DepartmentRepository departmentRepository,
@@ -50,7 +51,8 @@ public class EmployeeServiceImpl implements EmployeeService {
                                UserRepository userRepository,
                                EmployeeMapper employeeMapper,
                                EmployeeValidator employeeValidator,
-                               AuditLogService auditLogService) {
+                               AuditLogService auditLogService,
+                               com.procurement.workflow.service.RoleChangeTaskService roleChangeTaskService) {
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
         this.costCenterRepository = costCenterRepository;
@@ -59,6 +61,7 @@ public class EmployeeServiceImpl implements EmployeeService {
         this.employeeMapper = employeeMapper;
         this.employeeValidator = employeeValidator;
         this.auditLogService = auditLogService;
+        this.roleChangeTaskService = roleChangeTaskService;
     }
 
     @Override
@@ -128,9 +131,23 @@ public class EmployeeServiceImpl implements EmployeeService {
         CostCenter costCenter = findCostCenter(request.costCenterId());
         ensureDepartmentMatchesCostCenter(department, costCenter);
         Role role = findRole(request.roleId());
+        Role oldRole = employee.getRole();
         Employee manager = findManager(request.managerId(), id);
         employeeMapper.updateEntity(employee, request, department, costCenter, role, manager);
         Employee saved = employeeRepository.save(employee);
+
+        // Keep the linked account's role in sync so the change reflects on next
+        // login, and safely handle any open tasks assigned to this employee
+        // (retain where the new role is still authorised, reassign otherwise).
+        if (oldRole == null || !oldRole.getId().equals(role.getId())) {
+            final Role newRole = role;
+            userRepository.findByEmployee(saved).ifPresent(user -> {
+                user.setRole(newRole);
+                userRepository.save(user);
+            });
+            roleChangeTaskService.handleRoleChange(saved.getId(), oldRole == null ? role : oldRole, newRole,
+                    "Role changed via employee update (HR/Admin)");
+        }
 
         // Employment status drives linked account access: an active employee has an
         // enabled account, a deactivated employee loses login access in the same transaction.

@@ -9,7 +9,7 @@ import {
   PieChart,
   TrendingUp,
   BarChart3,
-  DollarSign,
+  IndianRupee,
   FolderKanban,
   Bell,
   UserCheck,
@@ -49,7 +49,7 @@ const FinanceDashboard = () => {
     { id: "budget-management", label: "Budget Management", icon: PieChart },
     { id: "expense-management", label: "Expense Management", icon: TrendingUp },
     { id: "financial-analytics", label: "Financial Analytics", icon: BarChart3 },
-    { id: "procurement-payments", label: "Procurement Payments", icon: DollarSign },
+    { id: "procurement-payments", label: "Procurement Payments", icon: IndianRupee },
     { id: "reports", label: "Financial Reports", icon: FolderKanban },
   ];
 

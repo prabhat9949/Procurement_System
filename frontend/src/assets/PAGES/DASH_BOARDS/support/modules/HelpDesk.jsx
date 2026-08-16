@@ -15,7 +15,7 @@ const initialFaqs = [
   {
     category: "Common Procurement Issues",
     items: [
-      { q: "Why did my Purchase Request trigger a 'Bypassed RFQ' alert?", a: "This happens when the purchase order amount exceeds $15,000.00 but only a single vendor quotation was submitted. To resolve, attach at least three competitive quotes or write a justification override." },
+      { q: "Why did my Purchase Request trigger a 'Bypassed RFQ' alert?", a: "This happens when the purchase order amount exceeds ₹15,000.00 but only a single vendor quotation was submitted. To resolve, attach at least three competitive quotes or write a justification override." },
       { q: "How do I edit a Purchase Order post-release?", a: "Once a PO has been approved by the department manager, it cannot be directly modified. The sourcing executive must raise a 'Modified PO Request' detailing changes which requires re-authorization." }
     ]
   },

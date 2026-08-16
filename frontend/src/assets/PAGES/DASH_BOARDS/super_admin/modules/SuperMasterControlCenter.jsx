@@ -127,7 +127,7 @@ const SuperMasterControlCenter = () => {
   const handleMakePayment = () => {
     const amt = prompt("Enter payment override amount ($):");
     if (!amt) return;
-    triggerToast(`Direct payment of $${amt} executed successfully via Super Admin Override.`);
+    triggerToast(`Direct payment of ₹${Number(amt || 0).toLocaleString("en-IN")} executed successfully via Super Admin Override.`);
   };
 
   const selectedRequest = requests.find(r => r.id === selectedReqId || r.numericId === selectedReqId) || requests[0];

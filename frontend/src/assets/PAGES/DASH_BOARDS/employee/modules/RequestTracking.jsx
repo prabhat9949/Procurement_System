@@ -29,6 +29,8 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
   const [lines, setLines] = useState([]);
   const [history, setHistory] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [assignments, setAssignments] = useState([]);
+  const [currentOwner, setCurrentOwner] = useState(null);
   const [po, setPo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -57,16 +59,36 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
     setDetailLoading(true);
     setError("");
     try {
-      const [pr, lineRes, histRes, taskRes] = await Promise.all([
+      const [pr, lineRes, tlRes, taskRes, assignRes] = await Promise.all([
         apiGet(`/api/purchase-requests/${id}`),
         apiGet(`/api/purchase-request-lines?purchaseRequestId=${id}&size=20`).catch(() => null),
-        apiGet(`/api/approval-histories?purchaseRequestId=${id}&size=50&sort=performedAt&direction=asc`).catch(() => null),
+        // Unified source-of-truth timeline: approvals + assignments + RFQ/PO/GRN + audit.
+        apiGet(`/api/procurement/${id}/timeline`).catch(() => null),
         apiGet(`/api/approval-tasks?purchaseRequestId=${id}&size=20&sort=assignedDate&direction=asc`).catch(() => null),
+        // Structured workflow assignment history (who owned each stage, when, why).
+        apiGet(`/api/workflow/history/PR/${id}`).catch(() => null),
       ]);
       setDetail(pr);
       setLines(lineRes?.content || []);
-      setHistory(histRes?.content || []);
+      setHistory(
+        (tlRes?.events || [])
+          .filter((e) => e.type !== "PR_CREATED") // rendered as the fixed first step below
+          .map((e) => ({
+            action: e.type,
+            performedAt: e.occurredAt,
+            performedByName: e.performedByName,
+            comments: e.description,
+            title: e.title,
+            stage: e.stage,
+          }))
+      );
       setTasks(taskRes?.content || []);
+      setAssignments(Array.isArray(assignRes) ? assignRes : assignRes?.content || []);
+      setCurrentOwner(
+        tlRes?.currentAssigneeName
+          ? { stage: tlRes.currentStage, name: tlRes.currentAssigneeName, role: tlRes.currentAssigneeRole }
+          : null
+      );
       const poRes = await apiGet(`/api/purchase-orders/by-request/${id}?size=1`).catch(() => null);
       setPo(poRes?.content?.[0] || null);
       if (onNotifyRefresh) onNotifyRefresh();
@@ -225,14 +247,16 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
                 )}
               </div>
 
-              {/* Current approver */}
-              {currentTask && (
+              {/* Current owner / next action: approval task or post-approval assignment */}
+              {(currentOwner?.name || currentTask) && (
                 <div style={{ display: "flex", alignItems: "center", gap: 12, background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", marginBottom: 18 }}>
                   <UserCheck size={20} color="#b45309" />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 12.5, fontWeight: 800, color: "#92400e" }}>CURRENT APPROVER</div>
+                    <div style={{ fontSize: 12.5, fontWeight: 800, color: "#92400e" }}>CURRENT OWNER — NEXT ACTION</div>
                     <div style={{ fontSize: 13.5, color: "#78350f" }}>
-                      {currentTask.assignedEmployeeName || "Pending assignment"} — {currentTask.status}
+                      {(currentOwner?.name || currentTask?.assignedEmployeeName || "Pending assignment")}
+                      {(currentOwner?.role || currentTask?.assignedRoleName) ? ` (${currentOwner?.role || currentTask?.assignedRoleName})` : ""}
+                      {currentOwner?.stage || currentTask?.stageName ? ` · Stage: ${currentOwner?.stage || currentTask?.stageName}` : ""}
                     </div>
                   </div>
                 </div>
@@ -243,7 +267,7 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
               <div className="emp-timeline-container" style={{ position: "relative", paddingLeft: 28 }}>
                 {[
                   { label: "Request Created", at: detail.createdAt, kind: "created" },
-                  ...history.map((h) => ({ label: ACTION_LABEL[h.action]?.label || h.action, at: h.performedAt, who: h.performedByName, comment: h.comments, kind: h.action })),
+                  ...history.map((h) => ({ label: h.title || ACTION_LABEL[h.action]?.label || h.action, at: h.performedAt, who: h.performedByName, comment: h.comments, kind: h.action })),
                 ].map((step, idx) => {
                   const meta = ACTION_LABEL[step.kind];
                   const color = meta?.color || "#2563eb";
@@ -262,6 +286,52 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
                   );
                 })}
               </div>
+
+              {/* Assignment history: who owned each stage, when, and why */}
+              <h4 style={{ margin: "22px 0 12px", fontSize: 13.5, fontWeight: 800, color: "#111", display: "flex", alignItems: "center", gap: 7 }}>
+                <UserCheck size={15} color="#7c3aed" /> Assignment History
+              </h4>
+              {assignments.length === 0 ? (
+                <div style={{ fontSize: 13, color: "#7a8999", background: "#f8fafc", borderRadius: 10, padding: "14px" }}>
+                  No team assignments have been created for this request yet.
+                </div>
+              ) : (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
+                    <thead>
+                      <tr style={{ color: "#7a8999", textTransform: "uppercase", fontSize: 10.5, textAlign: "left" }}>
+                        <th style={{ padding: "7px 8px" }}>Stage</th>
+                        <th style={{ padding: "7px 8px" }}>Assigned To</th>
+                        <th style={{ padding: "7px 8px" }}>Status</th>
+                        <th style={{ padding: "7px 8px" }}>Assigned</th>
+                        <th style={{ padding: "7px 8px" }}>Completed</th>
+                        <th style={{ padding: "7px 8px" }}>Reason</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assignments.map((a) => (
+                        <tr key={a.id} style={{ borderTop: "1px solid #f2f4f6" }}>
+                          <td style={{ padding: "8px", fontWeight: 700, color: "#0f172a" }}>{a.stage}</td>
+                          <td style={{ padding: "8px", color: "#334155" }}>
+                            {a.assignedEmployeeName}
+                            {a.assignedRoleName ? <div style={{ fontSize: 11, color: "#7a8999" }}>{a.assignedRoleName}</div> : null}
+                          </td>
+                          <td style={{ padding: "8px" }}>
+                            <span style={{
+                              fontSize: 10.5, fontWeight: 800, padding: "3px 8px", borderRadius: 999,
+                              background: a.status === "ASSIGNED" || a.status === "IN_PROGRESS" ? "rgba(245,158,11,.14)" : a.status === "COMPLETED" ? "rgba(5,150,105,.12)" : "rgba(100,116,139,.12)",
+                              color: a.status === "ASSIGNED" || a.status === "IN_PROGRESS" ? "#b45309" : a.status === "COMPLETED" ? "#059669" : "#64748b",
+                            }}>{a.status}</span>
+                          </td>
+                          <td style={{ padding: "8px", color: "#475569" }}>{formatDateIN(a.assignedAt)}</td>
+                          <td style={{ padding: "8px", color: "#475569" }}>{a.completedAt ? formatDateIN(a.completedAt) : "—"}</td>
+                          <td style={{ padding: "8px", color: "#64748b", maxWidth: 260 }}>{a.reason || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               {/* PO card */}
               {po ? (

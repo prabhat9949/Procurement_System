@@ -13,6 +13,10 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
+
+const canCreate = hasPermission("CAN_CREATE_PR");
+const canSubmit = hasPermission("CAN_SUBMIT_PR");
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
@@ -292,22 +296,31 @@ const CreateRequest = ({ onNavigate }) => {
 
       {/* ============ Actions ============ */}
       <div style={{ display: "flex", gap: 12, marginTop: 28, paddingTop: 20, borderTop: "1px solid #eef1f5" }}>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
-          disabled={saving}
-          onClick={() => saveRequest(false)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
-        </button>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
-          disabled={saving}
-          onClick={() => saveRequest(true)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
-        </button>
+        {canCreate && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
+            disabled={saving}
+            onClick={() => saveRequest(false)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
+          </button>
+        )}
+        {canSubmit && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
+            disabled={saving}
+            onClick={() => saveRequest(true)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
+          </button>
+        )}
+        {!canCreate && !canSubmit && (
+          <div style={{ fontSize: 13, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={16} /> You do not have permission to create or submit purchase requests. Contact your administrator.
+          </div>
+        )}
         <button
           className="emp-btn-primary-sm"
           style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import VendorProfileModal from "../../shared_ui/VendorProfileModal";
 import {
   Users,
@@ -6,21 +6,14 @@ import {
   Star,
   CheckCircle2,
   AlertCircle,
-  Truck,
   ShieldCheck,
   Building,
   Eye,
-  Plus,
-  BarChart3,
-  TrendingUp,
+  Loader2,
+  WifiOff,
   XCircle,
   FileText,
-  Clock,
-  DollarSign,
-  Award,
-  Lock,
-  RotateCcw,
-  Check
+  RefreshCw,
 } from "lucide-react";
 import {
   BarChart,
@@ -35,637 +28,416 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { apiGet, apiPut } from "../../../../../services/apiClient";
+import { formatINR } from "../../../../../utils/format";
 
-const initialVendors = [
-  {
-    id: "VEN-2026-001",
-    name: "ABC Technologies Pvt. Ltd.",
-    type: "Electronics & Hardware",
-    rating: 4.8,
-    status: "Active", // 'Active' | 'Blacklisted'
-    onTimeDelivery: "97.0%",
-    completionRate: "98.0%",
-    responseTime: "Within 4 Hours",
-    complianceStatus: "Certified & GST Verified",
-    certifications: ["GST Verified", "ISO Certified", "Company Verified", "Approved Vendor"],
-    lastOrderValue: "₹2,50,000",
-    lastOrderDate: "12 July 2026",
-    totalTransactions: 185,
-    email: "sales@abctech.com",
-    phone: "+91 98765 43210",
-    location: "Chennai, Tamil Nadu, India",
-    leadTime: "3 - 5 Business Days",
-    shippingCoverage: "PAN India",
-  },
-  {
-    id: "VND-101",
-    name: "Apple Business Direct",
-    type: "Hardware & IT Workstations",
-    rating: 4.9,
-    status: "Active",
-    onTimeDelivery: "99.2%",
-    completionRate: "99.5%",
-    responseTime: "Within 1 Hour",
-    complianceStatus: "Tier 1 Enterprise Certified",
-    certifications: ["GST Verified", "ISO Certified", "Tier 1 OEM Direct", "Approved Vendor"],
-    lastOrderValue: "$36,990.00",
-    lastOrderDate: "26 July 2026",
-    totalTransactions: 240,
-    email: "enterprise@apple.com",
-    phone: "+1 (800) 692-7753",
-    location: "Cupertino, CA, USA",
-    leadTime: "2 - 3 Business Days",
-    shippingCoverage: "Global Priority Express",
-  },
-  {
-    id: "VND-102",
-    name: "CDW Direct",
-    type: "Hardware & Reseller SLA",
-    rating: 4.7,
-    status: "Active",
-    onTimeDelivery: "96.5%",
-    completionRate: "97.2%",
-    responseTime: "Within 2 Hours",
-    complianceStatus: "ISO Certified",
-    certifications: ["GST Verified", "ISO Certified", "Approved Vendor"],
-    lastOrderValue: "$38,490.00",
-    lastOrderDate: "20 July 2026",
-    totalTransactions: 142,
-    email: "bids@cdw.com",
-    phone: "+1 (800) 800-4239",
-    location: "Vernon Hills, IL, USA",
-    leadTime: "1 - 2 Business Days",
-    shippingCoverage: "North America & International",
-  },
-  {
-    id: "VND-104",
-    name: "Datadog Inc.",
-    type: "Software & SaaS",
-    rating: 5.0,
-    status: "Active",
-    onTimeDelivery: "100.0%",
-    completionRate: "100.0%",
-    responseTime: "Instant Provisioning",
-    complianceStatus: "SOC2 & ISO 27001",
-    certifications: ["SOC2 Type II", "ISO 27001", "Approved Vendor"],
-    lastOrderValue: "$8,500.00",
-    lastOrderDate: "25 July 2026",
-    totalTransactions: 98,
-    email: "sales@datadoghq.com",
-    phone: "+1 (866) 329-4448",
-    location: "New York, NY, USA",
-    leadTime: "Instant SLA",
-    shippingCoverage: "Digital Cloud Tenant",
-  },
-  {
-    id: "VND-106",
-    name: "Cisco Systems Direct",
-    type: "Networking & Infra",
-    rating: 4.8,
-    status: "Active",
-    onTimeDelivery: "95.8%",
-    completionRate: "97.0%",
-    responseTime: "Within 3 Hours",
-    complianceStatus: "OEM Certified",
-    certifications: ["GST Verified", "ISO Certified", "OEM Direct"],
-    lastOrderValue: "$28,400.00",
-    lastOrderDate: "18 July 2026",
-    totalTransactions: 115,
-    email: "commercial@cisco.com",
-    phone: "+1 (800) 553-6387",
-    location: "San Jose, CA, USA",
-    leadTime: "3 - 4 Business Days",
-    shippingCoverage: "PAN India & Global",
-  },
-  {
-    id: "VND-999",
-    name: "Legacy Media Corp",
-    type: "Promotional Print Supplies",
-    rating: 3.2,
-    status: "Blacklisted",
-    onTimeDelivery: "72.0%",
-    completionRate: "81.0%",
-    responseTime: "Over 48 Hours",
-    complianceStatus: "Non-Compliant SLA Violation",
-    certifications: ["Company Verified"],
-    lastOrderValue: "$10,500.00",
-    lastOrderDate: "10 June 2026",
-    totalTransactions: 12,
-    email: "quotes@legacymedia.com",
-    phone: "+1 (800) 555-9011",
-    location: "Chicago, IL, USA",
-    leadTime: "14+ Business Days",
-    shippingCoverage: "Restricted Courier",
-    blacklistReason: "Repeated contract delivery delays & quality non-compliance.",
-  },
-];
+const STATUS_COLORS = {
+  ACTIVE: "#059669",
+  INACTIVE: "#64748b",
+  SUSPENDED: "#dc2626",
+  PENDING_APPROVAL: "#d97706",
+};
 
-const vendorAnalyticsSpend = [
-  { name: "Apple Direct", spend: 185000, orders: 42 },
-  { name: "CDW Direct", spend: 115000, orders: 28 },
-  { name: "Datadog SaaS", spend: 68500, orders: 14 },
-  { name: "Cisco Systems", spend: 55200, orders: 19 },
-  { name: "ABC Tech", spend: 42000, orders: 35 },
-];
+const statusLabel = (s) =>
+  ({ ACTIVE: "Active", INACTIVE: "Inactive", SUSPENDED: "Suspended", PENDING_APPROVAL: "Pending Approval" }[s] || s);
 
-const vendorAnalyticsShare = [
-  { name: "Apple Direct", value: 38, color: "#f8b400" },
-  { name: "CDW Direct", value: 24, color: "#059669" },
-  { name: "Datadog SaaS", value: 14, color: "#3b82f6" },
-  { name: "Cisco Systems", value: 12, color: "#7c3aed" },
-  { name: "ABC Tech", value: 12, color: "#d97706" },
-];
+const toProfileShape = (v) => ({
+  companyName: v.vendorName,
+  vendorId: v.vendorCode,
+  vendorType: v.vendorType || "General Supplier",
+  email: v.email,
+  phone: v.mobile || v.phone,
+  location: [v.addressLine1, v.city, v.state, v.country].filter(Boolean).join(", ") || "—",
+  productsServices: ["GST: " + (v.gstNumber || "—")].filter(Boolean),
+  performance: {
+    rating: `${v.rating || "—"} / 5`,
+    totalOrdersCompleted: "—",
+    onTimeDeliveries: "—",
+    successfulTransactions: "—",
+    responseTime: "—",
+  },
+  pricingInfo: [v.paymentTerms ? `Payment Terms: ${v.paymentTerms}` : "Payment Terms: Standard"].filter(Boolean),
+  deliveryInfo: {
+    deliveryTime: "—",
+    shippingAvailability: "—",
+  },
+  certifications: [
+    v.gstNumber ? "GST Verified" : null,
+    v.panNumber ? "PAN Registered" : null,
+    v.registrationNumber ? "Company Verified" : null,
+    v.approved ? "Approved Vendor" : null,
+  ].filter(Boolean),
+  recentProcurement: {
+    lastOrderValue: "—",
+    lastOrderDate: "—",
+    totalTransactions: "—",
+  },
+});
 
 const VendorManagement = () => {
-  const [vendors, setVendors] = useState(initialVendors);
-  const [activeTabFilter, setActiveTabFilter] = useState("all"); // 'all' | 'Active' | 'Blacklisted' | 'comparison' | 'analytics'
+  const [vendors, setVendors] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [activeTabFilter, setActiveTabFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-
-  // Selected Vendor Profile Modal
   const [profileVendor, setProfileVendor] = useState(null);
-
-  // Vendor Comparison Selection State
-  const [comparedVendorIds, setComparedVendorIds] = useState(["VEN-2026-001", "VND-101"]);
-
-  // Blacklist Confirmation Modal
-  const [blacklistModalVendor, setBlacklistModalVendor] = useState(null);
-  const [blacklistReasonInput, setBlacklistReasonInput] = useState("SLA Delivery Breach & Quality Non-Compliance");
-
+  const [comparedVendorIds, setComparedVendorIds] = useState([]);
+  const [statusModalVendor, setStatusModalVendor] = useState(null);
+  const [statusReasonInput, setStatusReasonInput] = useState("");
+  const [busy, setBusy] = useState(false);
   const [toastMsg, setToastMsg] = useState("");
+  const [spendChart, setSpendChart] = useState([]);
 
-  const filtered = vendors.filter((v) => {
-    const matchesSearch =
-      v.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      v.type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTab =
-      activeTabFilter === "all" ||
-      (activeTabFilter === "Active" && v.status === "Active") ||
-      (activeTabFilter === "Blacklisted" && v.status === "Blacklisted");
-    return matchesSearch && matchesTab;
-  });
-
-  const handleToggleBlacklist = (vendorObj) => {
-    const isCurrentlyBlacklisted = vendorObj.status === "Blacklisted";
-    const updated = vendors.map((v) => {
-      if (v.id === vendorObj.id) {
-        return {
-          ...v,
-          status: isCurrentlyBlacklisted ? "Active" : "Blacklisted",
-          blacklistReason: isCurrentlyBlacklisted ? null : blacklistReasonInput,
-        };
-      }
-      return v;
-    });
-    setVendors(updated);
-    setBlacklistModalVendor(null);
-    setToastMsg(
-      `Supplier "${vendorObj.name}" ${isCurrentlyBlacklisted ? "restored to Active status!" : "added to Blacklisted status!"}`
-    );
+  const triggerToast = (m) => {
+    setToastMsg(m);
     setTimeout(() => setToastMsg(""), 4000);
   };
 
-  const activeCount = vendors.filter((v) => v.status === "Active").length;
-  const blacklistedCount = vendors.filter((v) => v.status === "Blacklisted").length;
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [page, spendRes] = await Promise.all([
+        apiGet("/api/vendors?page=0&size=100&sort=vendorName&direction=asc"),
+        apiGet("/api/dashboard/charts/spend").catch(() => null),
+      ]);
+      setVendors(page?.content || []);
+      const spend = spendRes?.data || spendRes?.points || spendRes?.series || [];
+      setSpendChart(Array.isArray(spend) ? spend : []);
+    } catch (err) {
+      setError(err.message || "Unable to load vendors.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const filtered = vendors.filter((v) => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      !q ||
+      (v.vendorName || "").toLowerCase().includes(q) ||
+      (v.vendorCode || "").toLowerCase().includes(q) ||
+      (v.city || "").toLowerCase().includes(q) ||
+      (v.vendorType || "").toLowerCase().includes(q);
+    const matchesTab = activeTabFilter === "all" || v.status === activeTabFilter;
+    return matchesSearch && matchesTab;
+  });
+
+  const activeCount = vendors.filter((v) => v.status === "ACTIVE").length;
+  const suspendedCount = vendors.filter((v) => v.status === "SUSPENDED").length;
+  const pendingCount = vendors.filter((v) => v.status === "PENDING_APPROVAL").length;
+  const inactiveCount = vendors.filter((v) => v.status === "INACTIVE").length;
+
+  const openProfile = (v) => setProfileVendor(v);
+  const openProfileById = (id) => {
+    const v = vendors.find((x) => String(x.id) === String(id));
+    if (v) setProfileVendor(v);
+  };
+
+  const toggleCompare = (v) => {
+    setComparedVendorIds((prev) =>
+      prev.includes(v.id) ? prev.filter((x) => x !== v.id) : [...prev, v.id]
+    );
+  };
+
+  const handleStatusChange = async () => {
+    if (!statusModalVendor) return;
+    setBusy(true);
+    setError("");
+    try {
+      const v = statusModalVendor;
+      const newStatus = v.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+      await apiPut(`/api/vendors/${v.id}/status`, { status: newStatus, approved: newStatus === "ACTIVE" });
+      triggerToast(`${v.vendorName} is now ${statusLabel(newStatus)}.`);
+      setStatusModalVendor(null);
+      loadData();
+    } catch (err) {
+      setError(err.message || "Unable to update vendor status.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pieData = [
+    { name: "Active", value: activeCount },
+    { name: "Inactive", value: inactiveCount },
+    { name: "Suspended", value: suspendedCount },
+    { name: "Pending Approval", value: pendingCount },
+  ].filter((d) => d.value > 0);
+
+  const tabBtn = (key, label, count, color) => (
+    <button
+      key={key}
+      onClick={() => setActiveTabFilter(key)}
+      style={{
+        padding: "6px 14px",
+        borderRadius: "8px",
+        border: "none",
+        background: activeTabFilter === key ? (color || "#f8b400") : "transparent",
+        color: activeTabFilter === key ? (key === "all" ? "#000" : "#fff") : "#555555",
+        fontWeight: activeTabFilter === key ? "700" : "600",
+        fontSize: "13px",
+        cursor: "pointer",
+      }}
+    >
+      {label} {count > 0 ? `(${count})` : ""}
+    </button>
+  );
 
   return (
-    <div className="pman-vendor-management-container">
+    <div className="pman-requests-container">
       {/* Header */}
       <div className="pman-page-header">
         <div>
           <h1 className="pman-page-title">
-            <Users color="#f8b400" /> Enterprise Vendor Management & Ratings Hub
+            <Users color="#f8b400" /> Vendor Management
           </h1>
           <p className="pman-page-subtitle">
-            Evaluate vendor performance, compliance certifications, delivery metrics, analytics, and blacklisting status.
+            Approved vendor registry from the database — active, suspended and pending vendors with live eligibility status.
           </p>
         </div>
+        <button className="pman-btn-primary-sm" onClick={loadData}>
+          <RefreshCw size={16} /> Refresh
+        </button>
       </div>
 
       {toastMsg && (
-        <div
-          style={{
-            background: "rgba(5, 150, 105, 0.12)",
-            border: "1px solid #059669",
-            color: "#059669",
-            padding: "14px 20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-            fontWeight: "700",
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
-          <CheckCircle2 size={18} /> {toastMsg}
+        <div style={{ background: "#ecfdf5", color: "#065f46", padding: "12px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", fontWeight: 600, border: "1px solid #a7f3d0" }}>
+          <CheckCircle2 size={16} style={{ verticalAlign: "middle", marginRight: 6 }} /> {toastMsg}
         </div>
       )}
 
-      {/* FILTER TABS & SEARCH BAR */}
-      <div className="pman-card" style={{ marginBottom: "24px", padding: "20px" }}>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", alignItems: "center", justifyContent: "space-between" }}>
-          
-          {/* Tabs: View All, Active, Blacklisted, Vendor Comparison, Vendor Analytics */}
-          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-            <button
-              onClick={() => setActiveTabFilter("all")}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTabFilter === "all" ? "#f8b400" : "#f8f9fb",
-                color: activeTabFilter === "all" ? "#000000" : "#555555",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-                border: "1px solid #d9d9d9",
-              }}
-            >
-              View All Vendors ({vendors.length})
-            </button>
+      {error && (
+        <div style={{ background: "#fef2f2", color: "#991b1b", padding: "14px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", border: "1px solid #fecaca", display: "flex", gap: "10px", alignItems: "center" }}>
+          <WifiOff size={18} /> {error}
+        </div>
+      )}
 
-            <button
-              onClick={() => setActiveTabFilter("Active")}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTabFilter === "Active" ? "#059669" : "#f8f9fb",
-                color: activeTabFilter === "Active" ? "#ffffff" : "#555555",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-                border: "1px solid #d9d9d9",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <CheckCircle2 size={15} /> Active Vendors ({activeCount})
-            </button>
-
-            <button
-              onClick={() => setActiveTabFilter("Blacklisted")}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTabFilter === "Blacklisted" ? "#dc2626" : "#f8f9fb",
-                color: activeTabFilter === "Blacklisted" ? "#ffffff" : "#555555",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-                border: "1px solid #d9d9d9",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <XCircle size={15} /> Blacklisted Vendors ({blacklistedCount})
-            </button>
-
-            <button
-              onClick={() => setActiveTabFilter("comparison")}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTabFilter === "comparison" ? "#3b82f6" : "#f8f9fb",
-                color: activeTabFilter === "comparison" ? "#ffffff" : "#555555",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-                border: "1px solid #d9d9d9",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <Building size={15} /> Vendor Comparison Matrix
-            </button>
-
-            <button
-              onClick={() => setActiveTabFilter("analytics")}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "10px",
-                border: "none",
-                background: activeTabFilter === "analytics" ? "#7c3aed" : "#f8f9fb",
-                color: activeTabFilter === "analytics" ? "#ffffff" : "#555555",
-                fontWeight: "700",
-                fontSize: "13px",
-                cursor: "pointer",
-                border: "1px solid #d9d9d9",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-              }}
-            >
-              <BarChart3 size={15} /> Vendor Analytics
-            </button>
+      {/* Filter Bar */}
+      <div className="pman-card" style={{ marginBottom: "24px", padding: "18px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+          <div style={{ position: "relative", width: "340px" }}>
+            <Search size={16} color="#666666" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
+            <input
+              type="text"
+              placeholder="Search vendor name, code, city..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pman-form-input"
+              style={{ paddingLeft: "42px", height: "42px" }}
+            />
           </div>
-
-          {/* Search Bar */}
-          {activeTabFilter !== "comparison" && activeTabFilter !== "analytics" && (
-            <div style={{ position: "relative", width: "300px" }}>
-              <Search
-                size={15}
-                color="#666666"
-                style={{ position: "absolute", left: "12px", top: "50%", transform: "translateY(-50%)" }}
-              />
-              <input
-                type="text"
-                placeholder="Search vendor name, ID or type..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pman-form-input"
-                style={{ paddingLeft: "36px", height: "38px" }}
-              />
-            </div>
-          )}
-
+          <div style={{ display: "flex", background: "#f8f9fb", padding: "3px", borderRadius: "10px", border: "1px solid #d9d9d9" }}>
+            {tabBtn("all", "All", vendors.length, "#f8b400")}
+            {tabBtn("ACTIVE", "Active", activeCount, "#059669")}
+            {tabBtn("SUSPENDED", "Suspended", suspendedCount, "#dc2626")}
+            {tabBtn("PENDING_APPROVAL", "Pending", pendingCount, "#d97706")}
+          </div>
         </div>
       </div>
 
-      {/* VIEW SECTION 1: VENDOR COMPARISON MATRIX */}
-      {activeTabFilter === "comparison" ? (
-        <div className="pman-card" style={{ padding: "24px" }}>
-          <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <Building color="#f8b400" size={20} /> Side-by-Side Vendor Comparison Matrix
-          </h3>
-
-          <div style={{ display: "flex", gap: "16px", marginBottom: "20px" }}>
-            {vendors.map((v) => (
-              <label key={v.id} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", cursor: "pointer", background: comparedVendorIds.includes(v.id) ? "rgba(248, 180, 0, 0.15)" : "#f8f9fb", padding: "6px 12px", borderRadius: "8px", border: "1px solid #d9d9d9" }}>
-                <input
-                  type="checkbox"
-                  checked={comparedVendorIds.includes(v.id)}
-                  onChange={() => {
-                    if (comparedVendorIds.includes(v.id)) {
-                      if (comparedVendorIds.length > 1) setComparedVendorIds(comparedVendorIds.filter((id) => id !== v.id));
-                    } else {
-                      setComparedVendorIds([...comparedVendorIds, v.id]);
-                    }
-                  }}
-                  style={{ accentColor: "#f8b400" }}
-                />
-                <span style={{ fontWeight: "700", color: "#111" }}>{v.name}</span>
-              </label>
-            ))}
+      {/* KPI Cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+        {[
+          { label: "Active Vendors", value: activeCount, icon: <CheckCircle2 size={18} />, color: "#059669" },
+          { label: "Inactive", value: inactiveCount, icon: <AlertCircle size={18} />, color: "#64748b" },
+          { label: "Suspended", value: suspendedCount, icon: <XCircle size={18} />, color: "#dc2626" },
+          { label: "Pending Approval", value: pendingCount, icon: <ShieldCheck size={18} />, color: "#d97706" },
+        ].map((k) => (
+          <div key={k.label} className="pman-kpi-card">
+            <div className="pman-kpi-icon-wrapper" style={{ background: `${k.color}18`, color: k.color }}>
+              {k.icon}
+            </div>
+            <div className="pman-kpi-info">
+              <span className="pman-kpi-label">{k.label}</span>
+              <span className="pman-kpi-value">{k.value}</span>
+            </div>
           </div>
+        ))}
+      </div>
 
-          {/* Side by Side Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: `repeat(${comparedVendorIds.length}, 1fr)`, gap: "20px" }}>
-            {comparedVendorIds.map((id) => {
-              const v = vendors.find((x) => x.id === id);
-              if (!v) return null;
-              return (
-                <div key={v.id} className="pman-card pman-card-gold-glow" style={{ padding: "20px" }}>
-                  <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>{v.id}</span>
-                  <h4 style={{ fontSize: "18px", color: "#111", fontWeight: "800", margin: "4px 0" }}>{v.name}</h4>
-                  <p style={{ fontSize: "12px", color: "#666", marginBottom: "16px" }}>{v.type}</p>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px" }}>
-                    <div style={{ background: "#f8f9fb", padding: "10px", borderRadius: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Vendor Rating:</span>
-                      <p style={{ fontSize: "16px", color: "#d97706", fontWeight: "800", margin: "2px 0 0" }}>{v.rating} / 5.0 ⭐</p>
-                    </div>
-
-                    <div style={{ background: "#f8f9fb", padding: "10px", borderRadius: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>On-Time Delivery:</span>
-                      <p style={{ fontSize: "16px", color: "#059669", fontWeight: "800", margin: "2px 0 0" }}>{v.onTimeDelivery}</p>
-                    </div>
-
-                    <div style={{ background: "#f8f9fb", padding: "10px", borderRadius: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>SLA Lead Time:</span>
-                      <p style={{ fontWeight: "700", color: "#111", margin: "2px 0 0" }}>{v.leadTime}</p>
-                    </div>
-
-                    <div style={{ background: "#f8f9fb", padding: "10px", borderRadius: "8px" }}>
-                      <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Certifications:</span>
-                      <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>
-                        {v.certifications.map((c, i) => (
-                          <span key={i} style={{ fontSize: "11px", background: "rgba(5, 150, 105, 0.12)", color: "#059669", padding: "2px 6px", borderRadius: "6px", fontWeight: "700" }}>✓ {c}</span>
-                        ))}
+      {/* Main Table */}
+      <div className="pman-card">
+        <div className="pman-table-container">
+          {loading ? (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: "12px", color: "#666666" }}>
+              <Loader2 size={20} className="login-spin" /> Loading vendors…
+            </div>
+          ) : filtered.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#666666" }}>
+              <Building size={32} style={{ marginBottom: "10px", opacity: 0.4 }} />
+              <p style={{ fontWeight: 600 }}>No vendors found.</p>
+              <p style={{ fontSize: "13px" }}>No vendors match the current filter.</p>
+            </div>
+          ) : (
+            <table className="pman-table">
+              <thead>
+                <tr>
+                  <th>Vendor</th>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>GST</th>
+                  <th>Rating</th>
+                  <th>Status</th>
+                  <th>Approved</th>
+                  <th style={{ textAlign: "right" }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((v) => (
+                  <tr key={v.id}>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column" }}>
+                        <span style={{ fontWeight: "800", color: "#111111" }}>{v.vendorName}</span>
+                        <span style={{ fontSize: "11px", color: "#666666" }}>{v.vendorCode}</span>
                       </div>
-                    </div>
-
-                    <button
-                      className="pman-btn-primary-sm"
-                      style={{ marginTop: "12px", justifyContent: "center" }}
-                      onClick={() => setProfileVendor(v)}
-                    >
-                      <Eye size={14} /> Full Profile
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : activeTabFilter === "analytics" ? (
-        /* VIEW SECTION 2: VENDOR ANALYTICS DASHBOARD */
-        <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-          
-          {/* Charts Row */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px" }}>
-            <div className="pman-card" style={{ padding: "20px" }}>
-              <h3 style={{ fontSize: "16px", color: "#111", fontWeight: "800", marginBottom: "16px" }}>
-                Total Spend Awarded per Vendor ($USD)
-              </h3>
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={vendorAnalyticsSpend}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#ececec" />
-                    <XAxis dataKey="name" stroke="#666" fontSize={11} />
-                    <YAxis stroke="#666" fontSize={11} />
-                    <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
-                    <Bar dataKey="spend" name="Spend ($)" fill="#f8b400" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="pman-card" style={{ padding: "20px" }}>
-              <h3 style={{ fontSize: "16px", color: "#111", fontWeight: "800", marginBottom: "16px" }}>
-                Supplier Share Allocation (%)
-              </h3>
-              <div style={{ width: "100%", height: 260 }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie data={vendorAnalyticsShare} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={5} dataKey="value">
-                      {vendorAnalyticsShare.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={{ background: "#fff", border: "1px solid #f8b400", borderRadius: "8px" }} />
-                    <Legend />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      ) : (
-        /* VIEW SECTION 3: VENDORS GRID & CARDS (View All, Active, Blacklisted) */
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
-          {filtered.map((v) => (
-            <div key={v.id} className="pman-card pman-card-gold-glow">
-              
-              {/* Card Header */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>{v.id}</span>
-                  <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "800", marginTop: "2px" }}>{v.name}</h3>
-                </div>
-
-                <span
-                  style={{
-                    fontSize: "12px",
-                    padding: "3px 10px",
-                    borderRadius: "12px",
-                    fontWeight: "800",
-                    background: v.status === "Active" ? "rgba(5, 150, 105, 0.12)" : "rgba(220, 38, 38, 0.12)",
-                    color: v.status === "Active" ? "#059669" : "#dc2626",
-                  }}
-                >
-                  {v.status}
-                </span>
-              </div>
-
-              <p style={{ fontSize: "13px", color: "#666666", marginBottom: "14px" }}>Category: <strong>{v.type}</strong></p>
-
-              {/* Performance Metrics Box */}
-              <div
-                style={{
-                  padding: "14px",
-                  background: "#f8f9fb",
-                  borderRadius: "10px",
-                  border: "1px solid #ececec",
-                  marginBottom: "16px",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "6px",
-                  fontSize: "12.5px",
-                }}
-              >
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#666" }}>Overall Rating:</span>
-                  <strong style={{ color: "#d97706" }}>{v.rating} / 5.0 ⭐</strong>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#666" }}>Delivery Performance:</span>
-                  <strong style={{ color: "#059669" }}>{v.onTimeDelivery} On-Time</strong>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#666" }}>Procurement History:</span>
-                  <span>{v.totalTransactions} Orders (Last: {v.lastOrderValue})</span>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ color: "#666" }}>Compliance Status:</span>
-                  <span style={{ fontWeight: "700", color: "#059669" }}>{v.complianceStatus}</span>
-                </div>
-              </div>
-
-              {/* Certifications Badges */}
-              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "16px" }}>
-                {v.certifications.map((c, idx) => (
-                  <span
-                    key={idx}
-                    style={{
-                      fontSize: "11px",
-                      background: "rgba(5, 150, 105, 0.12)",
-                      color: "#059669",
-                      border: "1px solid #059669",
-                      padding: "2px 8px",
-                      borderRadius: "10px",
-                      fontWeight: "700",
-                    }}
-                  >
-                    ✓ {c}
-                  </span>
+                    </td>
+                    <td style={{ color: "#555555" }}>{v.vendorType || "—"}</td>
+                    <td style={{ color: "#555555", fontSize: "13px" }}>{[v.city, v.state].filter(Boolean).join(", ") || "—"}</td>
+                    <td style={{ color: "#555555", fontSize: "13px" }}>{v.gstNumber || "—"}</td>
+                    <td>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontWeight: 700, color: "#d97706" }}>
+                        <Star size={13} fill="#f8b400" color="#f8b400" /> {v.rating ?? "—"}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="pman-badge" style={{ background: `${STATUS_COLORS[v.status] || "#64748b"}18`, color: STATUS_COLORS[v.status] || "#64748b", border: `1px solid ${STATUS_COLORS[v.status] || "#64748b"}33` }}>
+                        <span className="pman-badge-dot"></span>
+                        {statusLabel(v.status)}
+                      </span>
+                    </td>
+                    <td style={{ fontSize: "12.5px", fontWeight: 700, color: v.approved ? "#059669" : "#d97706" }}>
+                      {v.approved ? "Yes" : "No"}
+                    </td>
+                    <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                      <button
+                        className="pman-sidebar-toggle"
+                        style={{ width: "32px", height: "32px", display: "inline-flex", marginRight: 6 }}
+                        onClick={() => toggleCompare(v)}
+                        title="Toggle comparison"
+                      >
+                        <FileText size={15} />
+                      </button>
+                      <button
+                        className="pman-sidebar-toggle"
+                        style={{ width: "32px", height: "32px", display: "inline-flex", marginRight: 6 }}
+                        onClick={() => openProfile(v)}
+                        title="View profile"
+                      >
+                        <Eye size={15} />
+                      </button>
+                      <button
+                        className="pman-sidebar-toggle"
+                        style={{ width: "32px", height: "32px", display: "inline-flex", background: v.status === "ACTIVE" ? "rgba(220,38,38,.1)" : "rgba(5,150,105,.1)", color: v.status === "ACTIVE" ? "#dc2626" : "#059669" }}
+                        onClick={() => { setStatusReasonInput(""); setStatusModalVendor(v); }}
+                        title={v.status === "ACTIVE" ? "Suspend vendor" : "Restore vendor"}
+                      >
+                        {v.status === "ACTIVE" ? <XCircle size={15} /> : <RefreshCw size={15} />}
+                      </button>
+                    </td>
+                  </tr>
                 ))}
-              </div>
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
 
-              {/* Action Buttons: View Profile & Blacklist / Restore Button */}
-              <div style={{ display: "flex", justifyContent: "space-between", gap: "10px" }}>
-                <button
-                  className="pman-btn-primary-sm"
-                  style={{ background: "#ffffff", color: "#111", border: "1px solid #d9d9d9" }}
-                  onClick={() => setProfileVendor(v)}
-                >
-                  <Eye size={15} /> View Vendor Profile
-                </button>
-
-                {v.status === "Active" ? (
-                  <button
-                    className="pman-btn-primary-sm"
-                    style={{ background: "#ffffff", color: "#dc2626", border: "1px solid #dc2626" }}
-                    onClick={() => setBlacklistModalVendor(v)}
-                  >
-                    <XCircle size={15} /> Blacklist
-                  </button>
-                ) : (
-                  <button
-                    className="pman-btn-primary-sm"
-                    style={{ background: "#059669", color: "#ffffff", border: "none" }}
-                    onClick={() => handleToggleBlacklist(v)}
-                  >
-                    <CheckCircle2 size={15} /> Restore Active
-                  </button>
-                )}
-              </div>
-
-            </div>
-          ))}
+      {/* Comparison Section */}
+      {comparedVendorIds.length > 1 && (
+        <div className="pman-card" style={{ marginTop: "24px", padding: "24px" }}>
+          <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#111", marginBottom: "16px" }}>Vendor Comparison ({comparedVendorIds.length})</h3>
+          <div style={{ overflowX: "auto" }}>
+            <table className="pman-table">
+              <thead>
+                <tr>
+                  <th>Attribute</th>
+                  {comparedVendorIds.map((id) => {
+                    const v = vendors.find((x) => String(x.id) === String(id));
+                    return v ? <th key={id}>{v.vendorName}</th> : null;
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ["Type", (v) => v.vendorType || "—"],
+                  ["Location", (v) => [v.city, v.state, v.country].filter(Boolean).join(", ") || "—"],
+                  ["Rating", (v) => `${v.rating ?? "—"} / 5`],
+                  ["GST", (v) => v.gstNumber || "—"],
+                  ["Status", (v) => statusLabel(v.status)],
+                  ["Approved", (v) => (v.approved ? "Yes" : "No")],
+                  ["Credit Limit", (v) => formatINR(v.creditLimit)],
+                ].map(([label, fn]) => (
+                  <tr key={label}>
+                    <td style={{ fontWeight: 700, color: "#111" }}>{label}</td>
+                    {comparedVendorIds.map((id) => {
+                      const v = vendors.find((x) => String(x.id) === String(id));
+                      return v ? <td key={id}>{fn(v)}</td> : null;
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
-      {/* VENDOR PROFILE MODAL (EXACT 8-SECTION SCHEMA) */}
+      {/* Analytics Section */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginTop: "24px" }}>
+        <div className="pman-card" style={{ padding: "24px" }}>
+          <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#111", marginBottom: "16px" }}>Vendor Status Distribution</h3>
+          {pieData.length === 0 ? (
+            <p style={{ color: "#888", fontSize: "13.5px", textAlign: "center", padding: "30px 0" }}>No vendor data available.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={85} label>
+                  {pieData.map((d, i) => (
+                    <Cell key={i} fill={["#059669", "#64748b", "#dc2626", "#d97706"][i % 4]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+        <div className="pman-card" style={{ padding: "24px" }}>
+          <h3 style={{ fontSize: "17px", fontWeight: 800, color: "#111", marginBottom: "16px" }}>Spend Trend</h3>
+          {spendChart.length === 0 ? (
+            <p style={{ color: "#888", fontSize: "13.5px", textAlign: "center", padding: "30px 0" }}>No spend data available yet.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <BarChart data={spendChart}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey={spendChart[0]?.label ? "label" : "month"} tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey={spendChart[0]?.value !== undefined ? "value" : "spend"} name="Spend (₹)" fill="#059669" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      {/* Profile Modal */}
       {profileVendor && (
         <VendorProfileModal
-          vendor={{
-            companyName: profileVendor.name,
-            vendorId: profileVendor.id,
-            vendorType: profileVendor.type,
-            email: profileVendor.email,
-            phone: profileVendor.phone,
-            location: profileVendor.location,
-            productsServices: ["Laptops", "Workstations", "Servers", "Printers", "Office Accessories"],
-            performance: {
-              rating: `${profileVendor.rating} / 5`,
-              totalOrdersCompleted: profileVendor.totalTransactions,
-              onTimeDeliveries: profileVendor.onTimeDelivery,
-              successfulTransactions: profileVendor.completionRate,
-              responseTime: profileVendor.responseTime,
-            },
-            pricingInfo: ["Competitive Enterprise Rate", "Bulk Discounts", "GST Included", "Negotiable"],
-            deliveryInfo: {
-              deliveryTime: profileVendor.leadTime,
-              shippingAvailability: profileVendor.shippingCoverage,
-            },
-            certifications: profileVendor.certifications,
-            recentProcurement: {
-              lastOrderValue: profileVendor.lastOrderValue,
-              lastOrderDate: profileVendor.lastOrderDate,
-              totalTransactions: profileVendor.totalTransactions,
-            },
-          }}
+          vendor={toProfileShape(profileVendor)}
           onClose={() => setProfileVendor(null)}
-          onAction={(actionName, vendorData) => {
-            setToastMsg(`Action [ ${actionName} ] executed for ${vendorData.companyName}`);
-            setTimeout(() => setToastMsg(""), 4000);
+          onAction={(actionName) => {
+            triggerToast(`Action [ ${actionName} ] executed for ${profileVendor.vendorName}`);
           }}
         />
       )}
 
-      {/* BLACKLIST CONFIRMATION MODAL */}
-      {blacklistModalVendor && (
+      {/* Status Change Modal */}
+      {statusModalVendor && (
         <div className="pman-modal-overlay">
           <div className="pman-modal" style={{ maxWidth: "520px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
@@ -674,38 +446,49 @@ const VendorManagement = () => {
                   <XCircle size={20} />
                 </div>
                 <div>
-                  <span style={{ fontSize: "11px", color: "#dc2626", fontWeight: "800", textTransform: "uppercase" }}>RESTRICT VENDOR</span>
-                  <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800", margin: 0 }}>Blacklist {blacklistModalVendor.name}</h3>
+                  <span style={{ fontSize: "11px", color: "#dc2626", fontWeight: "800", textTransform: "uppercase" }}>VENDOR STATUS</span>
+                  <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800", margin: 0 }}>
+                    {statusModalVendor.status === "ACTIVE" ? "Suspend" : "Restore"} {statusModalVendor.vendorName}
+                  </h3>
                 </div>
               </div>
-              <button onClick={() => setBlacklistModalVendor(null)} style={{ background: "none", border: "none", color: "#666" }}><XCircle size={20} /></button>
+              <button onClick={() => setStatusModalVendor(null)} style={{ background: "none", border: "none", color: "#666" }}>
+                <XCircle size={20} />
+              </button>
             </div>
 
             <p style={{ fontSize: "13.5px", color: "#555", marginBottom: "16px" }}>
-              Blacklisting vendor <strong>{blacklistModalVendor.name} ({blacklistModalVendor.id})</strong> will prevent sourcing executives from inviting them to new RFQs or issuing Purchase Orders.
+              {statusModalVendor.status === "ACTIVE"
+                ? `Suspending ${statusModalVendor.vendorName} prevents new RFQ invitations and purchase orders to this vendor.`
+                : `Restoring ${statusModalVendor.vendorName} re-enables this vendor for sourcing activities.`}
             </p>
 
             <div className="pman-form-group" style={{ marginBottom: "20px" }}>
-              <label className="pman-form-label">Blacklist Reason / Compliance Audit Record *</label>
+              <label className="pman-form-label">Reason / Record</label>
               <textarea
                 className="pman-form-input"
                 rows={3}
-                value={blacklistReasonInput}
-                onChange={(e) => setBlacklistReasonInput(e.target.value)}
-                required
+                value={statusReasonInput}
+                onChange={(e) => setStatusReasonInput(e.target.value)}
               />
             </div>
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button className="pman-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setBlacklistModalVendor(null)}>Cancel</button>
-              <button className="pman-btn-primary-sm" style={{ background: "#dc2626", color: "#fff", border: "none" }} onClick={() => handleToggleBlacklist(blacklistModalVendor)}>
-                <XCircle size={16} /> Confirm Blacklist
+              <button className="pman-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setStatusModalVendor(null)} disabled={busy}>
+                Cancel
+              </button>
+              <button
+                className="pman-btn-primary-sm"
+                style={{ background: statusModalVendor.status === "ACTIVE" ? "#dc2626" : "#059669", color: "#fff", border: "none" }}
+                onClick={handleStatusChange}
+                disabled={busy}
+              >
+                {busy ? <Loader2 size={15} className="login-spin" /> : statusModalVendor.status === "ACTIVE" ? "Confirm Suspension" : "Confirm Restore"}
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 };

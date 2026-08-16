@@ -1,346 +1,362 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
-  FileCheck2,
-  CheckCircle2,
   Award,
-  DollarSign,
-  Truck,
-  ShieldCheck,
-  Check,
-  Zap,
+  IndianRupee,
+  CheckCircle2,
+  Loader2,
+  AlertTriangle,
   Send,
-  AlertCircle,
-  X
+  X,
+  ArrowRight,
+  ShieldCheck,
+  Truck,
+  FileCheck2,
 } from "lucide-react";
+import { apiGet, apiPost } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
 
-const matrixData = {
-  rfqId: "RFQ-2026-901",
-  item: "MacBook Pro M3 Max 64GB Workstations (x10)",
-  targetBudget: "$38,990.00",
-  rawBudget: 38990,
-  approvalThreshold: "$25,000.00",
-  vendors: [
-    {
-      name: "Apple Business Direct",
-      recommended: true,
-      rating: "4.9 / 5.0 ⭐",
-      unitPrice: "$3,699.00",
-      totalPrice: "$36,990.00",
-      rawTotal: 36990,
-      leadTime: "3 Business Days",
-      warranty: "3 Years AppleCare+ Enterprise",
-      compliance: "100% Verified",
-      incentive: "5% Direct Volume Tier",
-      savings: "$2,000.00 under budget",
-      requiresApproval: true,
-    },
-    {
-      name: "CDW Direct",
-      recommended: false,
-      rating: "4.7 / 5.0 ⭐",
-      unitPrice: "$3,849.00",
-      totalPrice: "$38,490.00",
-      rawTotal: 38490,
-      leadTime: "2 Business Days",
-      warranty: "3 Years CDW Express Replace",
-      compliance: "100% Verified",
-      incentive: "Free Expedited Air Freight",
-      savings: "$500.00 under budget",
-      requiresApproval: true,
-    },
-    {
-      name: "Insight Tech Solutions",
-      recommended: false,
-      rating: "4.6 / 5.0 ⭐",
-      unitPrice: "$3,899.00",
-      totalPrice: "$38,990.00",
-      rawTotal: 38990,
-      leadTime: "5 Business Days",
-      warranty: "3 Years Standard Warranty",
-      compliance: "100% Verified",
-      incentive: "Standard Price Match",
-      savings: "Matches Budget Target",
-      requiresApproval: true,
-    },
-  ],
-};
+const canCompare = hasPermission("CAN_COMPARE_QUOTATIONS");
+const canSelect = hasPermission("CAN_SELECT_VENDOR");
+const canCreatePo = hasPermission("CAN_CREATE_PO");
 
-const VendorSelection = ({ onNavigate }) => {
-  const [selectedVendor, setSelectedVendor] = useState("Apple Business Direct");
-  const [showApprovalModal, setShowApprovalModal] = useState(false);
-  const [approvalTargetVendor, setApprovalTargetVendor] = useState(null);
+const METHOD_LABEL = { LOWEST_PRICE: "Lowest Price", BEST_VALUE: "Best Value", WEIGHTED_SCORE: "Weighted Score", TECHNICAL: "Technical" };
+
+const VendorSelection = () => {
+  const [rfqs, setRfqs] = useState([]);
+  const [selectedRfqId, setSelectedRfqId] = useState("");
+  const [quotations, setQuotations] = useState([]);
+  const [comparison, setComparison] = useState(null);
+  const [recommendedId, setRecommendedId] = useState(null);
+  const [approved, setApproved] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
   const [toastMsg, setToastMsg] = useState("");
+  const [showPoForm, setShowPoForm] = useState(false);
+  const [poForm, setPoForm] = useState({ expectedDeliveryDate: "", deliveryAddress: "", remarks: "" });
+  const [createdPo, setCreatedPo] = useState(null);
 
-  const handleSelectVendor = (vendorObj) => {
-    setSelectedVendor(vendorObj.name);
-    setToastMsg(`Best Supplier "${vendorObj.name}" selected for ${matrixData.rfqId}!`);
-    setTimeout(() => setToastMsg(""), 4000);
+  const toast = (t) => { setToastMsg(t); setTimeout(() => setToastMsg(""), 5000); };
+
+  const loadRfqs = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await apiGet("/api/rfqs?page=0&size=100&sort=createdAt&direction=desc").catch(() => null);
+      setRfqs(res?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load RFQs.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRfqs();
+  }, [loadRfqs]);
+
+  const loadQuotations = useCallback(async (rfqId) => {
+    if (!rfqId) return;
+    setLoading(true);
+    setError("");
+    setComparison(null);
+    setRecommendedId(null);
+    setApproved(false);
+    setCreatedPo(null);
+    try {
+      const res = await apiGet(`/api/vendor-quotations?rfqId=${rfqId}&page=0&size=50`).catch(() => null);
+      setQuotations(res?.content || []);
+      // Look for an existing comparison for this RFQ.
+      const compRes = await apiGet(`/api/quotation-comparisons?page=0&size=20`).catch(() => null);
+      const list = compRes?.content || [];
+      const match = list.find((c) => String(c.rfqId) === String(rfqId));
+      if (match) {
+        setComparison(match);
+        if (match.recommendedQuotationId) setRecommendedId(match.recommendedQuotationId);
+        if (match.status === "APPROVED") setApproved(true);
+      }
+    } catch (err) {
+      setError(err.message || "Unable to load quotations.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedRfqId) loadQuotations(selectedRfqId);
+  }, [selectedRfqId, loadQuotations]);
+
+  const run = async (fn, successMsg) => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await fn();
+      if (successMsg) toast(successMsg);
+      return result;
+    } catch (err) {
+      setError(err.message || "Action failed.");
+      return null;
+    } finally {
+      setBusy(false);
+    }
   };
 
-  const handleOpenApprovalModal = (vendorObj) => {
-    setApprovalTargetVendor(vendorObj);
-    setShowApprovalModal(true);
-  };
+  const createComparison = () =>
+    run(async () => {
+      const res = await apiPost("/api/quotation-comparisons", {
+        rfqId: Number(selectedRfqId),
+        comparisonMethod: "LOWEST_PRICE",
+        remarks: "Comparison generated by Procurement",
+      });
+      setComparison(res);
+      toast("Quotation comparison created.");
+    }, null);
 
-  const handleSubmitForApproval = (e) => {
+  const generateComparison = () =>
+    run(async () => {
+      const res = await apiPost(`/api/quotation-comparisons/${comparison.id}/generate`);
+      setComparison(res);
+      toast("Comparison generated — quotations evaluated.");
+    }, null);
+
+  const recommend = (quotationId) =>
+    run(async () => {
+      const res = await apiPost(`/api/quotation-comparisons/${comparison.id}/recommend/${quotationId}`);
+      setComparison(res);
+      setRecommendedId(quotationId);
+      toast("Quotation recommended for selection.");
+    }, null);
+
+  const approve = () =>
+    run(async () => {
+      const res = await apiPost(`/api/quotation-comparisons/${comparison.id}/approve`);
+      setComparison(res);
+      setApproved(true);
+      toast("Vendor selection approved.");
+    }, null);
+
+  const createPo = async (e) => {
     e.preventDefault();
-    setShowApprovalModal(false);
-    setToastMsg(
-      `Vendor Selection for ${approvalTargetVendor.name} (${approvalTargetVendor.totalPrice}) submitted to VP Sarah Jenkins for High-Value Sign-off!`
-    );
-    setTimeout(() => setToastMsg(""), 5000);
+    if (!poForm.expectedDeliveryDate) { setError("Expected delivery date is required."); return; }
+    setBusy(true);
+    setError("");
+    try {
+      const po = await apiPost("/api/purchase-orders", {
+        quotationComparisonId: comparison.id,
+        expectedDeliveryDate: poForm.expectedDeliveryDate,
+        deliveryAddress: poForm.deliveryAddress.trim() || null,
+        billingAddress: null,
+        remarks: poForm.remarks.trim() || null,
+      });
+      setCreatedPo(po);
+      setShowPoForm(false);
+      toast(`${po.poNumber} generated from the approved selection.`);
+    } catch (err) {
+      setError(err.message || "Unable to create the purchase order.");
+    } finally {
+      setBusy(false);
+    }
   };
+
+  const selectedRfq = rfqs.find((r) => String(r.id) === String(selectedRfqId));
+  const recommended = quotations.find((q) => String(q.id) === String(recommendedId));
+  const sorted = [...quotations].sort((a, b) => (Number(a.grandTotal) || 0) - (Number(b.grandTotal) || 0));
 
   return (
     <div className="pe-vendor-selection-container">
-      {/* Header */}
       <div className="pe-page-header">
         <div>
           <h1 className="pe-page-title">
-            <Award color="#f8b400" /> Commercial Bid Comparison & Vendor Selection Matrix
+            <Award color="#f8b400" /> Quotation Evaluation &amp; Vendor Selection
           </h1>
           <p className="pe-page-subtitle">
-            Compare submitted supplier quotations side-by-side, select the winning vendor, and submit high-value awards for approval.
+            Compare received quotations, recommend and approve a vendor, then generate the purchase order — all saved to the database.
           </p>
         </div>
       </div>
 
       {toastMsg && (
-        <div
-          style={{
-            background: "rgba(5, 150, 105, 0.12)",
-            border: "1px solid #059669",
-            color: "#059669",
-            padding: "14px 20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-            fontWeight: "700",
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
+        <div style={{ background: "rgba(5,150,105,.12)", border: "1px solid #059669", color: "#059669", padding: "14px 20px", borderRadius: 12, marginBottom: 20, fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 10 }}>
           <CheckCircle2 size={18} /> {toastMsg}
         </div>
       )}
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 13 }}>
+          <AlertTriangle size={17} /> {error}
+        </div>
+      )}
 
-      {/* RFQ Context Card */}
-      <div
-        className="pe-card pe-card-gold-glow"
-        style={{ marginBottom: "28px", padding: "20px 24px" }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "16px",
-          }}
-        >
-          <div>
-            <span style={{ fontSize: "12px", color: "#d97706", fontWeight: "800" }}>
-              COMPARING QUOTATIONS FOR: {matrixData.rfqId}
-            </span>
-            <h2 style={{ fontSize: "20px", color: "#111111", fontWeight: "700", marginTop: "2px" }}>
-              {matrixData.item}
-            </h2>
-            <p style={{ color: "#666666", fontSize: "13px", marginTop: "2px" }}>
-              Allocated Target Budget: <strong style={{ color: "#111111" }}>{matrixData.targetBudget}</strong> • High-Value Threshold: <strong>{matrixData.approvalThreshold}</strong>
-            </p>
-          </div>
-
-          <div
-            style={{
-              padding: "8px 16px",
-              background: "rgba(5, 150, 105, 0.12)",
-              borderRadius: "12px",
-              border: "1px solid #059669",
-              color: "#059669",
-              fontWeight: "700",
-              fontSize: "13px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
+      {/* RFQ selector */}
+      <div className="pe-card pe-card-gold-glow" style={{ marginBottom: 24, padding: "18px 24px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <label style={{ fontSize: 13, color: "#555", fontWeight: 700 }}>SELECT RFQ TO EVALUATE:</label>
+          <select
+            className="pe-form-select"
+            style={{ flex: 1, minWidth: 260, borderColor: "#f8b400", fontWeight: 700 }}
+            value={selectedRfqId}
+            onChange={(e) => setSelectedRfqId(e.target.value)}
           >
-            <Zap size={16} /> Automated Commercial Savings Matrix
-          </div>
+            <option value="">Choose an RFQ…</option>
+            {rfqs.map((r) => (
+              <option key={r.id} value={r.id}>{r.rfqNumber} · {r.purchaseRequestNumber} · {r.status}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Side-by-Side Comparison Matrix Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
-          gap: "20px",
-          marginBottom: "28px",
-        }}
-      >
-        {matrixData.vendors.map((v, idx) => {
-          const isSelected = selectedVendor === v.name;
-          return (
-            <div
-              key={idx}
-              className="pe-card"
-              style={{
-                border: isSelected ? "2px solid #059669" : "1px solid #ececec",
-                background: isSelected ? "linear-gradient(180deg, rgba(5,150,105,0.06) 0%, #ffffff 100%)" : "#ffffff",
-                position: "relative",
-              }}
-            >
-              {v.recommended && (
-                <div
-                  style={{
-                    position: "absolute",
-                    top: "12px",
-                    right: "12px",
-                    background: "var(--accent-gold-gradient)",
-                    color: "#000000",
-                    fontSize: "11px",
-                    fontWeight: "800",
-                    padding: "3px 10px",
-                    borderRadius: "12px",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Best Value Bid
-                </div>
-              )}
-
-              <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700" }}>{v.name}</h3>
-              <span style={{ fontSize: "13px", color: "#666666" }}>Supplier Rating: {v.rating}</span>
-
-              <div style={{ margin: "20px 0", borderTop: "1px solid #ececec", paddingTop: "16px" }}>
-                <span style={{ fontSize: "11px", color: "#666666", textTransform: "uppercase", fontWeight: "700" }}>
-                  Total Commercial Offer
-                </span>
-                <p style={{ fontSize: "26px", color: "#059669", fontWeight: "800", marginTop: "2px" }}>
-                  {v.totalPrice}
-                </p>
-                <span style={{ fontSize: "12px", color: "#d97706", fontWeight: "700" }}>
-                  Unit Rate: {v.unitPrice}
-                </span>
+      {!selectedRfqId ? (
+        <div className="pe-card" style={{ padding: 60, textAlign: "center", color: "#9aa8b8" }}>
+          <FileCheck2 size={30} style={{ opacity: 0.5, marginBottom: 8 }} />
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#475569" }}>Select an RFQ to evaluate quotations</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>Quotations will load from the database for comparison and vendor selection.</div>
+        </div>
+      ) : loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "80px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading quotations...
+        </div>
+      ) : (
+        <>
+          {selectedRfq && (
+            <div className="pe-card" style={{ marginBottom: 20, padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+              <div>
+                <span style={{ fontSize: 12, color: "#d97706", fontWeight: 800 }}>EVALUATING: {selectedRfq.rfqNumber}</span>
+                <h2 style={{ fontSize: 19, color: "#111", fontWeight: 700, margin: "2px 0 0" }}>
+                  {selectedRfq.purchaseRequestNumber} · {selectedRfq.departmentName}
+                </h2>
+                <p style={{ color: "#666", fontSize: 12.5, marginTop: 2 }}>Closing {formatDateIN(selectedRfq.closingDate, { withTime: false })} · {selectedRfq.remarks || "No remarks"}</p>
               </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: "12px", fontSize: "13px", color: "#333" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <Truck size={16} color="#f8b400" />
-                  <span>SLA Lead Time: <strong>{v.leadTime}</strong></span>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <ShieldCheck size={16} color="#f8b400" />
-                  <span>Warranty: <strong>{v.warranty}</strong></span>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <CheckCircle2 size={16} color="#059669" />
-                  <span>Compliance: <strong>{v.compliance}</strong></span>
-                </div>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <DollarSign size={16} color="#d97706" />
-                  <span>Budget Savings: <strong style={{ color: "#059669" }}>{v.savings}</strong></span>
-                </div>
-              </div>
-
-              {/* Action Buttons for Select Best Vendor & Submit for Approval */}
-              <div style={{ marginTop: "24px", display: "flex", flexDirection: "column", gap: "10px" }}>
-                <button
-                  className="pe-btn-primary-sm"
-                  style={{
-                    width: "100%",
-                    justifyContent: "center",
-                    background: isSelected ? "#059669" : "var(--accent-gold-gradient)",
-                    color: isSelected ? "#ffffff" : "#000000",
-                  }}
-                  onClick={() => handleSelectVendor(v)}
-                >
-                  {isSelected ? (
-                    <>
-                      <Check size={16} /> Selected Best Vendor
-                    </>
-                  ) : (
-                    "Select Best Vendor"
-                  )}
-                </button>
-
-                {v.rawTotal > 25000 && (
-                  <button
-                    className="pe-btn-primary-sm"
-                    style={{
-                      width: "100%",
-                      justifyContent: "center",
-                      background: "#ffffff",
-                      color: "#d97706",
-                      border: "1px solid #d97706",
-                    }}
-                    onClick={() => handleOpenApprovalModal(v)}
-                  >
-                    <Send size={15} /> Submit for Approval (&gt; $25k)
+              <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                {canCompare && !comparison && (
+                  <button className="pe-btn-primary-sm" disabled={busy} onClick={createComparison}>
+                    {busy ? <Loader2 size={15} className="login-spin" /> : <FileCheck2 size={15} />} Create Comparison
+                  </button>
+                )}
+                {canCompare && comparison && comparison.status === "DRAFT" && (
+                  <button className="pe-btn-primary-sm" disabled={busy} onClick={generateComparison}>
+                    {busy ? <Loader2 size={15} className="login-spin" /> : <ArrowRight size={15} />} Generate Evaluation
+                  </button>
+                )}
+                {canSelect && comparison && (comparison.status === "GENERATED" || comparison.status === "UNDER_REVIEW") && recommended && (
+                  <button className="pe-btn-primary-sm" style={{ background: "#059669" }} disabled={busy} onClick={approve}>
+                    {busy ? <Loader2 size={15} className="login-spin" /> : <CheckCircle2 size={15} />} Approve Selection
+                  </button>
+                )}
+                {canCreatePo && approved && !createdPo && (
+                  <button className="pe-btn-primary-sm" onClick={() => setShowPoForm(true)}>
+                    <Send size={15} /> Generate Purchase Order
                   </button>
                 )}
               </div>
             </div>
-          );
-        })}
-      </div>
+          )}
 
-      {/* SUBMIT FOR APPROVAL MODAL */}
-      {showApprovalModal && approvalTargetVendor && (
-        <div className="pe-modal-overlay">
-          <div className="pe-modal" style={{ maxWidth: "540px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>HIGH-VALUE AWARD APPROVAL SUBMISSION</span>
-                <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800" }}>{approvalTargetVendor.name}</h3>
-              </div>
-              <button onClick={() => setShowApprovalModal(false)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}>
-                <X size={20} />
-              </button>
+          {comparison && (
+            <div style={{ fontSize: 12.5, color: "#78350f", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "10px 14px", marginBottom: 16, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <ShieldCheck size={15} />
+              <strong>Comparison {comparison.status}:</strong> {METHOD_LABEL[comparison.comparisonMethod] || comparison.comparisonMethod}
+              {approved && <span style={{ color: "#059669", fontWeight: 800 }}>· SELECTION APPROVED</span>}
             </div>
+          )}
 
-            <form onSubmit={handleSubmitForApproval}>
-              <div style={{ background: "#fffbeb", border: "1px solid #fef3c7", padding: "14px", borderRadius: "10px", marginBottom: "16px", fontSize: "13px", color: "#92400e", display: "flex", gap: "10px", alignItems: "center" }}>
-                <AlertCircle size={20} color="#d97706" style={{ flexShrink: 0 }} />
-                <span>
-                  This award value (<strong>{approvalTargetVendor.totalPrice}</strong>) exceeds the $25,000 threshold and requires executive manager sign-off.
-                </span>
+          {quotations.length === 0 ? (
+            <div className="pe-card" style={{ padding: 60, textAlign: "center", color: "#9aa8b8" }}>
+              No quotations have been received for this RFQ yet.
+            </div>
+          ) : (
+            <div className="pe-card">
+              <div style={{ overflowX: "auto" }}>
+                <table className="pe-table" style={{ width: "100%" }}>
+                  <thead>
+                    <tr>
+                      <th>Vendor</th>
+                      <th style={{ textAlign: "right" }}>Total Bid</th>
+                      <th style={{ textAlign: "right" }}>Delivery (days)</th>
+                      <th style={{ textAlign: "right" }}>Warranty (mo)</th>
+                      <th>Valid Until</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: "right" }}>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sorted.map((q) => {
+                      const isRecommended = String(q.id) === String(recommendedId);
+                      const isLowest = sorted.length > 0 && String(q.id) === String(sorted[0].id);
+                      return (
+                        <tr key={q.id} style={{ background: isRecommended ? "rgba(5,150,105,.06)" : undefined }}>
+                          <td style={{ fontWeight: 700, color: "#111" }}>
+                            {q.vendorName}
+                            {isLowest && <span style={{ marginLeft: 8, fontSize: 10.5, fontWeight: 800, color: "#059669", background: "rgba(5,150,105,.12)", padding: "2px 8px", borderRadius: 999 }}>LOWEST</span>}
+                          </td>
+                          <td style={{ textAlign: "right", fontWeight: 800, color: "#059669" }}>{formatINR(q.grandTotal)}</td>
+                          <td style={{ textAlign: "right" }}>{q.deliveryDays ?? "—"}</td>
+                          <td style={{ textAlign: "right" }}>{q.warrantyMonths ?? "—"}</td>
+                          <td style={{ color: "#666", fontSize: 12.5 }}>{formatDateIN(q.validUntil, { withTime: false })}</td>
+                          <td>
+                            <span style={{ fontSize: 11, fontWeight: 800, padding: "3px 10px", borderRadius: 999, background: isRecommended ? "rgba(5,150,105,.12)" : "rgba(217,119,6,.12)", color: isRecommended ? "#059669" : "#d97706" }}>
+                              {isRecommended ? "RECOMMENDED" : q.status}
+                            </span>
+                          </td>
+                          <td style={{ textAlign: "right" }}>
+                            {canSelect && comparison && (comparison.status === "GENERATED" || comparison.status === "UNDER_REVIEW") && !approved && (
+                              <button className="pe-btn-primary-sm" style={{ background: "#fff", color: "#111", border: "1px solid #d9d9d9" }} disabled={busy} onClick={() => recommend(q.id)}>
+                                <Award size={14} /> Recommend
+                              </button>
+                            )}
+                            {approved && isRecommended && recommended && (
+                              <span style={{ fontSize: 12, fontWeight: 800, color: "#059679" }}>✓ Selected</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
+            </div>
+          )}
 
-              <div className="pe-form-group" style={{ marginBottom: "16px" }}>
-                <label className="pe-form-label">Approving Officer *</label>
-                <input
-                  type="text"
-                  className="pe-form-input"
-                  value="Sarah Jenkins (VP of Engineering & IT)"
-                  readOnly
-                />
+          {createdPo && (
+            <div style={{ marginTop: 16, background: "rgba(5,150,105,.08)", border: "1px solid #059669", color: "#065f46", borderRadius: 12, padding: "14px 18px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <Truck size={18} />
+              <strong>{createdPo.poNumber}</strong> generated for {createdPo.vendorName} — {formatINR(createdPo.grandTotal)} · expected delivery {formatDateIN(createdPo.expectedDeliveryDate, { withTime: false })}
+              <span style={{ marginLeft: "auto", fontSize: 12 }}>Open the Purchase Orders module to send it to the vendor.</span>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* PO creation form */}
+      {showPoForm && (
+        <div className="pe-modal-overlay">
+          <div className="pe-modal" style={{ maxWidth: 540 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <h3 style={{ fontSize: 18, color: "#111", fontWeight: 800 }}>Generate Purchase Order</h3>
+              <button onClick={() => setShowPoForm(false)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={createPo}>
+              {recommended && (
+                <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: 12, borderRadius: 10, fontSize: 13, marginBottom: 14 }}>
+                  <div><strong>Selected vendor:</strong> {recommended.vendorName}</div>
+                  <div><strong>Quotation:</strong> {recommended.quotationNumber} · {formatINR(recommended.grandTotal)}</div>
+                </div>
+              )}
+              <div className="pe-form-group" style={{ marginBottom: 16 }}>
+                <label className="pe-form-label">Expected Delivery Date *</label>
+                <input type="date" className="pe-form-input" value={poForm.expectedDeliveryDate} onChange={(e) => setPoForm({ ...poForm, expectedDeliveryDate: e.target.value })} required />
               </div>
-
-              <div className="pe-form-group" style={{ marginBottom: "20px" }}>
-                <label className="pe-form-label">Executive Award Justification / Notes</label>
-                <textarea
-                  className="pe-form-input"
-                  rows={3}
-                  defaultValue={`Requesting sign-off for awarding ${matrixData.rfqId} to ${approvalTargetVendor.name} at ${approvalTargetVendor.totalPrice}. Yields ${approvalTargetVendor.savings} with 100% compliance rating.`}
-                />
+              <div className="pe-form-group" style={{ marginBottom: 16 }}>
+                <label className="pe-form-label">Delivery Address</label>
+                <input type="text" className="pe-form-input" value={poForm.deliveryAddress} onChange={(e) => setPoForm({ ...poForm, deliveryAddress: e.target.value })} placeholder="Receiving location" />
               </div>
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-                <button
-                  type="button"
-                  className="pe-btn-primary-sm"
-                  style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}
-                  onClick={() => setShowApprovalModal(false)}
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="pe-btn-primary-sm">
-                  <Send size={16} /> Submit to Manager for Approval
+              <div className="pe-form-group" style={{ marginBottom: 20 }}>
+                <label className="pe-form-label">Remarks</label>
+                <textarea className="pe-form-input" rows={2} value={poForm.remarks} onChange={(e) => setPoForm({ ...poForm, remarks: e.target.value })} />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <button type="button" className="pe-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setShowPoForm(false)}>Cancel</button>
+                <button type="submit" className="pe-btn-primary-sm" disabled={busy}>
+                  {busy ? <Loader2 size={16} className="login-spin" /> : <Send size={16} />} Generate PO
                 </button>
               </div>
             </form>
