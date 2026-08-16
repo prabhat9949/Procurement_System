@@ -166,6 +166,9 @@ const Loginout = () => {
       localStorage.setItem("eps_display_name", session.displayName || session.username);
       localStorage.setItem("eps_role_code", backendRole);
       localStorage.setItem("eps_active_role", role);
+      // Permission codes returned by the backend login (database-driven). Used only
+      // to hide/show buttons; the backend enforces every permission on the API.
+      localStorage.setItem("eps_permissions", JSON.stringify(session.permissions || []));
 
       if (remember) {
         localStorage.setItem("eps_remember_username", username.trim());

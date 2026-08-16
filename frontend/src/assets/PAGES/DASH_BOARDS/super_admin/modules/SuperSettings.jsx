@@ -16,6 +16,11 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatDateIN } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
+
+// Self-service password change is controlled by the CHANGE_PASSWORD permission
+// (Admin-configurable). The backend enforces the same rule on the API.
+const canChangePassword = hasPermission("CHANGE_PASSWORD");
 
 const SuperSettings = () => {
   const [profile, setProfile] = useState(null);
@@ -141,55 +146,64 @@ const SuperSettings = () => {
           )}
         </div>
 
-        {/* Change Password */}
+        {/* Change Password — shown only when the account holds CHANGE_PASSWORD. */}
         <div className="sadmin-card" style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "12px", padding: "24px" }}>
           <h3 style={{ display: "flex", alignItems: "center", gap: "10px", color: "#111", fontSize: "17px", fontWeight: "700", marginBottom: "16px" }}>
-            <Lock size={18} color="#f8b400" /> Change Password
+            <Lock size={18} color={canChangePassword ? "#f8b400" : "#888"} /> Change Password
           </h3>
 
-          {error && (
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", color: "#dc2626", padding: "10px 14px", borderRadius: "8px", marginBottom: "14px", fontSize: "13.5px", fontWeight: "600" }}>
-              <AlertCircle size={16} /> {error}
-            </div>
-          )}
-
-          <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-            {[
-              { key: "current", label: "Current Password", placeholder: "Enter your current password" },
-              { key: "next", label: "New Password", placeholder: "Minimum 8 characters" },
-              { key: "confirm", label: "Confirm New Password", placeholder: "Repeat the new password" },
-            ].map((f) => (
-              <div className="sadmin-form-group" key={f.key}>
-                <label className="sadmin-form-label">{f.label} *</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPw[f.key] ? "text" : "password"}
-                    placeholder={f.placeholder}
-                    value={form[f.key]}
-                    onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
-                    className="sadmin-form-input"
-                    style={{ paddingRight: "44px" }}
-                    autoComplete={f.key === "current" ? "current-password" : "new-password"}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPw((s) => ({ ...s, [f.key]: !s[f.key] }))}
-                    style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#888", cursor: "pointer" }}
-                  >
-                    {showPw[f.key] ? <EyeOff size={17} /> : <Eye size={17} />}
-                  </button>
+          {!canChangePassword ? (
+            <p style={{ margin: 0, color: "#64748b", fontSize: "13.5px", lineHeight: 1.6 }}>
+              Self-service password change is disabled for this account. Contact a system administrator
+              if you need to change your password.
+            </p>
+          ) : (
+            <>
+              {error && (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(220,38,38,0.08)", border: "1px solid rgba(220,38,38,0.3)", color: "#dc2626", padding: "10px 14px", borderRadius: "8px", marginBottom: "14px", fontSize: "13.5px", fontWeight: "600" }}>
+                  <AlertCircle size={16} /> {error}
                 </div>
+              )}
+
+              <form onSubmit={handleChangePassword} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {[
+                  { key: "current", label: "Current Password", placeholder: "Enter your current password" },
+                  { key: "next", label: "New Password", placeholder: "Minimum 8 characters" },
+                  { key: "confirm", label: "Confirm New Password", placeholder: "Repeat the new password" },
+                ].map((f) => (
+                  <div className="sadmin-form-group" key={f.key}>
+                    <label className="sadmin-form-label">{f.label} *</label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type={showPw[f.key] ? "text" : "password"}
+                        placeholder={f.placeholder}
+                        value={form[f.key]}
+                        onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                        className="sadmin-form-input"
+                        style={{ paddingRight: "44px" }}
+                        autoComplete={f.key === "current" ? "current-password" : "new-password"}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPw((s) => ({ ...s, [f.key]: !s[f.key] }))}
+                        style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: "#888", cursor: "pointer" }}
+                      >
+                        {showPw[f.key] ? <EyeOff size={17} /> : <Eye size={17} />}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button type="submit" className="sadmin-btn-primary-sm" style={{ justifyContent: "center", padding: "12px" }} disabled={saving}>
+                  {saving ? <><Loader2 size={16} className="login-spin" /> Updating password...</> : <><Lock size={16} /> Update Password</>}
+                </button>
+              </form>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "16px", color: "#888", fontSize: "12.5px" }}>
+                <ShieldCheck size={14} color="#059669" /> Passwords are hashed with BCrypt on the backend. Never stored in plaintext.
               </div>
-            ))}
-
-            <button type="submit" className="sadmin-btn-primary-sm" style={{ justifyContent: "center", padding: "12px" }} disabled={saving}>
-              {saving ? <><Loader2 size={16} className="login-spin" /> Updating password...</> : <><Lock size={16} /> Update Password</>}
-            </button>
-          </form>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "16px", color: "#888", fontSize: "12.5px" }}>
-            <ShieldCheck size={14} color="#059669" /> Passwords are hashed with BCrypt on the backend. Never stored in plaintext.
-          </div>
+            </>
+          )}
         </div>
       </div>
 

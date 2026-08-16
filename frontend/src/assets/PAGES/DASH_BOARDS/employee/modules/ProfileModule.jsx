@@ -12,9 +12,46 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
+import { apiPost } from "../../../../../services/apiClient";
+import { hasPermission } from "../../../../../utils/permissions";
+
+// Self-service password change is allowed only when the account holds the
+// CHANGE_PASSWORD permission (configured by Admin). The backend enforces the
+// same rule — this only controls whether the option is visible.
+const canChangePassword = hasPermission("CHANGE_PASSWORD");
+
 const ProfileModule = ({ me, authMe }) => {
   const employee = me;
   const account = authMe;
+  const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
+  const [pwBusy, setPwBusy] = useState(false);
+  const [pwMsg, setPwMsg] = useState({ type: "", text: "" });
+
+  const changePassword = async (e) => {
+    e.preventDefault();
+    setPwMsg({ type: "", text: "" });
+    if (pwForm.next.length < 8) {
+      setPwMsg({ type: "error", text: "New password must be at least 8 characters." });
+      return;
+    }
+    if (pwForm.next !== pwForm.confirm) {
+      setPwMsg({ type: "error", text: "New password and confirmation do not match." });
+      return;
+    }
+    setPwBusy(true);
+    try {
+      await apiPost("/api/auth/change-password", {
+        currentPassword: pwForm.current,
+        newPassword: pwForm.next,
+      });
+      setPwMsg({ type: "success", text: "Password changed successfully." });
+      setPwForm({ current: "", next: "", confirm: "" });
+    } catch (err) {
+      setPwMsg({ type: "error", text: err.message || "Unable to change password." });
+    } finally {
+      setPwBusy(false);
+    }
+  };
 
   const infoRow = (Icon, label, value) => (
     <div style={{ display: "flex", gap: 12, padding: "11px 0", borderBottom: "1px solid #f2f4f6" }}>
@@ -89,15 +126,43 @@ const ProfileModule = ({ me, authMe }) => {
         </div>
       </div>
 
-      {/* Password changes are managed by Admin only. */}
+      {/* Account Security — Change Password is shown only when the account holds
+          the CHANGE_PASSWORD permission (Admin-configured). */}
       <div style={{ background: "#fff", border: "1px solid #e7ebf0", borderRadius: 14, padding: "20px 22px", marginTop: 18, maxWidth: 620 }}>
         <h3 style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 800, color: "#111", display: "flex", alignItems: "center", gap: 8 }}>
-          <Key size={16} color="#64748b" /> Account Security
+          <Key size={16} color={canChangePassword ? "#2563eb" : "#64748b"} /> Account Security
         </h3>
-        <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
-          Password changes are handled by your system administrator only. If you need to reset your
-          password, please contact the Admin / HR team.
-        </p>
+        {canChangePassword ? (
+          <form onSubmit={changePassword}>
+            {pwMsg.text && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8, background: pwMsg.type === "error" ? "#fef2f2" : "#ecfdf5", border: `1px solid ${pwMsg.type === "error" ? "#fecaca" : "#a7f3d0"}`, color: pwMsg.type === "error" ? "#991b1b" : "#065f46", borderRadius: 10, padding: "10px 12px", marginBottom: 12, fontSize: 13 }}>
+                {pwMsg.type === "error" ? <AlertTriangle size={15} /> : <CheckCircle2 size={15} />} {pwMsg.text}
+              </div>
+            )}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+              <div>
+                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Current Password</label>
+                <input type="password" style={{ width: "100%", padding: "9px 12px", border: "1px solid #d7dce3", borderRadius: 9, fontSize: 13, boxSizing: "border-box" }} value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} autoComplete="current-password" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>New Password</label>
+                <input type="password" style={{ width: "100%", padding: "9px 12px", border: "1px solid #d7dce3", borderRadius: 9, fontSize: 13, boxSizing: "border-box" }} value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} autoComplete="new-password" />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 12.5, fontWeight: 700, color: "#374151", marginBottom: 6 }}>Confirm New Password</label>
+                <input type="password" style={{ width: "100%", padding: "9px 12px", border: "1px solid #d7dce3", borderRadius: 9, fontSize: 13, boxSizing: "border-box" }} value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} autoComplete="new-password" />
+              </div>
+            </div>
+            <button type="submit" disabled={pwBusy} style={{ display: "inline-flex", alignItems: "center", gap: 7, marginTop: 14, padding: "9px 18px", border: "none", borderRadius: 9, background: "#2563eb", color: "#fff", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
+              {pwBusy ? <Loader2 size={15} className="lro-spin" /> : <Key size={15} />} Change Password
+            </button>
+          </form>
+        ) : (
+          <p style={{ margin: 0, fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>
+            Password changes are handled by your system administrator only. If you need to reset your
+            password, please contact the Admin / HR team.
+          </p>
+        )}
       </div>
     </div>
   );

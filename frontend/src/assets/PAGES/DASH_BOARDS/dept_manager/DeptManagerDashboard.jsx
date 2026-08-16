@@ -9,12 +9,13 @@ import {
   Clock,
   BarChart3,
   FolderKanban,
-  UserCheck,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 
 import ManagerOverview from "./modules/ManagerOverview";
@@ -25,7 +26,8 @@ import BudgetAnalytics from "./modules/BudgetAnalytics";
 import DeptDocuments from "./modules/DeptDocuments";
 import ManagerProfile from "./modules/ManagerProfile";
 import ProfileDrawer from "../shared_ui/ProfileDrawer";
-import ManagerUserApprovals from "./modules/ManagerUserApprovals";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const DeptManagerDashboard = () => {
   const navigate = useNavigate();
@@ -43,8 +45,9 @@ const DeptManagerDashboard = () => {
     { id: "team-requests", label: "Team Requisitions", icon: FileText },
     { id: "track-forms", label: "Track Forms", icon: Clock },
     { id: "budget-analytics", label: "Budget & Analytics", icon: BarChart3 },
-    { id: "user-approvals", label: "User Approvals", icon: UserCheck },
     { id: "documents", label: "Documents", icon: FolderKanban },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
   const handleLogout = () => {
@@ -86,8 +89,10 @@ const DeptManagerDashboard = () => {
         return <BudgetAnalytics />;
       case "documents":
         return <DeptDocuments />;
-      case "user-approvals":
-        return <ManagerUserApprovals />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <ManagerProfile />;
       default:

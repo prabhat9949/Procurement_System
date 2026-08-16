@@ -1,293 +1,229 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Clock,
   CheckCircle2,
-  UserCheck,
+  XCircle,
+  RotateCcw,
   Truck,
-  CheckCheck,
   Send,
   ShoppingBag,
-  PackageCheck,
-  Search,
-  Filter,
-  PauseCircle
+  Loader2,
+  AlertTriangle,
+  FileText,
+  ClipboardCheck,
 } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
 
-
-
-import { epsEventBus, fetchTrackForms } from "../../../../../services/epsApiService";
+const PO_PIPELINE = ["DRAFT", "GENERATED", "SENT", "ACKNOWLEDGED", "PARTIALLY_RECEIVED", "FULLY_RECEIVED", "CLOSED"];
 
 const ProcurementTracking = () => {
-  const [workflows, setWorkflows] = useState({});
-  const [selectedReqId, setSelectedReqId] = useState("");
-  const [activeTrackingFilter, setActiveTrackingFilter] = useState("all"); // 'all' | 'rfq' | 'po' | 'delivery'
+  const [pos, setPos] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
+  const [selectedPoId, setSelectedPoId] = useState("");
+  const [detail, setDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    const load = async () => {
-      const data = await fetchTrackForms();
-      if (data && Object.keys(data).length > 0) {
-        setWorkflows(data);
-      }
-    };
-    load();
-    const unsub = epsEventBus.subscribe(async () => {
-      const data = await fetchTrackForms();
-      if (data && Object.keys(data).length > 0) {
-        setWorkflows(data);
-      }
-    });
-    return unsub;
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [poRes, rfqRes] = await Promise.all([
+        apiGet("/api/purchase-orders?page=0&size=100&sort=orderDate&direction=desc").catch(() => null),
+        apiGet("/api/rfqs?page=0&size=100").catch(() => null),
+      ]);
+      setPos(poRes?.content || []);
+      setRfqs(rfqRes?.content || []);
+      setSelectedPoId((prev) => prev || poRes?.content?.[0]?.id || "");
+    } catch (err) {
+      setError(err.message || "Unable to load procurement data.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const activeWorkflow =
-    workflows[selectedReqId] ||
-    Object.values(workflows)[0] ||
-    null;
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  if (!activeWorkflow) {
+  const loadDetail = useCallback(async (poId) => {
+    if (!poId) return;
+    setDetailLoading(true);
+    setError("");
+    try {
+      const po = pos.find((p) => String(p.id) === String(poId));
+      if (!po) return;
+      const [histRes, prRes] = await Promise.all([
+        apiGet(`/api/approval-histories?purchaseRequestId=${po.purchaseRequestId}&size=50&sort=performedAt&direction=asc`).catch(() => null),
+        apiGet(`/api/purchase-requests/${po.purchaseRequestId}`).catch(() => null),
+      ]);
+      setDetail({
+        po,
+        pr: prRes || null,
+        history: histRes?.content || [],
+        rfq: rfqs.find((r) => String(r.purchaseRequestId) === String(po.purchaseRequestId)) || null,
+      });
+    } catch (err) {
+      setError(err.message || "Unable to load tracking details.");
+    } finally {
+      setDetailLoading(false);
+    }
+  }, [pos, rfqs]);
+
+  useEffect(() => {
+    if (selectedPoId) loadDetail(selectedPoId);
+  }, [selectedPoId, loadDetail]);
+
+  if (loading) {
     return (
-      <div className="pe-tracking-container" style={{ padding: "40px", textAlign: "center", color: "#666" }}>
-        <h2>No Procurement Workflows</h2>
-        <p>There are currently no active procurement workflows to track.</p>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "100px 0", color: "#888", fontWeight: 600 }}>
+        <Loader2 size={22} className="login-spin" /> Loading procurement workflows...
       </div>
     );
   }
 
-  const stepsList = activeWorkflow.steps || [];
+  if (pos.length === 0) {
+    return (
+      <div className="pe-tracking-container" style={{ padding: 40, textAlign: "center", color: "#666" }}>
+        <h2>No Purchase Orders</h2>
+        <p>There are currently no purchase orders to track. Generate a PO from an approved vendor selection to start tracking.</p>
+      </div>
+    );
+  }
 
-  const filteredSteps = stepsList.filter((s) => {
-    if (activeTrackingFilter === "all") return true;
-    if (activeTrackingFilter === "rfq") return s.phase === "RFQ" || s.title.includes("RFQ") || s.title.includes("Request");
-    if (activeTrackingFilter === "po") return s.phase === "PO" || s.title.includes("PO") || s.title.includes("Order");
-    if (activeTrackingFilter === "delivery") return s.phase === "Delivery" || s.title.includes("Delivered") || s.title.includes("Goods");
-    return true;
-  });
+  const currentIndex = detail ? PO_PIPELINE.indexOf(detail.po.status) : -1;
 
   return (
     <div className="pe-tracking-container">
-      {/* Header */}
       <div className="pe-page-header">
         <div>
           <h1 className="pe-page-title">
-            <Clock color="#f8b400" /> End-to-End Procurement & Delivery Tracker
+            <Clock color="#f8b400" /> Procurement &amp; Delivery Tracker
           </h1>
           <p className="pe-page-subtitle">
-            Track RFQ status, PO transmission status, and real-time shipment delivery progress.
+            Track the full journey of each purchase order — approvals, RFQ, PO status and delivery — from the database.
           </p>
         </div>
-
-        {/* Requisition Dropdown Selector */}
-        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <label style={{ fontSize: "13px", color: "#555555", fontWeight: "700" }}>
-            SELECT PROCUREMENT:
-          </label>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <label style={{ fontSize: 13, color: "#555", fontWeight: 700 }}>SELECT PURCHASE ORDER:</label>
           <select
-            value={selectedReqId}
-            onChange={(e) => setSelectedReqId(e.target.value)}
+            value={selectedPoId}
+            onChange={(e) => setSelectedPoId(e.target.value)}
             className="pe-form-select"
-            style={{ width: "240px", borderColor: "#f8b400", fontWeight: "700" }}
+            style={{ width: 280, borderColor: "#f8b400", fontWeight: 700 }}
           >
-            {Object.keys(workflows).map((id) => (
-              <option key={id} value={id}>
-                {id} - {(workflows[id].item || workflows[id].product || "Item").slice(0, 20)}...
-              </option>
+            {pos.map((p) => (
+              <option key={p.id} value={p.id}>{p.poNumber} — {p.vendorName} ({p.status})</option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Selected Workflow Banner */}
-      <div
-        className="pe-card pe-card-gold-glow"
-        style={{ marginBottom: "28px", padding: "24px" }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "16px",
-          }}
-        >
-          <div>
-            <span style={{ color: "#d97706", fontSize: "12px", fontWeight: "800" }}>
-              TRACKING ID: {selectedReqId} • RFQ: {activeWorkflow.rfqCode} • PO: {activeWorkflow.poCode}
-            </span>
-            <h2 style={{ fontSize: "22px", color: "#111111", fontWeight: "800", marginTop: "2px" }}>
-              {activeWorkflow.item}
-            </h2>
-            <p style={{ color: "#555555", fontSize: "13.5px", marginTop: "4px" }}>
-              Supplier: <strong style={{ color: "#111111" }}>{activeWorkflow.vendor}</strong> • Carrier: <strong>{activeWorkflow.carrier}</strong> (Waybill #{activeWorkflow.trackingNumber})
-            </p>
-          </div>
-
-          <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: "12px", color: "#666666", textTransform: "uppercase", fontWeight: "700" }}>
-              Overall Progress
-            </span>
-            <p style={{ fontSize: "26px", color: "#059669", fontWeight: "800" }}>
-              Stage {activeWorkflow.currentStep} of 8
-            </p>
-          </div>
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 13 }}>
+          <AlertTriangle size={17} /> {error}
         </div>
+      )}
 
-        {/* 3 Status Summary Pills for RFQ, PO, Delivery */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: "16px",
-            marginTop: "20px",
-            paddingTop: "20px",
-            borderTop: "1px solid #ececec",
-          }}
-        >
-          <div
-            onClick={() => setActiveTrackingFilter("rfq")}
-            style={{
-              padding: "12px 16px",
-              borderRadius: "10px",
-              background: activeTrackingFilter === "rfq" ? "rgba(248,180,0,0.18)" : "#f8f9fb",
-              border: activeTrackingFilter === "rfq" ? "2px solid #f8b400" : "1px solid #ececec",
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800", textTransform: "uppercase" }}>
-              1. RFQ Status
-            </span>
-            <p style={{ fontSize: "14px", fontWeight: "700", color: "#111", margin: "2px 0 0" }}>
-              {activeWorkflow.rfqStatus}
-            </p>
-          </div>
-
-          <div
-            onClick={() => setActiveTrackingFilter("po")}
-            style={{
-              padding: "12px 16px",
-              borderRadius: "10px",
-              background: activeTrackingFilter === "po" ? "rgba(248,180,0,0.18)" : "#f8f9fb",
-              border: activeTrackingFilter === "po" ? "2px solid #f8b400" : "1px solid #ececec",
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800", textTransform: "uppercase" }}>
-              2. PO Status
-            </span>
-            <p style={{ fontSize: "14px", fontWeight: "700", color: "#111", margin: "2px 0 0" }}>
-              {activeWorkflow.poStatus}
-            </p>
-          </div>
-
-          <div
-            onClick={() => setActiveTrackingFilter("delivery")}
-            style={{
-              padding: "12px 16px",
-              borderRadius: "10px",
-              background: activeTrackingFilter === "delivery" ? "rgba(248,180,0,0.18)" : "#f8f9fb",
-              border: activeTrackingFilter === "delivery" ? "2px solid #f8b400" : "1px solid #ececec",
-              cursor: "pointer",
-            }}
-          >
-            <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800", textTransform: "uppercase" }}>
-              3. Delivery Status
-            </span>
-            <p style={{ fontSize: "14px", fontWeight: "700", color: "#059669", margin: "2px 0 0" }}>
-              {activeWorkflow.deliveryStatus}
-            </p>
-          </div>
+      {detailLoading || !detail ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "80px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={20} className="login-spin" /> Loading tracking details...
         </div>
-      </div>
-
-      {/* 8-Stage Visual Timeline */}
-      <div className="pe-card" style={{ padding: "28px" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-          <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800" }}>
-            Fulfillment Stage Pipeline Visualization
-          </h3>
-
-          <div style={{ display: "flex", gap: "8px" }}>
-            {["all", "rfq", "po", "delivery"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setActiveTrackingFilter(f)}
-                style={{
-                  padding: "4px 12px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: activeTrackingFilter === f ? "#f8b400" : "#f8f9fb",
-                  color: activeTrackingFilter === f ? "#000" : "#555",
-                  fontWeight: activeTrackingFilter === f ? "700" : "600",
-                  fontSize: "12px",
-                  cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                {f === "all" ? "All Stages" : f}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="emp-timeline-container">
-          {filteredSteps.map((step, index) => (
-            <div
-              key={index}
-              className={`emp-timeline-item ${step.status}`}
-              style={{ opacity: step.status === "pending" ? 0.55 : 1 }}
-            >
-              <div className="emp-timeline-node">
-                {step.status === "done" && <CheckCircle2 size={13} color="#ffffff" />}
-                {step.status === "active" && (
-                  <PauseCircle size={14} color="#f8b400" />
-                )}
-              </div>
-
-              <div className="emp-timeline-content">
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    marginBottom: "4px",
-                  }}
-                >
-                  <h4
-                    style={{
-                      color: step.status === "active" ? "#d97706" : "#111111",
-                      fontSize: "15px",
-                      fontWeight: "700",
-                    }}
-                  >
-                    {step.title}
-                  </h4>
-                  <span style={{ fontSize: "12px", color: "#666666" }}>{step.timestamp}</span>
-                </div>
-
-                <p style={{ fontSize: "13px", color: "#555555", marginBottom: "8px" }}>
-                  {step.desc}
+      ) : (
+        <>
+          <div className="pe-card pe-card-gold-glow" style={{ marginBottom: 24, padding: 22 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16 }}>
+              <div>
+                <span style={{ color: "#d97706", fontSize: 12, fontWeight: 800 }}>
+                  PO: {detail.po.poNumber} {detail.rfq ? `· RFQ: ${detail.rfq.rfqNumber}` : ""} {detail.pr ? `· ${detail.pr.requestNumber}` : ""}
+                </span>
+                <h2 style={{ fontSize: 20, color: "#111", fontWeight: 800, marginTop: 2 }}>
+                  {detail.po.vendorName}
+                </h2>
+                <p style={{ color: "#555", fontSize: 13, marginTop: 4 }}>
+                  Amount: <strong style={{ color: "#059669" }}>{formatINR(detail.po.grandTotal)}</strong> · Expected delivery: <strong>{formatDateIN(detail.po.expectedDeliveryDate, { withTime: false })}</strong> · Payment: {detail.po.paymentTerms || "—"}
                 </p>
-
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    fontSize: "12px",
-                    color: "#d97706",
-                    fontWeight: "700",
-                  }}
-                >
-                  <UserCheck size={14} />
-                  <span>
-                    Actioned By: <strong>{step.actor}</strong>
-                  </span>
-                </div>
+              </div>
+              <div style={{ textAlign: "right" }}>
+                <span style={{ fontSize: 12, color: "#666", textTransform: "uppercase", fontWeight: 700 }}>PO Status</span>
+                <p style={{ fontSize: 22, color: detail.po.status === "FULLY_RECEIVED" || detail.po.status === "CLOSED" ? "#059669" : "#d97706", fontWeight: 800 }}>{detail.po.status}</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+
+          {/* PO pipeline */}
+          <div className="pe-card" style={{ marginBottom: 24, padding: 22 }}>
+            <h3 style={{ fontSize: 15, color: "#111", fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+              <ShoppingBag size={16} color="#f8b400" /> Purchase Order Pipeline
+            </h3>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {PO_PIPELINE.map((stage, idx) => {
+                const state = idx < currentIndex ? "done" : idx === currentIndex ? "current" : "todo";
+                return (
+                  <React.Fragment key={stage}>
+                    <div
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: 800,
+                        padding: "6px 12px",
+                        borderRadius: 999,
+                        background: state === "done" ? "rgba(5,150,105,.12)" : state === "current" ? "rgba(217,119,6,.12)" : "#f1f5f9",
+                        color: state === "done" ? "#059669" : state === "current" ? "#d97706" : "#94a3b8",
+                      }}
+                    >
+                      {state === "done" ? "✓" : state === "current" ? "⏳" : "○"} {stage}
+                    </div>
+                    {idx < PO_PIPELINE.length - 1 && <span style={{ color: "#cbd5e1", alignSelf: "center" }}>→</span>}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Approval + workflow timeline */}
+          <div className="pe-card" style={{ padding: 24 }}>
+            <h3 style={{ fontSize: 15, color: "#111", fontWeight: 800, marginBottom: 18, display: "flex", alignItems: "center", gap: 8 }}>
+              <ClipboardCheck size={16} color="#d97706" /> Request Approval &amp; Workflow Timeline
+            </h3>
+            <div className="emp-timeline-container">
+              {[
+                { label: "Request Created", at: detail.pr?.createdAt, kind: "CREATED" },
+                ...(detail.history || []).map((h) => ({
+                  label: h.action === "SUBMITTED" ? "Submitted" : h.action === "APPROVED" ? "Approved" : h.action === "REJECTED" ? "Rejected" : h.action === "RETURNED" ? "Returned for Correction" : h.action,
+                  at: h.performedAt,
+                  who: h.performedByName,
+                  comment: h.comments,
+                  kind: h.action,
+                })),
+                { label: "Purchase Order Generated", at: detail.po.orderDate, kind: "PO" },
+              ]
+                .filter((s) => s.at || s.kind === "PO")
+                .map((step, idx) => {
+                  const color = step.kind === "REJECTED" ? "#dc2626" : step.kind === "RETURNED" ? "#2563eb" : step.kind === "APPROVED" || step.kind === "PO" ? "#059669" : step.kind === "CREATED" ? "#7c3aed" : "#d97706";
+                  const Icon = step.kind === "REJECTED" ? XCircle : step.kind === "RETURNED" ? RotateCcw : step.kind === "APPROVED" || step.kind === "PO" ? CheckCircle2 : step.kind === "CREATED" ? FileText : Send;
+                  return (
+                    <div key={idx} className="emp-timeline-item" style={{ position: "relative", paddingBottom: 16 }}>
+                      <div className="emp-timeline-node" style={{ position: "absolute", left: 0, top: 2, width: 30, height: 30, borderRadius: "50%", background: `${color}14`, color, display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${color}` }}>
+                        <Icon size={13} />
+                      </div>
+                      <div style={{ marginLeft: 44 }}>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#111" }}>{step.label}</div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {step.at ? formatDateIN(step.at) : ""} {step.who ? `· ${step.who}` : ""}
+                        </div>
+                        {step.comment && (
+                          <div style={{ fontSize: 12.5, color: "#475569", marginTop: 4, background: "#f8fafc", borderRadius: 8, padding: "8px 10px" }}>“{step.comment}”</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

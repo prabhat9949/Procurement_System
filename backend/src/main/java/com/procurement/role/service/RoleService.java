@@ -115,6 +115,17 @@ public class RoleService {
             role.setRoleName(request.roleName().trim());
         }
         role.setDescription(request.description());
+        if (request.active() != null && !request.active()) {
+            if (Boolean.TRUE.equals(role.getSystemRole())) {
+                throw new ConflictException("System roles cannot be deactivated");
+            }
+            long assignedUsers = userRepository.countByRoleId(role.getId());
+            if (assignedUsers > 0) {
+                throw new ConflictException(
+                        "Role is assigned to " + assignedUsers
+                                + " user(s). Reassign those users before deactivating this role.");
+            }
+        }
         if (request.active() != null) {
             role.setActive(request.active());
         }
@@ -153,6 +164,25 @@ public class RoleService {
                 true, roleDetails(role), null, "Role deleted by admin");
     }
 
+    /**
+     * Logical permission dependencies: assigning the key permission automatically
+     * includes the required permissions so impossible configurations cannot be saved.
+     */
+    private static final java.util.Map<String, java.util.List<String>> PERMISSION_DEPENDENCIES =
+            java.util.Map.ofEntries(
+                    java.util.Map.entry("CAN_APPROVE_PR", java.util.List.of("CAN_VIEW_ASSIGNED_APPROVAL")),
+                    java.util.Map.entry("CAN_REJECT_PR", java.util.List.of("CAN_VIEW_ASSIGNED_APPROVAL")),
+                    java.util.Map.entry("CAN_RETURN_PR", java.util.List.of("CAN_VIEW_ASSIGNED_APPROVAL")),
+                    java.util.Map.entry("CAN_SELECT_VENDOR", java.util.List.of("CAN_VIEW_QUOTATIONS")),
+                    java.util.Map.entry("CAN_CREATE_PO", java.util.List.of("CAN_VIEW_PO")),
+                    java.util.Map.entry("CAN_APPROVE_PO", java.util.List.of("CAN_VIEW_PO")),
+                    java.util.Map.entry("CAN_CREATE_GRN", java.util.List.of("CAN_VIEW_PO")),
+                    java.util.Map.entry("CAN_VERIFY_GRN", java.util.List.of("CAN_VIEW_PO")),
+                    java.util.Map.entry("CAN_UPLOAD_INVOICE", java.util.List.of("CAN_VIEW_INVOICE")),
+                    java.util.Map.entry("CAN_VERIFY_INVOICE", java.util.List.of("CAN_VIEW_INVOICE")),
+                    java.util.Map.entry("CAN_THREE_WAY_MATCH", java.util.List.of("CAN_VIEW_INVOICE")),
+                    java.util.Map.entry("CAN_PROCESS_PAYMENT", java.util.List.of("CAN_VIEW_PAYMENT")));
+
     private void assignPermissions(Role role, List<Long> permissionIds) {
         if (permissionIds == null) {
             return;
@@ -161,7 +191,21 @@ public class RoleService {
         if (permissionIds.isEmpty()) {
             return;
         }
-        List<Permission> permissions = permissionRepository.findAllById(permissionIds);
+        java.util.LinkedHashSet<Long> expanded = new java.util.LinkedHashSet<>(permissionIds);
+        List<Permission> selected = permissionRepository.findAllById(permissionIds);
+        // Auto-include required dependencies so the saved set is always valid.
+        for (Permission permission : selected) {
+            java.util.List<String> required = PERMISSION_DEPENDENCIES.get(permission.getPermissionCode());
+            if (required == null) {
+                continue;
+            }
+            for (String code : required) {
+                permissionRepository.findByPermissionCode(code)
+                        .filter(p -> Boolean.TRUE.equals(p.getActive()))
+                        .ifPresent(p -> expanded.add(p.getId()));
+            }
+        }
+        List<Permission> permissions = permissionRepository.findAllById(expanded);
         List<RolePermission> mappings = permissions.stream()
                 .map(p -> RolePermission.builder().role(role).permission(p).build())
                 .toList();

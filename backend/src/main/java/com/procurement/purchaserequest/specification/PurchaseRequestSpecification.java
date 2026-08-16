@@ -4,6 +4,7 @@ import com.procurement.purchaserequest.entity.ApprovalStatus;
 import com.procurement.purchaserequest.entity.PurchaseRequest;
 import com.procurement.purchaserequest.entity.PurchaseRequestPriority;
 import com.procurement.purchaserequest.entity.PurchaseRequestStatus;
+import com.procurement.purchaserequestline.entity.PurchaseRequestLine;
 import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
@@ -14,6 +15,22 @@ import java.util.Objects;
 public final class PurchaseRequestSpecification {
 
     private PurchaseRequestSpecification() {
+    }
+
+    /**
+     * Restricts to purchase requests whose line items belong to one of the given
+     * categories (used for server-side per-officer scoping). Empty/null list
+     * matches everything.
+     */
+    public static Specification<PurchaseRequest> categoryIn(java.util.List<Long> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) return null;
+        return (root, query, cb) -> {
+            var sub = query.subquery(Long.class);
+            var line = sub.from(PurchaseRequestLine.class);
+            sub.select(line.get("purchaseRequest").get("id"));
+            sub.where(line.get("product").get("category").get("id").in(categoryIds));
+            return root.get("id").in(sub);
+        };
     }
 
     public static Specification<PurchaseRequest> search(String keyword, Long requesterId,

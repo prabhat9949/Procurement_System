@@ -120,7 +120,7 @@ public class ReportRepository {
     public Page<ReportRowResponse> purchaseRequests(ReportFilter filter, Pageable pageable) {
         var parts = ReportSpecification.common("pr", filter);
         String sql = """
-                select pr.purchase_request_id, pr.request_number, pr.purpose, pr.status, e.first_name, d.department_name, cc.cost_center_name,
+                select pr.purchase_request_id, pr.request_number, pr.purpose, pr.status, e.first_name, d.department_name, cc.name,
                        pr.request_date, null as quantity, pr.estimated_amount, pr.remarks
                 from purchase_requests pr
                 join employees e on e.employee_id = pr.requester_id

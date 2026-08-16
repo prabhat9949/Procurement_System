@@ -8,7 +8,7 @@ import {
   Calendar,
   Lock,
   Edit3,
-  DollarSign,
+  IndianRupee,
   Award,
   Bell,
   Activity,
@@ -21,8 +21,8 @@ const initialProfileData = {
   roleTitle: "Chief Financial Officer & Head of Treasury",
   joiningDate: "February 1, 2017",
   dept: "Corporate Treasury & Finance",
-  managedReserves: "$12,500,000.00 USD",
-  disbursementLimit: "$2,500,000.00 USD",
+  managedReserves: "₹1,25,00,000.00",
+  disbursementLimit: "₹25,00,000.00",
   email: "victoria.vance@enterprise.com",
   phone: "+1 (555) 011-9900",
   emergencyPhone: "+1 (555) 011-9905",
@@ -37,7 +37,7 @@ const initialProfileData = {
 const initialActivityLogs = [
   { action: "User Logged In", ip: "192.168.1.100", date: "2026-07-27 09:12 AM", details: "Logged into Corporate Treasury Portal" },
   { action: "Authorize Wire Release", ip: "192.168.1.100", date: "2026-07-26 03:00 PM", details: "Approved wire transfer PAY-2026-901 to Apple Business Direct" },
-  { action: "Update Budget Cap", ip: "192.168.1.98", date: "2026-07-24 11:15 AM", details: "Allocated additional $50,000 to Engineering cost center" },
+  { action: "Update Budget Cap", ip: "192.168.1.98", date: "2026-07-24 11:15 AM", details: "Allocated additional ₹50,000 to Engineering cost center" },
   { action: "Invoice Process", ip: "192.168.1.100", date: "2026-07-22 02:30 PM", details: "Cleared tax invoice INV-2026-9850 for payment" },
 ];
 

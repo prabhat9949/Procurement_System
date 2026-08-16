@@ -67,7 +67,7 @@ const ConnectedSuite = () => {
           {/* Invoices donut */}
           <div className="cs-float cs-invoices">
             <div className="cs-donut"></div>
-            <div className="cs-donut-value">$91,250</div>
+            <div className="cs-donut-value">₹91,250</div>
             <ul className="cs-legend">
               <li><span className="dot dot-yellow"></span> Invoices</li>
               <li><span className="dot dot-gray"></span> POs</li>
@@ -106,7 +106,7 @@ const ConnectedSuite = () => {
           {/* Funds */}
           <div className="cs-float cs-funds">
             <div className="cs-funds-label">Saved</div>
-            <div className="cs-funds-value">+$12,174</div>
+            <div className="cs-funds-value">+₹12,174</div>
           </div>
 
           {/* Purchases bar chart */}
@@ -126,11 +126,11 @@ const ConnectedSuite = () => {
           <div className="cs-float cs-payments">
             <div className="cs-payments-label">Spend Limit</div>
             <div className="cs-payments-value">
-              $8,500 <span>USD</span>
+              ₹8,500 <span>INR (₹)</span>
             </div>
             <div className="cs-progress">
               <div className="cs-progress-fill"></div>
-              <span className="cs-progress-goal">$10,000</span>
+              <span className="cs-progress-goal">₹10,000</span>
             </div>
           </div>
 
@@ -143,7 +143,7 @@ const ConnectedSuite = () => {
             <div className="cs-payee-details">
               <div>
                 <div className="cs-payee-label">Amount</div>
-                <div className="cs-payee-amount">$480.15</div>
+                <div className="cs-payee-amount">₹480.15</div>
               </div>
               <div>
                 <div className="cs-payee-label">Request Type</div>

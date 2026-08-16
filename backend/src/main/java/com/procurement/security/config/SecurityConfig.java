@@ -149,7 +149,14 @@ public class SecurityConfig {
                                 "/api/approval-stages/**",
                                 "/api/approval-tasks/**",
                                 "/api/approval-histories/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM", "AUDITOR")
+
+                        // Central workflow assignment engine: queues and task actions are
+                        // authorized per-assignment in the service layer (current assignee,
+                        // requester, or admin) — never by role alone.
+                        .requestMatchers(
+                                "/api/workflow/**"
+                        ).authenticated()
 
                         .requestMatchers(
                                 "/api/rfqs/**",
@@ -175,14 +182,15 @@ public class SecurityConfig {
                                 "/api/invoices/**",
                                 "/api/three-way-matches/**",
                                 "/api/payments/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "PROCUREMENT_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "PROCUREMENT_MANAGER", "AUDITOR")
 
                         // ===========================
                         // NOTIFICATIONS / REPORTING / AUDIT
                         // ===========================
                         .requestMatchers(
                                 "/api/notification-templates/**",
-                                "/api/audit-logs/**"
+                                "/api/audit-logs/**",
+                                "/api/audits/**"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR", "COMPLIANCE_OFFICER")
 
                         .requestMatchers(
@@ -194,9 +202,17 @@ public class SecurityConfig {
                                 "/api/dashboard/admin"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR")
 
+                        // Procurement workspace + the unified PR timeline. The timeline is
+                        // visible to every role that may view a purchase request; per-record
+                        // visibility (e.g. employees only seeing their own) is enforced in
+                        // the service layer.
                         .requestMatchers(
-                                "/api/dashboard/procurement"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER")
+                                "/api/dashboard/procurement",
+                                "/api/procurement/**"
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER",
+                                "PROCUREMENT_OFFICER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER",
+                                "HEAD", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM",
+                                "AUDITOR", "FINANCE_MANAGER", "WAREHOUSE_MANAGER")
 
                         .requestMatchers(
                                 "/api/dashboard/finance"
@@ -211,7 +227,8 @@ public class SecurityConfig {
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "VENDOR")
 
                         .requestMatchers(
-                                "/api/dashboard/hr"
+                                "/api/dashboard/hr",
+                                "/api/hr/**"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER")
 
                         .requestMatchers(

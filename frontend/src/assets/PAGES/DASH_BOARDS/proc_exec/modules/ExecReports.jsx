@@ -1,302 +1,184 @@
 import React, { useState } from "react";
 import {
-  FileText,
+  FolderKanban,
   Search,
   Download,
-  Eye,
+  FileText,
   FileCheck,
-  FolderKanban,
-  X,
+  Loader2,
+  WifiOff,
+  Users,
+  Send,
+  ShoppingBag,
 } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
 
-const mockReports = [
-  {
-    id: "REP-2026-001",
-    title: "Q2_2026_Enterprise_Procurement_Performance.pdf",
-    category: "Performance Reports",
-    type: "PDF Document",
-    size: "4.2 MB",
-    date: "2026-07-01",
-    author: "David Chen (Procurement Exec)",
-  },
-  {
-    id: "REP-2026-002",
-    title: "Vendor_Commercial_Bidding_Yield_Report.pdf",
-    category: "RFQ Statistics",
-    type: "PDF Document",
-    size: "2.8 MB",
-    date: "2026-07-15",
-    author: "Global Sourcing Team",
-  },
-  {
-    id: "REP-2026-003",
-    title: "Purchase_Order_Compliance_Audit_Log_July.pdf",
-    category: "PO Analytics",
-    type: "PDF Document",
-    size: "3.5 MB",
-    date: "2026-07-25",
-    author: "David Chen",
-  },
-  {
-    id: "REP-2026-004",
-    title: "Supplier_Rating_Scorecard_2026.pdf",
-    category: "Vendor Statistics",
-    type: "PDF Document",
-    size: "1.9 MB",
-    date: "2026-07-20",
-    author: "Procurement Analytics",
-  },
-];
+const downloadCsv = (filename, header, rows) => {
+  const csv = [header, ...rows].map((r) => r.map((v) => `"${v ?? ""}"`.replace(/"/g, '""')).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+};
 
 const ExecReports = () => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCat, setSelectedCat] = useState("all");
-  const [previewRep, setPreviewRep] = useState(null);
+  const [busyKey, setBusyKey] = useState("");
+  const [error, setError] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
 
-  const filtered = mockReports.filter((rep) => {
-    const matchesSearch =
-      rep.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      rep.id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCat =
-      selectedCat === "all" ||
-      rep.category.toLowerCase().includes(selectedCat.toLowerCase());
-    return matchesSearch && matchesCat;
-  });
+  const triggerToast = (m) => {
+    setToastMsg(m);
+    setTimeout(() => setToastMsg(""), 4000);
+  };
+
+  const exportReport = async (key, label, url, header, rowFn) => {
+    setBusyKey(key);
+    setError("");
+    try {
+      const page = await apiGet(url);
+      const rows = (page?.content || []).map(rowFn);
+      downloadCsv(`${key}-${new Date().toISOString().slice(0, 10)}.csv`, header, rows);
+      triggerToast(`${label} exported (${rows.length} rows).`);
+    } catch (err) {
+      setError(err.message || `Unable to export ${label}.`);
+    } finally {
+      setBusyKey("");
+    }
+  };
+
+  const reports = [
+    {
+      id: "REP-PR",
+      category: "Requests",
+      title: "Purchase Requests Register",
+      icon: FileText,
+      url: "/api/purchase-requests?page=0&size=500&sort=createdAt&direction=desc",
+      header: ["Request Number", "Requester", "Department", "Cost Center", "Priority", "Status", "Approval Status", "Amount", "Purpose", "Created"],
+      rowFn: (r) => [r.requestNumber, r.requesterName, r.departmentName, r.costCenterName, r.priority, r.status, r.approvalStatus, r.estimatedAmount, r.purpose, r.createdAt],
+    },
+    {
+      id: "REP-RFQ",
+      category: "RFQ",
+      title: "RFQ Register",
+      icon: Send,
+      url: "/api/rfqs?page=0&size=500&sort=createdAt&direction=desc",
+      header: ["RFQ Number", "Request", "Department", "Closing Date", "Opening Date", "Status", "Remarks"],
+      rowFn: (r) => [r.rfqNumber, r.purchaseRequestNumber, r.departmentName, r.closingDate, r.quotationOpeningDate, r.status, r.remarks],
+    },
+    {
+      id: "REP-PO",
+      category: "Purchase Orders",
+      title: "Purchase Order Register",
+      icon: ShoppingBag,
+      url: "/api/purchase-orders?page=0&size=500&sort=orderDate&direction=desc",
+      header: ["PO Number", "Vendor", "Request", "Order Date", "Expected Delivery", "Subtotal", "Tax", "Grand Total", "Status"],
+      rowFn: (r) => [r.poNumber, r.vendorName, r.requestNumber, r.orderDate, r.expectedDeliveryDate, r.subtotal, r.taxAmount, r.grandTotal, r.status],
+    },
+    {
+      id: "REP-VENDOR",
+      category: "Vendors",
+      title: "Vendor Register",
+      icon: Users,
+      url: "/api/vendors?page=0&size=500&sort=vendorName&direction=asc",
+      header: ["Vendor Code", "Vendor Name", "Type", "City", "GST", "Status", "Approved", "Rating"],
+      rowFn: (r) => [r.vendorCode, r.vendorName, r.vendorType, r.city, r.gstNumber, r.status, r.approved, r.rating],
+    },
+    {
+      id: "REP-QUOTE",
+      category: "Quotations",
+      title: "Vendor Quotation Register",
+      icon: FileCheck,
+      url: "/api/vendor-quotations?page=0&size=500&sort=createdAt&direction=desc",
+      header: ["Quotation Number", "RFQ", "Vendor", "Amount", "Currency", "Status", "Submitted"],
+      rowFn: (r) => [r.quotationNumber, r.rfqNumber, r.vendorName, r.totalAmount ?? r.amount, r.currency, r.status, r.createdAt],
+    },
+  ];
+
+  const filtered = reports.filter((r) =>
+    (r.title + " " + r.category).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const card = { background: "#fff", borderRadius: "12px", border: "1px solid #ececec", padding: "20px" };
 
   return (
-    <div className="pe-reports-container">
-      {/* Header */}
-      <div className="pe-page-header">
+    <div className="pe-reports-container" style={{ padding: "20px" }}>
+      {toastMsg && (
+        <div style={{ background: "#ecfdf5", color: "#065f46", padding: "12px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", fontWeight: 600, border: "1px solid #a7f3d0" }}>
+          {toastMsg}
+        </div>
+      )}
+
+      {error && (
+        <div style={{ background: "#fef2f2", color: "#991b1b", padding: "14px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", border: "1px solid #fecaca", display: "flex", gap: "10px", alignItems: "center" }}>
+          <WifiOff size={18} /> {error}
+        </div>
+      )}
+
+      <div className="pe-page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
         <div>
-          <h1 className="pe-page-title">
-            <FolderKanban color="#f8b400" /> Executive Procurement Reports Hub
+          <h1 className="pe-page-title" style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "800", color: "#111111" }}>
+            <FolderKanban color="#f8b400" size={28} /> Procurement Reports
           </h1>
-          <p className="pe-page-subtitle">
-            Formal sourcing audits, RFQ yield analysis, vendor scorecards, and purchase order reports.
+          <p className="pe-page-subtitle" style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>
+            Live exports generated from the database — requests, RFQs, purchase orders, vendors and quotations.
           </p>
         </div>
       </div>
 
-      {/* Filter & Search Bar */}
-      <div className="pe-card" style={{ marginBottom: "24px", padding: "18px 24px" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexWrap: "wrap",
-            gap: "16px",
-          }}
-        >
-          <div style={{ position: "relative", width: "340px" }}>
-            <Search
-              size={16}
-              color="#666666"
-              style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
-            />
-            <input
-              type="text"
-              placeholder="Search reports by title or ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pe-form-input"
-              style={{ paddingLeft: "42px", height: "42px" }}
-            />
-          </div>
-
-          <div
-            style={{
-              display: "flex",
-              background: "#f8f9fb",
-              padding: "3px",
-              borderRadius: "10px",
-              border: "1px solid #d9d9d9",
-            }}
-          >
-            {["all", "Performance Reports", "RFQ Statistics", "PO Analytics", "Vendor Statistics"].map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCat(cat)}
-                style={{
-                  padding: "6px 14px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: selectedCat === cat ? "#f8b400" : "transparent",
-                  color: selectedCat === cat ? "#000000" : "#555555",
-                  fontWeight: selectedCat === cat ? "700" : "600",
-                  fontSize: "13px",
-                  cursor: "pointer",
-                }}
-              >
-                {cat}
-              </button>
-            ))}
-          </div>
+      <div className="pe-card" style={{ ...card, marginBottom: "24px", padding: "18px 24px" }}>
+        <div style={{ position: "relative", width: "360px" }}>
+          <Search size={16} color="#666666" style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }} />
+          <input
+            type="text"
+            placeholder="Search reports..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pe-form-input"
+            style={{ paddingLeft: "42px", height: "42px", width: "100%", border: "1px solid #d9d9d9", borderRadius: "8px" }}
+          />
         </div>
       </div>
 
-      {/* Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {filtered.map((rep) => (
-          <div key={rep.id} className="pe-card" style={{ padding: "20px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
+        {filtered.length === 0 && (
+          <div style={{ ...card, padding: "40px", textAlign: "center", color: "#666" }}>
+            <FolderKanban size={30} style={{ opacity: 0.4, marginBottom: 8 }} />
+            <p>No reports match your search.</p>
+          </div>
+        )}
+        {filtered.map((r) => (
+          <div key={r.id} style={card}>
             <div style={{ display: "flex", alignItems: "flex-start", gap: "14px" }}>
-              <div
-                style={{
-                  width: "44px",
-                  height: "44px",
-                  borderRadius: "10px",
-                  background: "rgba(248, 180, 0, 0.15)",
-                  border: "1px solid #f8b400",
-                  color: "#d97706",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <FileText size={22} />
+              <div style={{ width: "44px", height: "44px", borderRadius: "10px", background: "rgba(248, 180, 0, 0.15)", border: "1px solid #f8b400", color: "#d97706", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <r.icon size={22} />
               </div>
               <div style={{ flex: 1, overflow: "hidden" }}>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>
-                  {rep.category.toUpperCase()} • {rep.id}
-                </span>
-                <h4
-                  style={{
-                    color: "#111111",
-                    fontSize: "14px",
-                    fontWeight: "700",
-                    margin: "4px 0",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                  }}
-                  title={rep.title}
-                >
-                  {rep.title}
+                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>{r.category.toUpperCase()} • {r.id}</span>
+                <h4 style={{ color: "#111111", fontSize: "14px", fontWeight: "700", margin: "4px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={r.title}>
+                  {r.title}
                 </h4>
-                <p style={{ fontSize: "12px", color: "#666666" }}>
-                  {rep.size} • Generated {rep.date}
-                </p>
+                <p style={{ fontSize: "12px", color: "#666666" }}>Live database export • CSV</p>
               </div>
             </div>
 
-            <div
-              style={{
-                marginTop: "16px",
-                paddingTop: "12px",
-                borderTop: "1px solid #ececec",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <span style={{ fontSize: "11px", color: "#555555" }}>By: {rep.author}</span>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button
-                  className="pe-sidebar-toggle"
-                  style={{ width: "32px", height: "32px", display: "inline-flex" }}
-                  title="Preview Report"
-                  onClick={() => setPreviewRep(rep)}
-                >
-                  <Eye size={15} />
-                </button>
-                <button
-                  className="pe-sidebar-toggle"
-                  style={{ width: "32px", height: "32px", display: "inline-flex", color: "#d97706" }}
-                  title="Download File"
-                  onClick={() => alert(`Downloading ${rep.title}...`)}
-                >
-                  <Download size={15} />
-                </button>
-              </div>
+            <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px solid #ececec", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: "11px", color: "#555555" }}>All amounts in INR (₹)</span>
+              <button
+                className="pe-btn-primary-sm"
+                style={{ padding: "6px 12px", fontSize: "12px" }}
+                onClick={() => exportReport(r.id, r.title, r.url, r.header, r.rowFn)}
+                disabled={busyKey === r.id}
+              >
+                {busyKey === r.id ? <Loader2 size={14} className="login-spin" /> : <Download size={14} />} {busyKey === r.id ? "Exporting…" : "Download CSV"}
+              </button>
             </div>
           </div>
         ))}
       </div>
-
-      {/* Preview Modal */}
-      {previewRep && (
-        <div className="pe-modal-overlay">
-          <div className="pe-modal" style={{ maxWidth: "560px" }}>
-            <div
-              style={{
-                display: "flex",
-                justify: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
-            >
-              <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700" }}>
-                Report Audit: {previewRep.id}
-              </h3>
-              <button
-                onClick={() => setPreviewRep(null)}
-                style={{ background: "none", border: "none", color: "#666666", cursor: "pointer" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div
-              style={{
-                height: "220px",
-                background: "#f8f9fb",
-                borderRadius: "12px",
-                border: "1px solid #ececec",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                padding: "20px",
-                textAlign: "center",
-              }}
-            >
-              <FileText size={48} color="#f8b400" style={{ marginBottom: "12px" }} />
-              <h4 style={{ color: "#111111", fontSize: "15px", fontWeight: "700" }}>
-                {previewRep.title}
-              </h4>
-              <p style={{ color: "#666666", fontSize: "13px", marginTop: "4px" }}>
-                Executive Procurement Audit ({previewRep.size})
-              </p>
-              <span
-                style={{
-                  color: "#059669",
-                  fontSize: "12px",
-                  fontWeight: "700",
-                  marginTop: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "6px",
-                }}
-              >
-                <FileCheck size={16} /> Verified Sourcing Cryptographic Signatures
-              </span>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "20px" }}>
-              <button
-                className="pe-btn-primary-sm"
-                onClick={() => alert(`Downloading ${previewRep.title}...`)}
-              >
-                <Download size={15} /> Download PDF
-              </button>
-              <button
-                className="pe-btn-primary-sm"
-                style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}
-                onClick={() => setPreviewRep(null)}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

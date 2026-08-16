@@ -11,4 +11,6 @@ public interface PaymentRepository extends JpaRepository<Payment,Long>, JpaSpeci
     Optional<Payment> findByPaymentNumber(String paymentNumber);
     boolean existsByPaymentNumber(String paymentNumber);
     java.util.List<Payment> findByInvoiceId(Long invoiceId);
+    java.util.List<Payment> findByPurchaseOrderId(Long purchaseOrderId);
+    java.util.List<Payment> findByVendorId(Long vendorId);
 }

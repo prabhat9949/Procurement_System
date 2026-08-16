@@ -9,7 +9,7 @@ import {
   FileCheck2,
   Truck,
   FileText,
-  DollarSign,
+  IndianRupee,
   FolderKanban,
   Bell,
   UserCheck,
@@ -50,7 +50,7 @@ const VendorDashboard = () => {
     { id: "purchase-orders", label: "Purchase Orders", icon: ShoppingBag },
     { id: "delivery-tracking", label: "Delivery Tracking", icon: Truck },
     { id: "invoices", label: "Invoices", icon: FileText },
-    { id: "payments", label: "Payments", icon: DollarSign },
+    { id: "payments", label: "Payments", icon: IndianRupee },
     { id: "reports", label: "Reports", icon: FolderKanban },
     ];
 

@@ -31,12 +31,12 @@ const Connectedtwo = () => {
             <div className="ct-payment-row">
               <span className="ct-icon-circle ct-icon-dark">💳</span>
               <span>PO Issued</span>
-              <span className="ct-amount">$1,513</span>
+              <span className="ct-amount">₹1,513</span>
             </div>
             <div className="ct-payment-row">
               <span className="ct-icon-circle ct-icon-yellow">P</span>
               <span>PO Issued</span>
-              <span className="ct-amount">$497</span>
+              <span className="ct-amount">₹497</span>
             </div>
           </div>
         </div>

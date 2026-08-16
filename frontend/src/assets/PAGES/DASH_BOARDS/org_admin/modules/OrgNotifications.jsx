@@ -12,7 +12,7 @@ const initialNotifs = [
   {
     id: 2,
     title: "High-Value Procurement Wire Cleared",
-    message: "PAY-2026-904 ($54,200.00 Dell Technologies) cleared by FedWire.",
+    message: "PAY-2026-904 (₹54,200.00 Dell Technologies) cleared by FedWire.",
     time: "2 hours ago",
     unread: true,
   },

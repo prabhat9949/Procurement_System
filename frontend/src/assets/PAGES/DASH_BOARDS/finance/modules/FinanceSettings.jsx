@@ -129,7 +129,7 @@ const FinanceSettings = () => {
               }}
             >
               <span style={{ fontSize: "14px", color: "#111", fontWeight: "600" }}>
-                Alert on High-Value Payment Approvals (&gt; $25k)
+                Alert on High-Value Payment Approvals (&gt; ₹25,000)
               </span>
               <input
                 type="checkbox"

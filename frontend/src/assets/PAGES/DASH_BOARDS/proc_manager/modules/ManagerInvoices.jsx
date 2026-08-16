@@ -2,262 +2,242 @@ import React, { useState, useEffect } from "react";
 import {
   Receipt,
   CheckCircle2,
-  Clock,
   Eye,
   FileText,
-  Building2,
-  CalendarDays,
-  DollarSign,
-  QrCode,
-  X,
-  Check,
+  IndianRupee,
   AlertTriangle,
+  Loader2,
+  WifiOff,
+  RefreshCw,
+  GitCompareArrows,
+  Landmark,
 } from "lucide-react";
-import { epsEventBus, getStoredVendorInvoices } from "../../../../../services/epsApiService";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
+
+const invoiceStatus = (s) =>
+  ({
+    DRAFT: "Draft", RECEIVED: "Received", UNDER_VERIFICATION: "Under Verification",
+    MATCH_PENDING: "Match Pending", MATCHED: "Matched", APPROVED: "Approved",
+    REJECTED: "Rejected", PARTIALLY_PAID: "Partially Paid", PAID: "Paid", CANCELLED: "Cancelled",
+  }[s] || s);
+
+const invoiceColor = (s) => {
+  if (["PAID", "APPROVED", "MATCHED"].includes(s)) return "#059669";
+  if (["REJECTED", "CANCELLED"].includes(s)) return "#dc2626";
+  if (["RECEIVED", "UNDER_VERIFICATION", "MATCH_PENDING"].includes(s)) return "#d97706";
+  return "#64748b";
+};
+
+const matchColor = (s) => (s === "MATCHED" ? "#059669" : s === "MISMATCH" ? "#dc2626" : s === "PARTIAL_MATCH" ? "#d97706" : "#64748b");
+
+const paymentColor = (s) => {
+  if (s === "PAID") return "#059669";
+  if (["CANCELLED", "FAILED", "REFUNDED"].includes(s)) return "#dc2626";
+  if (["DRAFT", "SCHEDULED", "APPROVED", "PROCESSING"].includes(s)) return "#d97706";
+  return "#64748b";
+};
+
+const badge = (text, color) => (
+  <span className="pman-badge" style={{ background: `${color}18`, color, border: `1px solid ${color}33` }}>
+    <span className="pman-badge-dot"></span>{text}
+  </span>
+);
 
 const ManagerInvoices = () => {
-  const [invoices, setInvoices] = useState(() => getStoredVendorInvoices());
-  const [selectedInv, setSelectedInv] = useState(null);
-  const [toastMsg, setToastMsg] = useState("");
-  const [activeTab, setActiveTab] = useState("pending");
+  const [tab, setTab] = useState("invoices");
+  const [invoices, setInvoices] = useState([]);
+  const [matches, setMatches] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState(null);
 
-  const triggerToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 4000);
+  const loadData = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [inv, m, pay] = await Promise.all([
+        apiGet("/api/invoices?page=0&size=100&sort=invoiceDate&direction=desc").catch(() => null),
+        apiGet("/api/three-way-matches?page=0&size=100&sort=matchDate&direction=desc").catch(() => null),
+        apiGet("/api/payments?page=0&size=100&sort=paymentDate&direction=desc").catch(() => null),
+      ]);
+      setInvoices(inv?.content || []);
+      setMatches(m?.content || []);
+      setPayments(pay?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load invoice data.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Subscribe to new invoices from vendor portal in real-time
   useEffect(() => {
-    const unsub = epsEventBus.subscribe((event) => {
-      if (event.type === "INVOICE_SUBMITTED" && event.data) {
-        setInvoices((prev) => {
-          if (prev.some((i) => i.id === event.data.id)) return prev;
-          return [event.data, ...prev];
-        });
-      }
-    });
-    return unsub;
+    loadData();
   }, []);
 
-  const handleAcknowledge = (invId) => {
-    setInvoices((prev) =>
-      prev.map((i) => (i.id === invId ? { ...i, status: "Acknowledged" } : i))
-    );
-    setSelectedInv(null);
-    triggerToast(`Invoice ${invId} acknowledged and routed to Finance for payment clearance.`);
-  };
-
-  const handleFlag = (invId) => {
-    setInvoices((prev) =>
-      prev.map((i) => (i.id === invId ? { ...i, status: "Flagged" } : i))
-    );
-    setSelectedInv(null);
-    triggerToast(`Invoice ${invId} has been flagged for review.`);
-  };
-
-  const pending = invoices.filter((i) => !i.status || i.status === "Pending");
-  const acknowledged = invoices.filter((i) => i.status === "Acknowledged");
-  const flagged = invoices.filter((i) => i.status === "Flagged");
-
-  const displayList = activeTab === "pending" ? pending : activeTab === "acknowledged" ? acknowledged : flagged;
-
-  const statusColor = (status) => {
-    if (status === "Acknowledged") return { bg: "rgba(5,150,105,0.1)", color: "#059669", border: "#059669" };
-    if (status === "Flagged") return { bg: "rgba(239,68,68,0.1)", color: "#dc2626", border: "#dc2626" };
-    return { bg: "rgba(248,180,0,0.1)", color: "#d97706", border: "#f8b400" };
-  };
+  const inputStyle = { width: "100%", padding: "10px 12px", border: "1px solid #d7dce3", borderRadius: "9px", fontSize: "13.5px", background: "#fff", outline: "none" };
 
   return (
-    <div className="pman-tracking-container">
-      {/* Header */}
+    <div className="pman-invoices-container">
       <div className="pman-page-header">
         <div>
           <h1 className="pman-page-title">
-            <Receipt color="#f8b400" /> Vendor Invoice Management
+            <Receipt color="#f8b400" /> Vendor Invoices & Financial Status
           </h1>
           <p className="pman-page-subtitle">
-            Review and acknowledge tax invoices submitted by vendors. All invoices are simultaneously routed to Finance for payment clearance.
+            Invoice, three-way match and payment visibility for procurement monitoring — Finance remains the action owner.
           </p>
         </div>
+        <button className="pman-btn-primary-sm" onClick={loadData}>
+          <RefreshCw size={16} /> Refresh
+        </button>
       </div>
 
-      {/* Toast */}
-      {toastMsg && (
-        <div style={{ background: "rgba(5,150,105,0.1)", border: "1px solid #059669", color: "#059669", padding: "14px 20px", borderRadius: "12px", marginBottom: "20px", fontWeight: "700", fontSize: "14px", display: "flex", alignItems: "center", gap: "10px" }}>
-          <CheckCircle2 size={18} /> {toastMsg}
+      {error && (
+        <div style={{ background: "#fef2f2", color: "#991b1b", padding: "14px 16px", borderRadius: "10px", marginBottom: "16px", fontSize: "13.5px", border: "1px solid #fecaca", display: "flex", gap: "10px", alignItems: "center" }}>
+          <WifiOff size={18} /> {error}
         </div>
       )}
 
-      {/* Stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px", marginBottom: "28px" }}>
-        {[
-          { label: "Pending Review", count: pending.length, color: "#f8b400", icon: <Clock size={22} color="#f8b400" /> },
-          { label: "Acknowledged", count: acknowledged.length, color: "#059669", icon: <CheckCircle2 size={22} color="#059669" /> },
-          { label: "Flagged", count: flagged.length, color: "#dc2626", icon: <AlertTriangle size={22} color="#dc2626" /> },
-        ].map((stat) => (
-          <div key={stat.label} className="pman-card" style={{ padding: "20px 24px", display: "flex", alignItems: "center", gap: "16px" }}>
-            {stat.icon}
-            <div>
-              <div style={{ fontSize: "28px", fontWeight: "800", color: stat.color }}>{stat.count}</div>
-              <div style={{ fontSize: "13px", color: "#666", fontWeight: "600" }}>{stat.label}</div>
-            </div>
-          </div>
-        ))}
-      </div>
-
       {/* Tabs */}
-      <div style={{ display: "flex", gap: "8px", marginBottom: "20px" }}>
-        {["pending", "acknowledged", "flagged"].map((tab) => (
+      <div style={{ display: "flex", gap: "10px", marginBottom: "20px" }}>
+        {[
+          { key: "invoices", label: `Invoices (${invoices.length})`, icon: <FileText size={15} /> },
+          { key: "matches", label: `Three-Way Matches (${matches.length})`, icon: <GitCompareArrows size={15} /> },
+          { key: "payments", label: `Payments (${payments.length})`, icon: <Landmark size={15} /> },
+        ].map((t) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
+            key={t.key}
+            onClick={() => { setTab(t.key); setSelected(null); }}
+            className="pman-btn-primary-sm"
             style={{
-              padding: "8px 20px",
-              borderRadius: "8px",
-              border: "none",
-              fontWeight: "700",
-              fontSize: "13px",
-              cursor: "pointer",
-              background: activeTab === tab ? "#f8b400" : "#f3f4f6",
-              color: activeTab === tab ? "#111" : "#555",
-              textTransform: "capitalize",
-              transition: "all 0.2s",
+              background: tab === t.key ? "#f8b400" : "#f8f9fb",
+              color: tab === t.key ? "#000" : "#555",
+              border: "1px solid #d9d9d9",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {t.icon} {t.label}
           </button>
         ))}
       </div>
 
-      {/* Invoices list */}
-      {displayList.length === 0 ? (
-        <div className="pman-card" style={{ textAlign: "center", padding: "60px 20px" }}>
-          <Receipt size={48} color="#ccc" style={{ margin: "0 auto 12px" }} />
-          <p style={{ color: "#999", fontWeight: "600" }}>No invoices in this category yet.</p>
-          <p style={{ color: "#bbb", fontSize: "13px", marginTop: "4px" }}>Invoices submitted by vendors in the Supplier Portal will appear here instantly.</p>
-        </div>
-      ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {displayList.map((inv) => {
-            const sc = statusColor(inv.status || "Pending");
-            return (
-              <div key={inv.id} className="pman-card pman-card-gold-glow">
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "12px" }}>
-                  <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-                      <span style={{ fontWeight: "800", color: "#d97706", fontSize: "15px" }}>{inv.id}</span>
-                      <span style={{ fontSize: "12px", color: "#666" }}>PO: <strong>{inv.poId}</strong></span>
-                      <span style={{ padding: "3px 10px", borderRadius: "20px", fontSize: "11px", fontWeight: "700", background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
-                        {inv.status || "Pending"}
-                      </span>
-                    </div>
-                    <h4 style={{ fontSize: "16px", color: "#111", fontWeight: "700" }}>{inv.item}</h4>
-                    <p style={{ fontSize: "13px", color: "#555", marginTop: "2px" }}>Vendor: <strong>{inv.vendor}</strong> • Buyer: {inv.buyer}</p>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "22px", fontWeight: "800", color: "#059669" }}>
-                      ${(inv.totalAmount || inv.amount || 0).toLocaleString()}
-                    </div>
-                    <div style={{ fontSize: "12px", color: "#888", marginTop: "2px" }}>Due: {inv.dueDate || "N/A"}</div>
-                  </div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "14px" }}>
-                  <button
-                    className="pman-btn-sm"
-                    style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", padding: "8px 16px", borderRadius: "8px", fontWeight: "600", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-                    onClick={() => setSelectedInv(inv)}
-                  >
-                    <Eye size={14} /> View Details
-                  </button>
-                  {(!inv.status || inv.status === "Pending") && (
-                    <>
-                      <button
-                        style={{ background: "#059669", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-                        onClick={() => handleAcknowledge(inv.id)}
-                      >
-                        <Check size={14} /> Acknowledge
-                      </button>
-                      <button
-                        style={{ background: "#dc2626", color: "#fff", border: "none", padding: "8px 16px", borderRadius: "8px", fontWeight: "700", fontSize: "13px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}
-                        onClick={() => handleFlag(inv.id)}
-                      >
-                        <AlertTriangle size={14} /> Flag
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Invoice Detail Modal */}
-      {selectedInv && (
-        <div className="pman-modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#fff", borderRadius: "16px", maxWidth: "640px", width: "100%", padding: "32px", maxHeight: "90vh", overflowY: "auto" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "24px", paddingBottom: "16px", borderBottom: "2px solid #f8b400" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800", textTransform: "uppercase" }}>Invoice Detail</span>
-                <h2 style={{ fontSize: "20px", color: "#111", fontWeight: "800", marginTop: "2px" }}>{selectedInv.id}</h2>
-              </div>
-              <button onClick={() => setSelectedInv(null)} style={{ background: "none", border: "none", cursor: "pointer", color: "#666" }}>
-                <X size={22} />
-              </button>
-            </div>
-
-            {/* Detail rows */}
-            {[
-              { label: "Vendor", value: selectedInv.vendor },
-              { label: "Item", value: selectedInv.item },
-              { label: "PO Reference", value: selectedInv.poId },
-              { label: "Invoice Amount", value: `$${(selectedInv.amount || 0).toLocaleString()}` },
-              { label: "Tax (9%)", value: `$${((selectedInv.taxAmount) || (selectedInv.amount || 0) * 0.09).toFixed(2)}` },
-              { label: "Total Amount", value: `$${(selectedInv.totalAmount || (selectedInv.amount || 0) * 1.09).toLocaleString()}` },
-              { label: "Due Date", value: selectedInv.dueDate || "N/A" },
-              { label: "Bank Details", value: selectedInv.bankDetails || "N/A" },
-              { label: "Notes", value: selectedInv.notes || "N/A" },
-            ].map(({ label, value }) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid #f3f4f6" }}>
-                <span style={{ fontSize: "13px", color: "#777", fontWeight: "600" }}>{label}</span>
-                <span style={{ fontSize: "13px", color: "#111", fontWeight: "700", textAlign: "right", maxWidth: "60%" }}>{value}</span>
-              </div>
-            ))}
-
-            {/* Attachments */}
-            <div style={{ marginTop: "16px" }}>
-              <p style={{ fontSize: "12px", fontWeight: "700", color: "#555", marginBottom: "10px" }}>Attachments</p>
-              <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: "#f8f9fb", borderRadius: "8px", border: "1px solid #ececec" }}>
-                  <FileText size={14} color="#f8b400" />
-                  <span style={{ fontSize: "12px", color: "#555" }}>{selectedInv.invoicePdfName || `INV_${selectedInv.id}.pdf`}</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 14px", background: "#f8f9fb", borderRadius: "8px", border: "1px solid #ececec" }}>
-                  <QrCode size={14} color="#f8b400" />
-                  <span style={{ fontSize: "12px", color: "#555" }}>{selectedInv.qrCodeName || `QR_${selectedInv.id}.png`}</span>
-                </div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "24px" }}>
-              {(!selectedInv.status || selectedInv.status === "Pending") && (
-                <>
-                  <button style={{ background: "#dc2626", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }} onClick={() => handleFlag(selectedInv.id)}>
-                    Flag
-                  </button>
-                  <button style={{ background: "#059669", color: "#fff", border: "none", padding: "10px 20px", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }} onClick={() => handleAcknowledge(selectedInv.id)}>
-                    Acknowledge & Forward to Finance
-                  </button>
-                </>
-              )}
-              <button style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9", padding: "10px 20px", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }} onClick={() => setSelectedInv(null)}>
-                Close
-              </button>
-            </div>
+      <div className="pman-card">
+        {loading ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "60px 0", gap: "12px", color: "#666666" }}>
+            <Loader2 size={20} className="login-spin" /> Loading financial data…
           </div>
-        </div>
-      )}
+        ) : tab === "invoices" ? (
+          invoices.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#666666" }}>
+              <FileText size={32} style={{ opacity: 0.4, marginBottom: 10 }} />
+              <p style={{ fontWeight: 600 }}>No invoices recorded.</p>
+            </div>
+          ) : (
+            <div className="pman-table-container">
+              <table className="pman-table">
+                <thead>
+                  <tr>
+                    <th>Invoice</th>
+                    <th>Vendor</th>
+                    <th>PO</th>
+                    <th>Invoice Date</th>
+                    <th>Due Date</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoices.map((i) => (
+                    <tr key={i.id}>
+                      <td style={{ fontWeight: 800, color: "#d97706" }}>{i.invoiceNumber}</td>
+                      <td style={{ fontWeight: 600 }}>{i.vendorName}</td>
+                      <td style={{ color: "#555" }}>{i.purchaseOrderId || "—"}</td>
+                      <td style={{ color: "#666", fontSize: 13 }}>{formatDateIN(i.invoiceDate, { withTime: false })}</td>
+                      <td style={{ color: "#666", fontSize: 13 }}>{i.dueDate ? formatDateIN(i.dueDate, { withTime: false }) : "—"}</td>
+                      <td style={{ fontWeight: 800 }}>{formatINR(i.grandTotal)}</td>
+                      <td>{badge(invoiceStatus(i.status), invoiceColor(i.status))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : tab === "matches" ? (
+          matches.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "60px 0", color: "#666666" }}>
+              <GitCompareArrows size={32} style={{ opacity: 0.4, marginBottom: 10 }} />
+              <p style={{ fontWeight: 600 }}>No three-way matches yet.</p>
+            </div>
+          ) : (
+            <div className="pman-table-container">
+              <table className="pman-table">
+                <thead>
+                  <tr>
+                    <th>Match No.</th>
+                    <th>PO</th>
+                    <th>GRN</th>
+                    <th>Invoice</th>
+                    <th>Vendor</th>
+                    <th>Result</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((m) => (
+                    <tr key={m.id}>
+                      <td style={{ fontWeight: 800, color: "#d97706" }}>{m.matchNumber}</td>
+                      <td style={{ color: "#555" }}>{m.purchaseOrderNumber}</td>
+                      <td style={{ color: "#555" }}>{m.goodsReceiptNoteNumber || "—"}</td>
+                      <td style={{ color: "#555" }}>{m.invoiceNumber || "—"}</td>
+                      <td style={{ fontWeight: 600 }}>{m.vendorName}</td>
+                      <td>{badge(m.overallResult || m.status, matchColor(m.overallResult || m.status))}</td>
+                      <td style={{ color: "#555", fontSize: 13 }}>{m.status}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        ) : payments.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#666666" }}>
+            <Landmark size={32} style={{ opacity: 0.4, marginBottom: 10 }} />
+            <p style={{ fontWeight: 600 }}>No payments recorded.</p>
+          </div>
+        ) : (
+          <div className="pman-table-container">
+            <table className="pman-table">
+              <thead>
+                <tr>
+                  <th>Payment</th>
+                  <th>Vendor</th>
+                  <th>Invoice</th>
+                  <th>Payment Date</th>
+                  <th>Net Amount</th>
+                  <th>Paid</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p) => (
+                  <tr key={p.id}>
+                    <td style={{ fontWeight: 800, color: "#d97706" }}>{p.paymentNumber}</td>
+                    <td style={{ fontWeight: 600 }}>{p.vendorName}</td>
+                    <td style={{ color: "#555" }}>{p.invoiceNumber || "—"}</td>
+                    <td style={{ color: "#666", fontSize: 13 }}>{p.paymentDate ? formatDateIN(p.paymentDate, { withTime: false }) : "—"}</td>
+                    <td style={{ fontWeight: 800 }}>{formatINR(p.netAmount)}</td>
+                    <td>{formatINR(p.paidAmount)}</td>
+                    <td>{badge(p.status, paymentColor(p.status))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

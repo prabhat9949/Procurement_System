@@ -10,16 +10,24 @@ import {
   Save,
   Loader2,
   IndianRupee,
+  Search,
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 const CreateRequest = ({ onNavigate }) => {
+  // Read effective permissions at render time so admin grants/revocations
+  // take effect after a session refresh without a stale module-level value.
+  const canCreate = hasPermission("CAN_CREATE_PR");
+  const canSubmit = hasPermission("CAN_SUBMIT_PR");
   const [me, setMe] = useState(null);
   const [products, setProducts] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -43,8 +51,8 @@ const CreateRequest = ({ onNavigate }) => {
       try {
         const employee = await apiGet("/api/employees/me");
         setMe(employee);
-        const productPage = await apiGet("/api/products?active=true&size=500");
-        setProducts(productPage?.content || []);
+        const productList = await apiGet("/api/products/active");
+        setProducts(productList || []);
         if (employee?.departmentId) {
           const cc = await apiGet(`/api/cost-centers/by-department/${employee.departmentId}`);
           setCostCenters(cc || []);
@@ -66,6 +74,16 @@ const CreateRequest = ({ onNavigate }) => {
   }, []);
 
   const selectedProduct = products.find((p) => p.id === Number(form.productId));
+  const categories = ["ALL", ...Array.from(new Set(products.map((p) => p.categoryName).filter(Boolean)))];
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory = categoryFilter === "ALL" || product.categoryName === categoryFilter;
+    const q = productSearch.trim().toLowerCase();
+    const matchesSearch = !q
+      || (product.productName || "").toLowerCase().includes(q)
+      || (product.sku || "").toLowerCase().includes(q)
+      || (product.brand || "").toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -93,7 +111,7 @@ const CreateRequest = ({ onNavigate }) => {
   };
 
   const buildHeaderPayload = () => ({
-    requesterId: me.id,
+    requesterId: me.employeeId || me.id,
     departmentId: me.departmentId,
     costCenterId: Number(form.costCenterId),
     requiredDate: form.requiredDate,
@@ -196,9 +214,28 @@ const CreateRequest = ({ onNavigate }) => {
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 14 }}>
           <div>
             <label style={fieldLabel}>Product / Service *</label>
+            <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10, marginBottom: 10 }}>
+              <div style={{ position: "relative" }}>
+                <Search size={15} style={{ position: "absolute", left: 12, top: 12, color: "#94a3b8" }} />
+                <input
+                  type="text"
+                  style={{ ...inputStyle, paddingLeft: 34 }}
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Search by product, SKU, or brand"
+                />
+              </div>
+              <select style={inputStyle} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category === "ALL" ? "All categories" : category}
+                  </option>
+                ))}
+              </select>
+            </div>
             <select style={inputStyle} value={form.productId} onChange={(e) => handleProductChange(e.target.value)}>
               <option value="">Select from catalogue…</option>
-              {products.map((p) => (
+              {filteredProducts.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.productName} {p.sku ? `(${p.sku})` : ""} — {p.categoryName || "Uncategorised"}
                 </option>
@@ -206,7 +243,12 @@ const CreateRequest = ({ onNavigate }) => {
             </select>
             {selectedProduct && (
               <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
-                {selectedProduct.description || "No description on file"} · Reference price {formatINR(selectedProduct.unitPrice)}
+                {selectedProduct.description || "No description on file"} · SKU {selectedProduct.sku || "—"} · Brand {selectedProduct.brand || "—"} · Reference price {formatINR(selectedProduct.unitPrice)}
+              </div>
+            )}
+            {!selectedProduct && (
+              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                Only active catalogue products are shown. If the required item is missing, it needs the non-catalog request workflow.
               </div>
             )}
           </div>
@@ -292,22 +334,31 @@ const CreateRequest = ({ onNavigate }) => {
 
       {/* ============ Actions ============ */}
       <div style={{ display: "flex", gap: 12, marginTop: 28, paddingTop: 20, borderTop: "1px solid #eef1f5" }}>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
-          disabled={saving}
-          onClick={() => saveRequest(false)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
-        </button>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
-          disabled={saving}
-          onClick={() => saveRequest(true)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
-        </button>
+        {canCreate && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
+            disabled={saving}
+            onClick={() => saveRequest(false)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
+          </button>
+        )}
+        {canSubmit && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
+            disabled={saving}
+            onClick={() => saveRequest(true)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
+          </button>
+        )}
+        {!canCreate && !canSubmit && (
+          <div style={{ fontSize: 13, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={16} /> You do not have permission to create or submit purchase requests. Contact your administrator.
+          </div>
+        )}
         <button
           className="emp-btn-primary-sm"
           style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}

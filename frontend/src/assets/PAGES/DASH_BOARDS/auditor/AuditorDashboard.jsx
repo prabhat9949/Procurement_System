@@ -5,7 +5,7 @@ import "./AuditorDashboard.css";
 import {
   LayoutDashboard,
   ShieldCheck,
-  DollarSign,
+  IndianRupee,
   FileText,
   Star,
   Boxes,
@@ -45,13 +45,13 @@ const AuditorDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "procurement-audits", label: "Procurement Audits", icon: ShieldCheck },
-    { id: "financial-audits", label: "Financial Audits", icon: DollarSign },
+    { id: "financial-audits", label: "Financial Audits", icon: IndianRupee },
     { id: "po-audits", label: "PO Audits", icon: FileText },
     { id: "vendor-audits", label: "Vendor Audits", icon: Star },
     { id: "inventory-audits", label: "Inventory Audits", icon: Boxes },
     { id: "compliance-monitoring", label: "Compliance Monitoring", icon: ShieldCheck },
     { id: "risk-analysis", label: "Risk Analysis", icon: AlertTriangle },
-    { id: "budget-allocations", label: "Budget Allocations", icon: DollarSign },
+    { id: "budget-allocations", label: "Budget Allocations", icon: IndianRupee },
     { id: "reports", label: "Audit Reports", icon: FolderKanban },
     ];
 

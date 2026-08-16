@@ -1,97 +1,117 @@
-import React, { useState } from "react";
-import { PieChart, PlusCircle, CheckCircle2 } from "lucide-react";
-import { getBudgetAllocations, saveBudgetAllocations } from "../../../../../services/epsApiService";
+import React, { useState, useEffect, useCallback } from "react";
+import { PieChart, Loader2, WifiOff, IndianRupee, AlertTriangle } from "lucide-react";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR } from "../../../../../utils/format";
 
 const AuditorBudgetAllocation = () => {
-  const [allocations, setAllocations] = useState(getBudgetAllocations());
-  const [newDept, setNewDept] = useState("");
-  const [newAmt, setNewAmt] = useState("");
-  const [toastMsg, setToastMsg] = useState("");
+  const [centers, setCenters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  const triggerToast = (msg) => {
-    setToastMsg(msg);
-    setTimeout(() => setToastMsg(""), 4000);
-  };
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const page = await apiGet("/api/cost-centers?page=0&size=200").catch(() => apiGet("/api/cost-centers"));
+      setCenters(page?.content || page || []);
+    } catch (err) {
+      setError(err.message || "Unable to load budget allocations.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const handleAllocate = (e) => {
-    e.preventDefault();
-    if (!newDept || !newAmt) return;
-    
-    const amount = parseFloat(newAmt);
-    const newAlloc = {
-      id: `ALLOC-${Math.floor(1000 + Math.random() * 9000)}`,
-      department: newDept,
-      allocatedAmt: amount,
-      spentAmt: 0,
-      remainingAmt: amount,
-      lastUpdated: new Date().toISOString().split("T")[0]
-    };
+  useEffect(() => { loadData(); }, [loadData]);
 
-    const updated = [newAlloc, ...allocations];
-    setAllocations(updated);
-    saveBudgetAllocations(updated);
-    
-    setNewDept("");
-    setNewAmt("");
-    triggerToast(`Successfully allocated $${amount.toLocaleString()} to ${newDept}`);
-  };
+  const totalBudget = centers.reduce((a, c) => a + Number(c.budget || 0), 0);
+  const totalUsed = centers.reduce((a, c) => a + Number(c.usedBudget || 0), 0);
+  const pct = totalBudget > 0 ? Math.round((totalUsed / totalBudget) * 100) : 0;
 
   return (
     <div style={{ padding: "20px" }}>
-      {toastMsg && (
-        <div style={{ position: "fixed", bottom: 24, right: 24, background: "#059669", color: "#fff", padding: "12px 24px", borderRadius: "8px", zIndex: 1000 }}>
-          <CheckCircle2 size={16} style={{ marginRight: "8px", display: "inline" }} />
-          {toastMsg}
+      <div className="aud-page-header">
+        <div>
+          <h1 className="aud-page-title" style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <PieChart color="#dc2626" /> Budget Allocations
+          </h1>
+          <p className="aud-page-subtitle">Cost-center budgets, spend and utilisation — read-only, live from the database.</p>
+        </div>
+      </div>
+
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", padding: "14px 18px", borderRadius: "10px", marginBottom: "20px", fontSize: "14px", fontWeight: 600 }}>
+          <WifiOff size={18} />
+          <span style={{ flex: 1 }}>{error}</span>
+          <button onClick={loadData} style={{ background: "#111", color: "#fff", border: "none", padding: "8px 14px", borderRadius: "8px", fontWeight: 700, cursor: "pointer" }}>Retry</button>
         </div>
       )}
-      
-      <div style={{ marginBottom: "24px" }}>
-        <h1 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "700", color: "#111" }}>
-          <PieChart color="#d97706" size={28} /> Budget Allocations
-        </h1>
-        <p style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>Allocate funding directly to Finance Management for departmental spending.</p>
-      </div>
 
-      <div style={{ display: "flex", gap: "24px", flexWrap: "wrap" }}>
-        {/* Form */}
-        <div style={{ flex: "1 1 300px", background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid #ececec" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}>
-            <PlusCircle size={18} color="#d97706" /> New Allocation
-          </h3>
-          <form onSubmit={handleAllocate} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px" }}>Department</label>
-              <input type="text" value={newDept} onChange={e => setNewDept(e.target.value)} required style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #d9d9d9" }} />
-            </div>
-            <div>
-              <label style={{ display: "block", fontSize: "13px", fontWeight: "600", marginBottom: "6px" }}>Amount ($)</label>
-              <input type="number" value={newAmt} onChange={e => setNewAmt(e.target.value)} required style={{ width: "100%", padding: "10px", borderRadius: "6px", border: "1px solid #d9d9d9" }} />
-            </div>
-            <button type="submit" style={{ padding: "12px", background: "#111", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", cursor: "pointer" }}>
-              Allocate Funds
-            </button>
-          </form>
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "60px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading budget data...
         </div>
-
-        {/* List */}
-        <div style={{ flex: "2 1 500px", background: "#fff", padding: "24px", borderRadius: "12px", border: "1px solid #ececec" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px" }}>Current Allocations</h3>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            {allocations.map(a => (
-              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", padding: "16px", background: "#f8f9fb", borderRadius: "8px", border: "1px solid #eee" }}>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", fontWeight: "700" }}>{a.id} • {a.lastUpdated}</span>
-                  <h4 style={{ margin: "4px 0 0", fontSize: "16px", color: "#111" }}>{a.department}</h4>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "11px", color: "#666" }}>Allocated Amount</span>
-                  <div style={{ fontSize: "18px", fontWeight: "800", color: "#059669" }}>${a.allocatedAmt.toLocaleString()}</div>
-                </div>
-              </div>
-            ))}
+      ) : (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "24px" }}>
+            <div className="aud-card" style={{ padding: "18px" }}>
+              <span style={{ fontSize: "12px", color: "#666", fontWeight: 700 }}>TOTAL BUDGET</span>
+              <p style={{ fontSize: "22px", fontWeight: "800", color: "#111", margin: "4px 0" }}>{formatINR(totalBudget)}</p>
+            </div>
+            <div className="aud-card" style={{ padding: "18px" }}>
+              <span style={{ fontSize: "12px", color: "#666", fontWeight: 700 }}>SPENT</span>
+              <p style={{ fontSize: "22px", fontWeight: "800", color: "#d97706", margin: "4px 0" }}>{formatINR(totalUsed)}</p>
+            </div>
+            <div className="aud-card" style={{ padding: "18px" }}>
+              <span style={{ fontSize: "12px", color: "#666", fontWeight: "700" }}>REMAINING</span>
+              <p style={{ fontSize: "22px", fontWeight: "800", color: "#059669", margin: "4px 0" }}>{formatINR(totalBudget - totalUsed)}</p>
+            </div>
+            <div className="aud-card" style={{ padding: "18px" }}>
+              <span style={{ fontSize: "12px", color: "#666", fontWeight: "700" }}>UTILISATION</span>
+              <p style={{ fontSize: "22px", fontWeight: "800", color: pct >= 90 ? "#dc2626" : pct >= 70 ? "#d97706" : "#111", margin: "4px 0" }}>{pct}%</p>
+            </div>
           </div>
-        </div>
-      </div>
+
+          <div className="aud-card" style={{ overflow: "hidden" }}>
+            <h4 style={{ padding: "16px 20px", fontSize: "15px", fontWeight: "700", color: "#111", borderBottom: "1px solid #ececec", display: "flex", alignItems: "center", gap: "8px" }}>
+              <IndianRupee size={16} color="#dc2626" /> Cost Center Budgets
+            </h4>
+            <div className="aud-table-container">
+              <table className="aud-table">
+                <thead>
+                  <tr><th>Code</th><th>Cost Center</th><th>Department</th><th>Budget</th><th>Spent</th><th>Remaining</th><th>Utilisation</th></tr>
+                </thead>
+                <tbody>
+                  {centers.length === 0 ? (
+                    <tr><td colSpan="7" style={{ textAlign: "center", padding: "28px", color: "#666" }}>No cost-center budget data available.</td></tr>
+                  ) : centers.map((c) => {
+                    const cp = Number(c.budget || 0) > 0 ? Math.round((Number(c.usedBudget || 0) / Number(c.budget || 0)) * 100) : 0;
+                    const remaining = Number(c.budget || 0) - Number(c.usedBudget || 0);
+                    return (
+                      <tr key={c.id}>
+                        <td style={{ fontWeight: "800", color: "#dc2626" }}>{c.code}</td>
+                        <td style={{ fontWeight: 600 }}>{c.name}</td>
+                        <td style={{ fontSize: "13px" }}>{c.departmentName || "—"}</td>
+                        <td style={{ fontWeight: 700 }}>{formatINR(c.budget)}</td>
+                        <td style={{ color: "#d97706", fontWeight: 600 }}>{formatINR(c.usedBudget)}</td>
+                        <td style={{ color: remaining < 0 ? "#dc2626" : "#059669", fontWeight: 700 }}>{formatINR(remaining)}</td>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <div style={{ flex: 1, background: "#ececec", borderRadius: 6, height: 8, minWidth: 60 }}>
+                              <div style={{ width: `${Math.min(cp, 100)}%`, height: 8, borderRadius: 6, background: cp >= 90 ? "#dc2626" : cp >= 70 ? "#d97706" : "#059669" }} />
+                            </div>
+                            <span style={{ fontSize: "12px", fontWeight: 700, color: cp >= 90 ? "#dc2626" : "#555" }}>{cp}%</span>
+                            {cp >= 90 && <AlertTriangle size={14} color="#dc2626" />}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };
