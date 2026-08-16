@@ -16,10 +16,6 @@ import { apiGet, apiPost, apiPut, apiDelete } from "../../../../../services/apiC
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 import { hasPermission } from "../../../../../utils/permissions";
 
-const canEdit = hasPermission("CAN_EDIT_PR");
-const canSubmit = hasPermission("CAN_SUBMIT_PR");
-const canCancel = hasPermission("CAN_CANCEL_PR");
-
 const STATUS_STYLE = {
   DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
   SUBMITTED: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
@@ -35,6 +31,9 @@ const displayStatus = (r) => (r.approvalStatus === "RETURNED" ? "RETURNED" : r.s
 const statusLabel = (s) => (s === "UNDER_REVIEW" ? "Pending" : s === "RETURNED" ? "Returned for Correction" : s.replace("_", " "));
 
 const MyRequests = ({ onNavigate, onSelectTracking }) => {
+  const canEdit = hasPermission("CAN_EDIT_PR");
+  const canSubmit = hasPermission("CAN_SUBMIT_PR");
+  const canCancel = hasPermission("CAN_CANCEL_PR");
   const [requests, setRequests] = useState([]);
   const [linesByRequest, setLinesByRequest] = useState({});
   const [loading, setLoading] = useState(true);

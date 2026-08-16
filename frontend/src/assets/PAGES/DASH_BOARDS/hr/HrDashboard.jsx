@@ -47,9 +47,7 @@ const moneyFormat = new Intl.NumberFormat("en-IN", {
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "directory", label: "Employee Directory", icon: Users },
-  { id: "departments", label: "Departments", icon: Building2 },
   { id: "structure", label: "Reporting Structure", icon: GitBranch },
-  { id: "accounts", label: "Employee Accounts", icon: UserCog },
   { id: "tracking", label: "Procurement Tracking", icon: ClipboardList },
   { id: "reports", label: "HR Reports", icon: BarChart3 },
   { id: "notifications", label: "Notifications", icon: Bell },
@@ -173,9 +171,7 @@ export default function HrDashboard() {
       {activeTab === "directory" && (
         <DirectoryView departments={departments} roles={roles} costCenters={costCenters} onChanged={refreshAll} />
       )}
-      {activeTab === "departments" && <DepartmentsView departments={departments} dash={dash} />}
       {activeTab === "structure" && <StructureView />}
-      {activeTab === "accounts" && <AccountsView />}
       {activeTab === "tracking" && (
         <ProcurementTrackingView departments={departments} />
       )}
@@ -217,18 +213,13 @@ function OverviewView({ dash, loading, onGoTo }) {
     { label: "Inactive Employees", code: "INACTIVE_EMPLOYEES", color: "#dc2626", icon: User },
     { label: "New This Month", code: "NEW_EMPLOYEES", color: "#f59e0b", icon: TrendingUp },
     { label: "With User Account", code: "WITH_USER_ACCOUNT", color: "#7c3aed", icon: KeyRound },
-    { label: "Without User Account", code: "WITHOUT_USER_ACCOUNT", color: "#d97706", icon: UserCog },
     { label: "Without Manager", code: "WITHOUT_MANAGER", color: "#e11d48", icon: GitBranch },
-    { label: "Departments", code: "DEPARTMENTS", color: "#0891b2", icon: Building2 },
-    { label: "Designations (Roles)", code: "DESIGNATIONS", color: "#64748b", icon: BriefcaseBusiness },
-    { label: "Cost Centers", code: "COST_CENTERS", color: "#0d9488", icon: Wallet },
   ];
 
   const chartByCode = (code) => charts.find((c) => c.code === code);
 
   const actionCenter = [
     { label: "Employees without reporting manager", value: kpi("WITHOUT_MANAGER"), color: "#e11d48", tab: "directory" },
-    { label: "Employees without linked user account", value: kpi("WITHOUT_USER_ACCOUNT"), color: "#d97706", tab: "accounts" },
     { label: "Inactive employees requiring review", value: kpi("INACTIVE_EMPLOYEES"), color: "#dc2626", tab: "directory" },
     { label: "New joiners this month", value: kpi("NEW_EMPLOYEES"), color: "#059669", tab: "directory" },
   ];
@@ -258,7 +249,7 @@ function OverviewView({ dash, loading, onGoTo }) {
 
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 16, marginTop: 20 }}>
-        {[chartByCode("EMPLOYEES_BY_DEPARTMENT"), chartByCode("EMPLOYEES_BY_DESIGNATION"), chartByCode("EMPLOYEES_BY_STATUS"), chartByCode("EMPLOYEES_BY_MANAGER"), chartByCode("EMPLOYEE_ACCOUNT_STATUS")].filter(Boolean).map((chart) => (
+        {[chartByCode("EMPLOYEES_BY_STATUS"), chartByCode("EMPLOYEES_BY_MANAGER")].filter(Boolean).map((chart) => (
           <section key={chart.code} style={{ background: "#fff", borderRadius: 12, padding: 20, border: "1px solid #e7ebf0" }}>
             <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#111" }}>{chart.label}</h3>
             {chart.points?.length ? (
@@ -528,7 +519,6 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
                       return (
                         <>
                           <IconBtn title="View profile" onClick={() => setProfileEmployee(employee)}><Eye size={15} /></IconBtn>
-                          <IconBtn title="Edit" onClick={() => { setEditing(employee); setFormOpen(true); }}><Edit size={15} /></IconBtn>
                           <IconBtn title={employee.active ? "Deactivate" : "Activate"} onClick={() => (employee.active ? setConfirmTarget(employee) : toggleActive(employee))} danger={employee.active}>
                             {employee.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
                           </IconBtn>
@@ -1735,13 +1725,6 @@ function ReportsView({ departments, costCenters, dash }) {
           onExport={exportDirectory}
         />
         <ReportCard
-          title="Department-wise Employee Count"
-          subtitle="Headcount and cost centers per department"
-          headers={["Department", "Employees", "Cost Centers", "Status"]}
-          rows={departments.map((d) => [d.departmentName, d.employeeCount ?? 0, d.costCenterCount ?? 0, d.active ? "Active" : "Inactive"])}
-          onExport={exportDept}
-        />
-        <ReportCard
           title="Designation Distribution"
           subtitle="Employees grouped by designation / role"
           headers={["Designation", "Employees"]}
@@ -1754,13 +1737,6 @@ function ReportsView({ departments, costCenters, dash }) {
           headers={["Status", "Employees"]}
           rows={chartPoints("EMPLOYEES_BY_STATUS").map((p) => [p.label, Number(p.value)])}
           onExport={exportStatus}
-        />
-        <ReportCard
-          title="Employee Account Status"
-          subtitle="User-account linkage across the organisation"
-          headers={["Account Status", "Employees"]}
-          rows={chartPoints("EMPLOYEE_ACCOUNT_STATUS").map((p) => [p.label, Number(p.value)])}
-          onExport={exportAccounts}
         />
         <ReportCard
           title="Manager-wise Employee Count"

@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/products")
 @PreAuthorize("isAuthenticated()")
@@ -59,6 +61,12 @@ public class ProductController {
             @RequestParam(defaultValue = "productName") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
         return search(keyword, categoryId, vendorId, active, page, size, sort, direction);
+    }
+
+    @GetMapping("/active")
+    public ApiResponse<List<ProductResponse>> activeProducts() {
+        return ApiResponse.success(productService.search(null, null, null, true,
+                PageRequest.of(0, 1000, Sort.by(Sort.Direction.ASC, "productName"))).content());
     }
 
     @GetMapping("/{id}")

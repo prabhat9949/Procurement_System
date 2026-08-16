@@ -112,7 +112,23 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
 
     @Transactional public void submit(PurchaseRequest pr){
         if(pr.getStatus()!=PurchaseRequestStatus.DRAFT)throw new ConflictException("Only draft purchase requests can be submitted");
-        var matching=rules.findByDepartmentIdAndActiveTrue(pr.getDepartment().getId()).stream().filter(r->pr.getEstimatedAmount().compareTo(r.getMinimumAmount())>=0&&(r.getMaximumAmount()==null||pr.getEstimatedAmount().compareTo(r.getMaximumAmount())<=0)).toList();
+        var amount = pr.getEstimatedAmount();
+        var departmentRules = rules.findByDepartmentIdAndActiveTrue(pr.getDepartment().getId());
+        var matching = departmentRules.stream()
+                .filter(r -> amount.compareTo(r.getMinimumAmount()) >= 0
+                        && (r.getMaximumAmount() == null || amount.compareTo(r.getMaximumAmount()) <= 0))
+                .sorted(java.util.Comparator.comparing(com.procurement.approvalrule.entity.ApprovalRule::getMinimumAmount).reversed())
+                .toList();
+        // Departments may not yet have a complete approval matrix. Use the
+        // configured active enterprise rule as a safe fallback rather than
+        // rejecting every valid PR with “No active approval rule matches”.
+        if (matching.isEmpty()) {
+            matching = rules.findByActiveTrue().stream()
+                    .filter(r -> amount.compareTo(r.getMinimumAmount()) >= 0
+                            && (r.getMaximumAmount() == null || amount.compareTo(r.getMaximumAmount()) <= 0))
+                    .sorted(java.util.Comparator.comparing(com.procurement.approvalrule.entity.ApprovalRule::getMinimumAmount).reversed())
+                    .toList();
+        }
         if(matching.isEmpty())throw new ConflictException("No active approval rule matches this purchase request");
         var stage=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(matching.get(0).getId()).stream().findFirst().orElseThrow(()->new ConflictException("Approval rule has no active stages"));
         // Route to the requester's actual manager from the reporting chain (not a role-wide pick).

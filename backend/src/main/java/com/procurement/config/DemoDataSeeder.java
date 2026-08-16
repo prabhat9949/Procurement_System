@@ -185,36 +185,7 @@ public class DemoDataSeeder {
             inventory(bengaluruRegional, "PRD-M365", 40, 5, 0, 10, 200, 25, new BigDecimal("17500"), inventoryRepository, productRepository);
             inventory(bengaluruRegional, "PRD-DESK-1", 2, 0, 0, 5, 40, 8, new BigDecimal("26500"), inventoryRepository, productRepository);
 
-            // ============ Sample Purchase Requests ============
-            Employee emp = employeeRepository.findByEmployeeCode("EMP010").orElse(null);
-            Department dept = departmentRepository.findByDepartmentCode("IT").orElse(null);
-            CostCenter cc = costCenterRepository.findByCode("IT-001").orElse(null);
-
-            if (emp != null && dept != null && cc != null) {
-                pr("PR-2026-000001", LocalDate.now().minusDays(2), LocalDate.now().plusDays(20),
-                        emp, dept, cc, PurchaseRequestPriority.HIGH, PurchaseRequestStatus.UNDER_REVIEW,
-                        ApprovalStatus.PENDING, "Replacement MacBook Pro for design team (3 units)",
-                        "Existing laptops exceed 5 years and fail performance requirements.",
-                        new BigDecimal("479700"), "employee@123", purchaseRequestRepository);
-                pr("PR-2026-000002", LocalDate.now().minusDays(5), LocalDate.now().plusDays(10),
-                        emp, dept, cc, PurchaseRequestPriority.MEDIUM, PurchaseRequestStatus.APPROVED,
-                        ApprovalStatus.APPROVED, "A4 paper and stationery restock for Q3",
-                        "Monthly consumable requirement for all departments.",
-                        new BigDecimal("43500"), "employee@123", purchaseRequestRepository);
-                pr("PR-2026-000003", LocalDate.now().minusDays(1), LocalDate.now().plusDays(30),
-                        emp, dept, cc, PurchaseRequestPriority.URGENT, PurchaseRequestStatus.DRAFT,
-                        ApprovalStatus.PENDING, "Microsoft 365 licences for 10 new joiners",
-                        "New hires need licensed accounts before onboarding week.",
-                        new BigDecimal("185000"), "employee@123", purchaseRequestRepository);
-                pr("PR-2026-000004", LocalDate.now().minusDays(12), LocalDate.now().plusDays(15),
-                        emp, dept, cc, PurchaseRequestPriority.LOW, PurchaseRequestStatus.REJECTED,
-                        ApprovalStatus.REJECTED, "Office chair replacement — pilot batch",
-                        "Ergonomic chair upgrade request pending revised budget.",
-                        new BigDecimal("125000"), "employee@123", purchaseRequestRepository);
-                log.info("Seeded 4 sample purchase requests.");
-            } else {
-                log.warn("Skipped sample purchase requests: employee/department/cost-center not found.");
-            }
+            log.info("Transaction sample seeding disabled; PR/RFQ/PO records are created only by user workflow actions.");
 
             log.info("Demo master data seeded: {} UOMs, {} categories, {} vendors, {} products, {} warehouses, {} inventory rows.",
                     uomRepository.count(), categoryRepository.count(), vendorRepository.count(),

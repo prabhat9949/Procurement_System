@@ -150,7 +150,7 @@ public class ExportServiceImpl implements ExportService {
                 for (int i = 0; i < vals.length; i++) {
                     var cell = row.createCell(i);
                     if (i == 9 && vals[i] != null) {
-                        cell.setCellValue("Rs. " + formatINR((BigDecimal) vals[i]));
+                        cell.setCellValue("₹ " + formatINR((BigDecimal) vals[i]));
                     } else {
                         cell.setCellValue(vals[i] == null ? "" : vals[i].toString());
                     }
@@ -330,7 +330,7 @@ public class ExportServiceImpl implements ExportService {
     private String textOf(Object value, int columnIndex) {
         if (value == null) return "";
         if (columnIndex == 9 && value instanceof BigDecimal amount) {
-            return "Rs. " + formatINR(amount);
+            return "₹ " + formatINR(amount);
         }
         return String.valueOf(value);
     }
@@ -412,4 +412,5 @@ public class ExportServiceImpl implements ExportService {
     private String v(Object o) {
         return o == null ? "" : String.valueOf(o).replace(",", ";");
     }
+
 }

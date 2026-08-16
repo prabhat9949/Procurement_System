@@ -94,6 +94,18 @@ public class WorkflowServiceImpl implements WorkflowService {
                 .orElse(false);
     }
 
+    private String currentRoleCode() {
+        return users.findByUsername(username())
+                .map(User::getRole)
+                .map(r -> r.getRoleCode())
+                .orElse("");
+    }
+
+    private boolean canManageAssignments() {
+        String role = currentRoleCode();
+        return ADMIN_ROLES.contains(role) || "PROCUREMENT_MANAGER".equals(role);
+    }
+
     private WorkflowAssignment find(Long id) {
         return assignments.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Workflow assignment not found: " + id));
@@ -164,6 +176,9 @@ public class WorkflowServiceImpl implements WorkflowService {
     @Override
     @Transactional
     public WorkflowAssignmentResponse assign(WorkflowAssignRequest req) {
+        if (!canManageAssignments()) {
+            throw new ForbiddenException("Only administrators or procurement managers can create workflow assignments");
+        }
         if (!ALLOWED_ENTITY_TYPES.contains(req.entityType())) {
             throw new ConflictException("Unsupported entity type: " + req.entityType() +
                     " (supported: " + ALLOWED_ENTITY_TYPES + ")");
@@ -175,6 +190,10 @@ public class WorkflowServiceImpl implements WorkflowService {
         }
         if (assignee.getRole() == null) {
             throw new ConflictException("Assigned employee has no role");
+        }
+        if ("PROCUREMENT_MANAGER".equals(currentRoleCode())
+                && !isProcurementTarget(req.stage(), assignee.getRole().getRoleCode())) {
+            throw new ForbiddenException("Procurement managers may assign only to an eligible procurement/team officer");
         }
         // Idempotency: never create a second active assignment for the same stage.
         assignments.findByEntityTypeAndEntityIdAndStatusAndStage(
@@ -335,10 +354,12 @@ public class WorkflowServiceImpl implements WorkflowService {
         var user = currentEmployee();
         boolean admin = isAdmin();
         boolean assignee = wa.getAssignedEmployee().getId().equals(user.getId());
+        boolean previousAssignee = assignments.findByEntityTypeAndEntityIdOrderByAssignedAtAsc(wa.getEntityType(), wa.getEntityId())
+                .stream().anyMatch(a -> a.getAssignedEmployee().getId().equals(user.getId()));
         boolean requester = "PR".equals(wa.getEntityType())
                 && requests.findById(wa.getEntityId()).map(pr -> pr.getRequester() != null
                         && pr.getRequester().getId().equals(user.getId())).orElse(false);
-        if (!admin && !assignee && !requester) {
+        if (!admin && !assignee && !previousAssignee && !requester) {
             throw new ForbiddenException("You are not authorized to view this workflow task");
         }
         return toResponse(wa);
@@ -358,8 +379,23 @@ public class WorkflowServiceImpl implements WorkflowService {
                 if (!own) throw new ForbiddenException("You can only view assignment history for your own requests");
             }
         }
-        return assignments.findByEntityTypeAndEntityIdOrderByAssignedAtAsc(entityType, entityId)
-                .stream().map(this::toResponse).toList();
+        var rows = assignments.findByEntityTypeAndEntityIdOrderByAssignedAtAsc(entityType, entityId);
+        var user = currentEmployee();
+        boolean admin = isAdmin();
+        boolean requester = "PR".equalsIgnoreCase(entityType)
+                && requests.findById(entityId).map(pr -> pr.getRequester() != null && pr.getRequester().getId().equals(user.getId())).orElse(false);
+        boolean participant = rows.stream().anyMatch(a -> a.getAssignedEmployee().getId().equals(user.getId()));
+        if (!admin && !requester && !participant) {
+            throw new ForbiddenException("You are not authorized to view this workflow history");
+        }
+        return rows.stream().map(this::toResponse).toList();
+    }
+
+    private boolean isProcurementTarget(String stage, String roleCode) {
+        String s = stage == null ? "" : stage.toUpperCase();
+        String r = roleCode == null ? "" : roleCode.toUpperCase();
+        return r.contains("PROCUREMENT") || r.contains("EQUIPMENT") || r.contains("SOFTWARE") || r.contains("FACILITIES")
+                || s.contains("PROCUREMENT") || s.contains("EQUIPMENT") || s.contains("SOFTWARE") || s.contains("FACILITIES");
     }
 
     // ------------------------------------------------------------------
@@ -397,8 +433,14 @@ public class WorkflowServiceImpl implements WorkflowService {
     @Override
     @Transactional
     public WorkflowAssignmentResponse assignToTeam(PurchaseRequest pr, String reason) {
-        var officer = resolveTeamOfficer(pr);
-        String stage = officer.getRole().getRoleCode();
+        // Final approval always enters the Procurement Manager's scoped queue.
+        // The manager must explicitly assign the category-specific officer/team;
+        // never bypass that ownership boundary by selecting the first officer.
+        var managerRole = roles.findByRoleCode("PROCUREMENT_MANAGER")
+                .orElseThrow(() -> new ConflictException("Procurement Manager role is not configured"));
+        var officer = employees.findFirstByRoleIdAndActiveTrue(managerRole.getId())
+                .orElseThrow(() -> new ConflictException("No active Procurement Manager is configured"));
+        String stage = "PROCUREMENT_MANAGER";
         // Idempotent: if this PR already has an active team assignment, keep it.
         var existing = assignments.findByEntityTypeAndEntityIdAndStatusAndStage(
                 "PR", pr.getId(), WorkflowAssignmentStatus.ASSIGNED, stage);
@@ -417,7 +459,7 @@ public class WorkflowServiceImpl implements WorkflowService {
                 .status(WorkflowAssignmentStatus.ASSIGNED)
                 .action("PROCESS")
                 .reason(reason == null || reason.isBlank()
-                        ? "Category routing: PR fully approved — assigned to " + officer.getRole().getRoleName()
+                        ? "Final approval complete — queued for Procurement Manager category assignment"
                         : reason)
                 .assignedAt(LocalDateTime.now())
                 .build());

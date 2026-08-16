@@ -88,7 +88,7 @@ const ProcurementTracking = () => {
       setError("");
       try {
         const data = await apiGet(`/api/procurement/${selectedReqId}/timeline`);
-        setTimeline(data);
+        setTimeline({ ...(data || {}), events: Array.isArray(data?.events) ? data.events : [] });
       } catch (err) {
         setError(err.message || "Unable to load workflow timeline.");
       } finally {
@@ -99,7 +99,7 @@ const ProcurementTracking = () => {
   }, [selectedReqId]);
 
   const stagePosition = timeline?.currentStage
-    ? Math.max(0, PIPELINE.findIndex((s) => timeline.currentStage.toUpperCase().includes(s)) || 0)
+    ? Math.max(0, PIPELINE.findIndex((s) => String(timeline.currentStage).toUpperCase().includes(s)) || 0)
     : 0;
   const progress = timeline ? Math.min(100, Math.round(((stagePosition + 1) / PIPELINE.length) * 100)) : 0;
 

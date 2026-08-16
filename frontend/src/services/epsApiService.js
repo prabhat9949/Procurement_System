@@ -1,4 +1,5 @@
 // EPS API & Real-Time Sync Service
+import { apiGet } from "./apiClient";
 const API_BASE_URL = "http://localhost:8080/api/v1";
 const LOCAL_STORAGE_KEY = "eps_enterprise_master_requests";
 const BUDGET_STORAGE_KEY = "eps_dept_budget_analytics";
@@ -202,17 +203,30 @@ export const fetchTeamRequisitions = async (deptId = 1) => {
 };
 
 export const fetchTrackForms = async () => {
-  const requests = getStoredMasterRequests();
+  let requests = [];
+  try {
+    const page = await apiGet("/api/purchase-requests?page=0&size=100&sort=createdAt&direction=desc");
+    // Track every actionable request, including those currently awaiting approval.
+    requests = (page?.content || []).filter((r) => !["DRAFT", "CANCELLED"].includes(String(r.status || "").toUpperCase()));
+  } catch {
+    return {};
+  }
   const workflows = {};
+  const timelines = await Promise.all(requests.map(async (req) => {
+    try { return await apiGet(`/api/procurement/${req.id}/timeline`); } catch { return null; }
+  }));
 
-  const rfqs = getStoredRfqs();
-  const pos = getStoredPurchaseOrders();
+  const rfqs = [];
+  const pos = [];
 
-  requests.forEach((req) => {
-    const isApproved = req.status === "approved";
-    const isCompleted = req.status === "completed";
-    const isRejected = req.status === "rejected";
-    const currentStep = isCompleted ? 8 : isRejected ? 2 : isApproved ? Math.max(req.currentStep || 3, 3) : 2;
+  requests.forEach((req, index) => {
+    const timeline = timelines[index];
+    const events = timeline?.events || [];
+    const isApproved = req.status === "APPROVED";
+    const isCompleted = req.status === "COMPLETED";
+    const isRejected = req.status === "REJECTED";
+    const eventTypes = new Set(events.map((e) => e.type));
+    const currentStep = isCompleted ? 8 : isRejected ? 2 : eventTypes.has("GRN_CREATED") ? 6 : eventTypes.has("PO_CREATED") ? 5 : eventTypes.has("RFQ_CREATED") ? 4 : isApproved ? 3 : 2;
 
     const matchingRfq = rfqs.find(r => r.reqId === req.id || r.id === req.rfqCode);
     const matchingPo = pos.find(p => p.reqId === req.id || p.rfqId === matchingRfq?.id);
@@ -244,16 +258,22 @@ export const fetchTrackForms = async () => {
 
     workflows[req.id] = {
       id: req.id,
-      item: req.product,
-      product: req.product,
-      requester: req.requester || "Team Member",
-      role: req.role || "Senior Architect",
-      dept: req.dept || "Engineering & IT",
-      cost: req.cost,
-      vendor: req.vendor || "Enterprise Direct",
-      approvedDate: req.date,
-      priority: req.priority || "Medium",
-      status: req.status,
+      item: req.purpose || req.requestNumber,
+      product: req.purpose || req.requestNumber,
+      requester: timeline?.requesterName || req.requesterName || "Team Member",
+      role: "Employee",
+      dept: req.departmentName || "—",
+      cost: req.estimatedAmount,
+      vendor: "Pending procurement assignment",
+      currentAssignee: timeline?.currentAssigneeName || "Unassigned",
+      currentAssigneeRole: timeline?.currentAssigneeRole || "",
+      nextApprover: timeline?.currentAssigneeName || "Procurement Manager",
+      nextApproverRole: timeline?.currentAssigneeRole || "PROCUREMENT_MANAGER",
+      currentStage: timeline?.currentStage || "WORKFLOW",
+      approvedDate: req.createdAt,
+      priority: req.priority || "MEDIUM",
+      status: timeline?.currentStatus || req.status,
+      timelineEvents: events,
       currentStep: currentStep,
       rfqCode: matchingRfq ? matchingRfq.id : (req.rfqCode || "Pending Sourcing"),
       poCode: matchingPo ? matchingPo.id : (req.poNumber || "Pending PO Generation"),

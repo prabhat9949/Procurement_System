@@ -18,11 +18,12 @@ import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 import { hasPermission } from "../../../../../utils/permissions";
 
-const canApprove = hasPermission("CAN_APPROVE_PR");
-const canReject = hasPermission("CAN_REJECT_PR");
-const canReturn = hasPermission("CAN_RETURN_PR");
-
 const ApprovalQueue = ({ onTrackForm }) => {
+  // Read permissions during render so a role/permission change is reflected
+  // immediately after the auth session is refreshed (module-level values were stale).
+  const canApprove = hasPermission("CAN_APPROVE_PR");
+  const canReject = hasPermission("CAN_REJECT_PR");
+  const canReturn = hasPermission("CAN_RETURN_PR");
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -69,6 +70,11 @@ const ApprovalQueue = ({ onTrackForm }) => {
   const submitDecision = async (e) => {
     e.preventDefault();
     if (!targetTask) return;
+    const allowed = decision === "APPROVED" ? canApprove : decision === "REJECTED" ? canReject : canReturn;
+    if (!allowed) {
+      setError("Your current role does not have permission to submit this decision. Please sign in again after a role change.");
+      return;
+    }
     setSubmitting(true);
     setError("");
     try {
@@ -80,10 +86,13 @@ const ApprovalQueue = ({ onTrackForm }) => {
       } else {
         await apiPost(`/api/approval-tasks/${targetTask.id}/return`, body);
       }
+      // Remove the completed task immediately so it cannot remain visible as
+      // pending while the next dashboard refresh is in flight.
+      setTasks((current) => current.filter((task) => task.id !== targetTask.id));
       setToast({ type: decision === "APPROVED" ? "success" : decision === "REJECTED" ? "danger" : "info", text: `${targetTask.taskNumber} ${decision === "APPROVED" ? "approved" : decision === "REJECTED" ? "rejected" : "returned for correction"}.` });
       setTargetTask(null);
       setComments("");
-      loadData();
+      await loadData();
     } catch (err) {
       setError(err.message || "Unable to submit the decision.");
     } finally {

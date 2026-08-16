@@ -18,6 +18,8 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 
 import ManagerOverview from "./modules/ManagerOverview";
@@ -31,6 +33,8 @@ import ProcurementTracking from "./modules/ProcurementTracking";
 import ManagerReports from "./modules/ManagerReports";
 import ManagerProfile from "./modules/ManagerProfile";
 import ManagerInvoices from "./modules/ManagerInvoices";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const ProcManagerDashboard = () => {
   const navigate = useNavigate();
@@ -51,6 +55,8 @@ const ProcManagerDashboard = () => {
     { id: "procurement-analytics", label: "Procurement Analytics", icon: BarChart3 },
     { id: "procurement-tracking", label: "Procurement Tracking", icon: Clock },
     { id: "reports", label: "Procurement Reports", icon: FolderKanban },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
     ];
 
   const handleLogout = () => {
@@ -81,6 +87,10 @@ const ProcManagerDashboard = () => {
         return <ProcurementTracking />;
       case "reports":
         return <ManagerReports />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <ManagerProfile />;
       default:

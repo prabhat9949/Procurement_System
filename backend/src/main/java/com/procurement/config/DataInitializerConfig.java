@@ -260,7 +260,7 @@ public class DataInitializerConfig {
             // 4.4 Procurement Officer (matrix procurement@123)
             Employee procurementOfficer = createEmployeeIfNotExists(
                     employeeRepository, "EMP009", "Rohan", "Gupta",
-                    "rohan.gupta@enterprise.com", "9876543218", procurementDept, procCostCenter, procurementOfficerRole);
+                    "rohan.gupta@enterprise.com", "9876543218", procurementDept, procCostCenter, procurementManagerRole);
 
             // 4.5 Finance Officer
             Employee financeEmployee = createEmployeeIfNotExists(
@@ -415,7 +415,7 @@ public class DataInitializerConfig {
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_HEAD, PASSWORD_HEAD, null, head, headRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
-                    USER_PROCUREMENT, PASSWORD_PROCUREMENT, LEGACY_PROCUREMENT, procurementOfficer, procurementOfficerRole);
+                    USER_PROCUREMENT, PASSWORD_PROCUREMENT, LEGACY_PROCUREMENT, procurementOfficer, procurementManagerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_PROCUREMENT2, PASSWORD_PROCUREMENT2, null, procurement2, procurementOfficerRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
