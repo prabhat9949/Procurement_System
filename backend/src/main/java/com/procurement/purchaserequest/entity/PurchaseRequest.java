@@ -71,6 +71,10 @@ public class PurchaseRequest {
     @Column(name = "estimated_amount", nullable = false, precision = 15, scale = 2)
     private BigDecimal estimatedAmount;
 
+    @Column(name = "budget_committed", nullable = false)
+    @Builder.Default
+    private Boolean budgetCommitted = false;
+
     @Column(name = "created_by", nullable = false, length = 100, updatable = false)
     private String createdBy;
 
@@ -92,6 +96,7 @@ public class PurchaseRequest {
         if (status == null) status = PurchaseRequestStatus.DRAFT;
         if (approvalStatus == null) approvalStatus = ApprovalStatus.PENDING;
         if (estimatedAmount == null) estimatedAmount = BigDecimal.ZERO;
+        if (budgetCommitted == null) budgetCommitted = false;
     }
 
     @PreUpdate

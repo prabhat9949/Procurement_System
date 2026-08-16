@@ -1,7 +1,9 @@
 package com.procurement.employee.service;
 
+import com.procurement.auditlog.service.AuditLogService;
 import com.procurement.common.exception.BadRequestException;
 import com.procurement.common.exception.ConflictException;
+import com.procurement.common.exception.ForbiddenException;
 import com.procurement.common.exception.ResourceNotFoundException;
 import com.procurement.common.response.PageResponse;
 import com.procurement.costcenter.entity.CostCenter;
@@ -21,6 +23,8 @@ import com.procurement.role.repository.RoleRepository;
 import com.procurement.user.repository.UserRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +41,8 @@ public class EmployeeServiceImpl implements EmployeeService {
     private final UserRepository userRepository;
     private final EmployeeMapper employeeMapper;
     private final EmployeeValidator employeeValidator;
+    private final AuditLogService auditLogService;
+    private final com.procurement.workflow.service.RoleChangeTaskService roleChangeTaskService;
 
     public EmployeeServiceImpl(EmployeeRepository employeeRepository,
                                DepartmentRepository departmentRepository,
@@ -44,7 +50,9 @@ public class EmployeeServiceImpl implements EmployeeService {
                                RoleRepository roleRepository,
                                UserRepository userRepository,
                                EmployeeMapper employeeMapper,
-                               EmployeeValidator employeeValidator) {
+                               EmployeeValidator employeeValidator,
+                               AuditLogService auditLogService,
+                               com.procurement.workflow.service.RoleChangeTaskService roleChangeTaskService) {
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
         this.costCenterRepository = costCenterRepository;
@@ -52,6 +60,8 @@ public class EmployeeServiceImpl implements EmployeeService {
         this.userRepository = userRepository;
         this.employeeMapper = employeeMapper;
         this.employeeValidator = employeeValidator;
+        this.auditLogService = auditLogService;
+        this.roleChangeTaskService = roleChangeTaskService;
     }
 
     @Override
@@ -70,6 +80,9 @@ public class EmployeeServiceImpl implements EmployeeService {
         Employee saved = employeeRepository.save(employee);
         saved.setEmployeeCode(finalEmployeeCode(saved.getId()));
         saved = employeeRepository.save(saved);
+        auditLogService.record("Employee", "Employee", saved.getId(), "CREATE",
+                saved.getEmployeeCode(), "EMPLOYEE", true, null,
+                employeeDetails(saved), "Employee record created by HR/Admin");
         return employeeMapper.toResponse(saved);
     }
 
@@ -93,18 +106,69 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public EmployeeResponse myProfile() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new ForbiddenException("Authentication required");
+        }
+        return userRepository.findByUsername(authentication.getName())
+                .map(user -> user.getEmployee())
+                .map(employeeMapper::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "No employee record is linked to the authenticated user"));
+    }
+
+    @Override
     @Transactional
     public EmployeeResponse update(Long id, EmployeeRequest request) {
         employeeValidator.validate(request);
         Employee employee = findEmployee(id);
+        String old = employeeDetails(employee);
+        Boolean oldActive = employee.getActive();
         ensureUnique(request.email(), request.phone(), id);
         Department department = findDepartment(request.departmentId());
         CostCenter costCenter = findCostCenter(request.costCenterId());
         ensureDepartmentMatchesCostCenter(department, costCenter);
         Role role = findRole(request.roleId());
+        Role oldRole = employee.getRole();
         Employee manager = findManager(request.managerId(), id);
         employeeMapper.updateEntity(employee, request, department, costCenter, role, manager);
-        return employeeMapper.toResponse(employeeRepository.save(employee));
+        Employee saved = employeeRepository.save(employee);
+
+        // Keep the linked account's role in sync so the change reflects on next
+        // login, and safely handle any open tasks assigned to this employee
+        // (retain where the new role is still authorised, reassign otherwise).
+        if (oldRole == null || !oldRole.getId().equals(role.getId())) {
+            final Role newRole = role;
+            userRepository.findByEmployee(saved).ifPresent(user -> {
+                user.setRole(newRole);
+                userRepository.save(user);
+            });
+            roleChangeTaskService.handleRoleChange(saved.getId(), oldRole == null ? role : oldRole, newRole,
+                    "Role changed via employee update (HR/Admin)");
+        }
+
+        // Employment status drives linked account access: an active employee has an
+        // enabled account, a deactivated employee loses login access in the same transaction.
+        if (request.active() != null && (oldActive == null || !oldActive.equals(request.active()))) {
+            final boolean active = Boolean.TRUE.equals(request.active());
+            userRepository.findByEmployee(saved).ifPresent(user -> {
+                if (Boolean.TRUE.equals(user.getEnabled()) != active) {
+                    user.setEnabled(active);
+                    userRepository.save(user);
+                }
+            });
+        }
+
+        String operation = "UPDATE";
+        if (oldActive != null && request.active() != null && !oldActive.equals(request.active())) {
+            operation = Boolean.TRUE.equals(request.active()) ? "ACTIVATE" : "DEACTIVATE";
+        }
+        auditLogService.record("Employee", "Employee", saved.getId(), operation,
+                saved.getEmployeeCode(), "EMPLOYEE", true, old,
+                employeeDetails(saved), "Employee record updated by HR/Admin");
+        return employeeMapper.toResponse(saved);
     }
 
     @Override
@@ -114,7 +178,11 @@ public class EmployeeServiceImpl implements EmployeeService {
         if (userRepository.findByEmployee(employee).isPresent()) {
             throw new ConflictException("Employee has a linked user account and cannot be deleted");
         }
+        String old = employeeDetails(employee);
         employeeRepository.delete(employee);
+        auditLogService.record("Employee", "Employee", id, "DELETE",
+                employee.getEmployeeCode(), "EMPLOYEE", true, old, null,
+                "Employee record deleted");
     }
 
     private Employee findEmployee(Long id) {
@@ -168,8 +236,17 @@ public class EmployeeServiceImpl implements EmployeeService {
         }
     }
 
+    private String employeeDetails(Employee employee) {
+        return "{code=" + employee.getEmployeeCode()
+                + ", name=" + employee.getFirstName() + " " + employee.getLastName()
+                + ", dept=" + (employee.getDepartment() == null ? "null" : employee.getDepartment().getDepartmentName())
+                + ", role=" + (employee.getRole() == null ? "null" : employee.getRole().getRoleCode())
+                + ", active=" + employee.getActive() + "}";
+    }
+
     private String temporaryEmployeeCode() {
-        return "TMP-" + UUID.randomUUID();
+        // Must fit the employee_code column (length 30): "TMP-" + 12 hex chars.
+        return "TMP-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12);
     }
 
     private String finalEmployeeCode(Long id) {

@@ -10,4 +10,7 @@ import java.util.Optional;
 public interface PaymentRepository extends JpaRepository<Payment,Long>, JpaSpecificationExecutor<Payment> {
     Optional<Payment> findByPaymentNumber(String paymentNumber);
     boolean existsByPaymentNumber(String paymentNumber);
+    java.util.List<Payment> findByInvoiceId(Long invoiceId);
+    java.util.List<Payment> findByPurchaseOrderId(Long purchaseOrderId);
+    java.util.List<Payment> findByVendorId(Long vendorId);
 }

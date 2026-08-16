@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -30,6 +31,7 @@ public class PurchaseRequestController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('CAN_CREATE_PR')")
     public ResponseEntity<ApiResponse<PurchaseRequestResponse>> create(
             @Valid @RequestBody PurchaseRequestRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
@@ -96,6 +98,7 @@ public class PurchaseRequestController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('CAN_EDIT_PR')")
     public ApiResponse<PurchaseRequestResponse> update(@PathVariable Long id,
                                                        @Valid @RequestBody PurchaseRequestRequest request) {
         return ApiResponse.success("Purchase request updated",
@@ -103,13 +106,21 @@ public class PurchaseRequestController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyAuthority('CAN_EDIT_PR','CAN_CANCEL_PR')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         purchaseRequestService.delete(id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{id}/submit")
+    @PreAuthorize("hasAuthority('CAN_SUBMIT_PR')")
     public ApiResponse<PurchaseRequestResponse> submit(@PathVariable Long id) {
         return ApiResponse.success("Purchase request submitted", purchaseRequestService.submit(id));
+    }
+
+    @PostMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('CAN_CANCEL_PR')")
+    public ApiResponse<PurchaseRequestResponse> cancel(@PathVariable Long id) {
+        return ApiResponse.success("Purchase request cancelled", purchaseRequestService.cancel(id));
     }
 }

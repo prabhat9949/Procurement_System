@@ -19,6 +19,10 @@ public class NotificationController {
     public ResponseEntity<ApiResponse<NotificationResponse>> create(@Valid @RequestBody NotificationRequest request){return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success("Notification created",service.create(request)));}
     @GetMapping
     public ApiResponse<PageResponse<NotificationResponse>> search(@RequestParam(required=false)String keyword,@RequestParam(required=false)Long userId,@RequestParam(required=false)NotificationStatus status,@RequestParam(required=false)NotificationPriority priority,@RequestParam(required=false)NotificationType type,@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size,@RequestParam(defaultValue="createdAt")String sort,@RequestParam(defaultValue="desc")String direction){var order="asc".equalsIgnoreCase(direction)?Sort.by(sort).ascending():Sort.by(sort).descending();return ApiResponse.success(service.search(keyword,userId,status,priority,type,PageRequest.of(page,size,order)));}
+    @GetMapping("/my")
+    public ApiResponse<PageResponse<MyNotificationResponse>> my(@RequestParam(defaultValue="0")int page,@RequestParam(defaultValue="20")int size){return ApiResponse.success(service.myNotifications(PageRequest.of(page,size,org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC,"id"))));}
+    @GetMapping("/my/unread-count")
+    public ApiResponse<Long> myUnreadCount(){return ApiResponse.success(service.myUnreadCount());}
     @GetMapping("/{id}")
     public ApiResponse<NotificationResponse> get(@PathVariable Long id){return ApiResponse.success(service.get(id));}
     @PostMapping("/{id}/send")

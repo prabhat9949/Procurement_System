@@ -41,6 +41,15 @@ public class Category {
     @Column(name = "active_flag", nullable = false)
     private Boolean active = true;
 
+    /**
+     * Role code of the team that owns execution for this category
+     * (e.g. EQUIPMENT_ASSET_TEAM, IT_SOFTWARE_TEAM, FACILITIES_TEAM).
+     * Populated from database configuration; drives the category routing
+     * engine after final approval.
+     */
+    @Column(name = "team_role_code", length = 50)
+    private String teamRoleCode;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 

@@ -8,4 +8,5 @@ import java.util.*;
     boolean existsByRuleCode(String code);
     List<ApprovalRule> findByDepartmentIdAndActiveTrue(Long departmentId);
     List<ApprovalRule> findByDepartmentId(Long departmentId);
+    List<ApprovalRule> findByActiveTrue();
 }

@@ -32,4 +32,6 @@ public interface PurchaseRequestService {
     void delete(Long id);
 
     PurchaseRequestResponse submit(Long id);
+
+    PurchaseRequestResponse cancel(Long id);
 }
