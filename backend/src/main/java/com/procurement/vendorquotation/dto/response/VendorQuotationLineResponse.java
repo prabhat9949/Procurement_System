@@ -1,0 +1,1 @@
+package com.procurement.vendorquotation.dto.response;import java.math.BigDecimal;public record VendorQuotationLineResponse(Long id,Long quotationId,Long rfqLineId,Long productId,String productName,BigDecimal quantity,BigDecimal unitPrice,BigDecimal discountPercentage,BigDecimal taxPercentage,BigDecimal lineAmount,String remarks){}

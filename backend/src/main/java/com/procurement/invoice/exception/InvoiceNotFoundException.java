@@ -1,0 +1,1 @@
+package com.procurement.invoice.exception;import com.procurement.common.exception.ResourceNotFoundException;public class InvoiceNotFoundException extends ResourceNotFoundException{public InvoiceNotFoundException(Long id){super("Invoice not found: "+id);}}

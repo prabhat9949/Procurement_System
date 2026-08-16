@@ -1,0 +1,1 @@
+package com.procurement.goodsreceipt.dto.response;import java.math.BigDecimal;public record GrnLineResponse(Long id,Long grnId,Long purchaseOrderLineId,Long productId,String productName,BigDecimal orderedQuantity,BigDecimal receivedQuantity,BigDecimal acceptedQuantity,BigDecimal rejectedQuantity,BigDecimal damagedQuantity,BigDecimal remainingQuantity){}

@@ -1,0 +1,365 @@
+.ct-wrapper {
+  font-family: inherit;
+  background: #fff;
+}
+
+/* ---------- TOP FLOATING CARDS ---------- */
+.ct-top-cards {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  padding: 40px 40px 0;
+  flex-wrap: wrap;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ct-card {
+  width: 220px;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.ct-card-green { background: #dce8dc; }
+.ct-card-purple { background: #ebe1fb; }
+.ct-card-orange { background: #fbe9c6; }
+.ct-card-tan { background: #f0ded1; }
+
+.ct-card-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #222;
+}
+
+.ct-card-inner {
+  background: #fff;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.ct-inner-label {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 6px;
+}
+
+.ct-invoice-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: #444;
+  padding: 4px 0;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.ct-payment-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 6px 0;
+}
+
+.ct-amount {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.ct-icon-circle {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: #fff;
+}
+
+.ct-icon-dark { background: #1a1a1a; }
+.ct-icon-yellow { background: #f5c451; color: #1a1a1a; }
+
+.ct-proc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.ct-proc-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #222;
+}
+
+.ct-proc-sub {
+  font-size: 10px;
+  color: #999;
+}
+
+.ct-check {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ct-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ddd;
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+.ct-treasury-label {
+  font-size: 11px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.ct-treasury-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  padding: 5px 0;
+}
+
+/* ---------- CONNECTING STRIP ---------- */
+.ct-strip {
+  display: flex;
+  height: 6px;
+  max-width: 1160px;
+  margin: 0 auto;
+}
+
+.ct-strip-segment {
+  flex: 1;
+}
+
+.ct-seg-green { background: #a8c5a4; }
+.ct-seg-purple { background: #c7aef0; }
+.ct-seg-orange { background: #f5c451; }
+.ct-seg-tan { background: #dcb59a; }
+
+/* ---------- DARK BANNER ---------- */
+.ct-banner {
+  background: #0a0a0a;
+  margin: 0 40px;
+  border-radius: 0 0 20px 20px;
+  padding: 50px 20px 60px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.ct-banner-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 30px 30px;
+}
+
+.ct-banner h2 {
+  position: relative;
+  color: #fff;
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 24px;
+}
+
+.ct-pills {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ct-pill {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ct-pill:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ---------- ERP SECTION ---------- */
+.ct-erp-section {
+  background: #111;
+  margin: 24px 40px;
+  border-radius: 24px;
+  padding: 50px 50px 40px;
+}
+
+.ct-eyebrow {
+  display: block;
+  color: #f5c451;
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.ct-erp-title {
+  color: #fff;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 16px;
+}
+
+.ct-erp-desc {
+  color: #999;
+  font-size: 13.5px;
+  max-width: 520px;
+  line-height: 1.6;
+  margin-bottom: 36px;
+}
+
+.ct-logos {
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  flex-wrap: wrap;
+  margin-bottom: 36px;
+}
+
+.ct-logo {
+  color: #777;
+  font-size: 16px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.ct-integrations-btn {
+  background: #fff;
+  color: #111;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: block;
+  margin: 0 auto;
+}
+
+.ct-integrations-btn:hover {
+  background: #eee;
+}
+
+/* ---------- CUSTOMER STORIES ---------- */
+.ct-stories-section {
+  padding: 60px 40px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.ct-eyebrow-dark {
+  color: #d4a017;
+}
+
+.ct-stories-title {
+  font-size: 30px;
+  font-weight: 600;
+  color: #111;
+  line-height: 1.3;
+  margin-bottom: 36px;
+}
+
+.ct-stories-cards {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.ct-story-card {
+  flex: 1;
+  min-width: 260px;
+  border: 1px solid #eee;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.ct-story-banner {
+  height: 130px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.ct-banner-yellow { background: #f7d97a; }
+.ct-banner-green { background: #cdd9c2; }
+.ct-banner-blue { background: #dbe6f5; }
+
+.ct-story-body {
+  padding: 20px;
+}
+
+.ct-story-body h3 {
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: #111;
+}
+
+.ct-story-body p {
+  font-size: 13px;
+  color: #666;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.ct-story-meta {
+  display: flex;
+  gap: 30px;
+  border-top: 1px solid #eee;
+  padding-top: 14px;
+}
+
+.ct-meta-label {
+  font-size: 11px;
+  color: #999;
+  font-weight: 600;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 900px) {
+  .ct-top-cards {
+    gap: 12px;
+  }
+  .ct-card {
+    width: 45%;
+  }
+  .ct-erp-section,
+  .ct-banner {
+    margin: 16px;
+    padding: 30px 20px;
+  }
+  .ct-erp-title,
+  .ct-stories-title,
+  .ct-banner h2 {
+    font-size: 24px;
+  }
+}

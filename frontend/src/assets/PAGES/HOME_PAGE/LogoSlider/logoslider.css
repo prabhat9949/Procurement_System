@@ -1,0 +1,87 @@
+.logo-slider {
+    width: 100%;
+    padding: 35px 0;
+    background: #ffffff;
+    overflow: hidden;
+    position: relative;
+}
+
+.logo-slider::before,
+.logo-slider::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    width: 120px;
+    height: 100%;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.logo-slider::before {
+    left: 0;
+    background: linear-gradient(to right, #fff, transparent);
+}
+
+.logo-slider::after {
+    right: 0;
+    background: linear-gradient(to left, #fff, transparent);
+}
+
+.logo-track {
+    display: flex;
+    align-items: center;
+    width: max-content;
+    animation: scrollLogos 28s linear infinite;
+}
+
+.logo-slider:hover .logo-track {
+    animation-play-state: paused;
+}
+
+.logo-item {
+    flex: 0 0 auto;
+    width: 170px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0 18px;
+}
+
+.logo-item img {
+    width: 120px;
+    height: 55px;
+    object-fit: contain;
+    filter: grayscale(100%);
+    opacity: .65;
+    transition: .35s;
+}
+
+.logo-item img:hover {
+    filter: grayscale(0%);
+    opacity: 1;
+    transform: scale(1.08);
+}
+
+@keyframes scrollLogos {
+
+    from {
+        transform: translateX(0);
+    }
+
+    to {
+        transform: translateX(-50%);
+    }
+
+}
+
+@media (max-width:768px) {
+
+    .logo-item {
+        width: 130px;
+    }
+
+    .logo-item img {
+        width: 90px;
+    }
+
+}

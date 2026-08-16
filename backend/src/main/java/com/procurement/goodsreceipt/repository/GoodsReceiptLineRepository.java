@@ -1,0 +1,1 @@
+package com.procurement.goodsreceipt.repository;import com.procurement.goodsreceipt.entity.*;import org.springframework.data.jpa.repository.*;import org.springframework.stereotype.Repository;import java.util.*;@Repository public interface GoodsReceiptLineRepository extends JpaRepository<GoodsReceiptLine,Long>{List<GoodsReceiptLine>findByGoodsReceiptNoteId(Long id);}

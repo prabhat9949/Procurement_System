@@ -1,0 +1,1 @@
+package com.procurement.approvalhistory.service;import com.procurement.approvalhistory.dto.response.*;import com.procurement.common.response.*;import org.springframework.data.domain.Pageable;public interface ApprovalHistoryService{PageResponse<ApprovalHistoryResponse> search(Long requestId,Long performedById,Pageable pageable);ApprovalHistoryResponse getById(Long id);}

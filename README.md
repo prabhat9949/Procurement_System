@@ -506,20 +506,87 @@ docs/
 
 ***
 
-## Installation Guide
+## Quick Start (5 minutes)
+
+The database, schema, tables, roles, users and demo master data are all created
+**automatically** on first run — you do not need to create anything manually.
+
+### 1. Start MySQL (automatic)
+
+> **Option A — Docker (recommended):**
+> ```bash
+> docker compose up -d
+> ```
+> This starts MySQL 8 with the `enterprise_procurement` database already created
+> (user `root`, password `root`, port `3306`).
+
+> **Option B — Local MySQL:**
+> Ensure MySQL Server is running on `localhost:3306`. The backend JDBC URL uses
+> `createDatabaseIfNotExist=true`, so the database is created automatically on
+> first connection — no manual `CREATE DATABASE` needed.
+
+### 2. Start the backend
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+On first startup the backend will automatically:
+
+- Create all tables from the JPA entities (`ddl-auto=update`)
+- Seed **17 roles**, **6 departments**, **6 cost centers**, **17 employees** and the full login matrix (below)
+- Seed **demo master data**: 8 UOMs, 6 categories, 5 vendors, 11 products, 2 warehouses, 8 inventory rows and 4 sample purchase requests
+
+### 3. Start the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open **http://localhost:5173** and sign in with any account from the login matrix.
+
+---
+
+## Development Login Matrix
+
+| Role | Username | Password |
+|------|----------|----------|
+| Super Admin | `admin@123` | `Admin@123` |
+| HR | `hr@123` | `Hr@123` |
+| Employee | `employee@123` | `Employee@123` |
+| Employee 2 | `employee2@123` | `Employee2@123` |
+| Department Manager | `manager@123` | `Manager@123` |
+| Senior Manager | `seniormanager@123` | `Senior@123` |
+| Head / Executive | `head@123` | `Head@123` |
+| Procurement | `procurement@123` | `Procurement@123` |
+| Equipment & Asset Team | `equipment@123` | `Equipment@123` |
+| IT Software Team | `software@123` | `Software@123` |
+| Facilities Team | `facilities@123` | `Facilities@123` |
+| Warehouse | `warehouse@123` | `Warehouse@123` |
+| Finance | `finance@123` | `Finance@123` |
+| Auditor | `auditor@123` | `Auditor@123` |
+| Vendor | `vendor@123` | `Vendor@123` |
+
+> The login page shows these as one-click demo chips (development builds only).
+> In production, users authenticate with organisation-issued credentials.
+
+---
+
+## Installation Guide (manual)
 
 ### Prerequisites
 
 Make sure the following tools are installed:
 
-- Java 21
+- Java 17+ (project targets Java 17)
 - Maven
 - Node.js LTS
 - Git
-- MySQL Server
-- MySQL Workbench
-- IntelliJ IDEA
-- VS Code
+- MySQL Server (or Docker)
+- MySQL Workbench (optional)
 
 ### Clone the Repository
 
@@ -528,10 +595,15 @@ git clone https://github.com/<your-organization>/enterprise-procurement-system.g
 cd enterprise-procurement-system
 ```
 
-### Create the Database
+### Configure Database Credentials (optional)
 
-```sql
-CREATE DATABASE enterprise_procurement;
+The defaults are `root` / `root` on `localhost:3306`. Override them with
+environment variables instead of editing files:
+
+```bash
+SPRING_DATASOURCE_URL="jdbc:mysql://localhost:3306/enterprise_procurement?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata"
+SPRING_DATASOURCE_USERNAME=root
+SPRING_DATASOURCE_PASSWORD=your_password
 ```
 
 ### Backend Setup
@@ -546,21 +618,9 @@ mvn spring-boot:run
 
 ```bash
 cd frontend
+cp .env.example .env   # optional; defaults to http://localhost:8080
 npm install
 npm run dev
-```
-
-### Configure Application Properties
-
-Update the backend configuration file:
-
-```properties
-spring.datasource.url=jdbc:mysql://localhost:3306/enterprise_procurement
-spring.datasource.username=root
-spring.datasource.password=YOUR_PASSWORD
-spring.jpa.hibernate.ddl-auto=update
-spring.jpa.show-sql=true
-spring.jpa.properties.hibernate.format_sql=true
 ```
 
 ***

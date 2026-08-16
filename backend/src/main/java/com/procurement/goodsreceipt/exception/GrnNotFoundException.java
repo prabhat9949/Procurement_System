@@ -1,0 +1,1 @@
+package com.procurement.goodsreceipt.exception;import com.procurement.common.exception.ResourceNotFoundException;public class GrnNotFoundException extends ResourceNotFoundException{public GrnNotFoundException(Long id){super("Goods receipt note not found: "+id);}}

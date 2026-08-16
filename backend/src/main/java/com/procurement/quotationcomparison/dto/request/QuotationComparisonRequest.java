@@ -1,0 +1,1 @@
+package com.procurement.quotationcomparison.dto.request;import com.procurement.quotationcomparison.entity.ComparisonMethod;import jakarta.validation.constraints.*;public record QuotationComparisonRequest(@NotNull Long rfqId,@NotNull ComparisonMethod comparisonMethod,String remarks){}
