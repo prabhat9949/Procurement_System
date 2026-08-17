@@ -1,0 +1,9 @@
+CREATE TABLE assignment (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    purchase_request_id BIGINT NOT NULL,
+    assignee_role VARCHAR(50) NOT NULL,
+    status VARCHAR(30) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pr FOREIGN KEY (purchase_request_id) REFERENCES purchase_request(id)
+);

@@ -11,5 +11,7 @@ public enum NotificationType {
     INVOICE,
     PAYMENT,
     REMINDER,
-    CUSTOM
+    CUSTOM,
+    PROCUREMENT,
+    FULFILMENT
 }

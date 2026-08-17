@@ -81,6 +81,27 @@ public class Product {
     private BigDecimal taxPercentage;
 
     @Builder.Default
+    @Column(name = "is_digital", nullable = false)
+    private Boolean isDigital = false;
+
+    @Column(name = "license_type", length = 50)
+    private String licenseType;
+
+    @Builder.Default
+    @Column(name = "total_licenses")
+    private Integer totalLicenses = 0;
+
+    @Builder.Default
+    @Column(name = "allocated_licenses")
+    private Integer allocatedLicenses = 0;
+
+    @Column(name = "license_expiry_date")
+    private java.time.LocalDate licenseExpiryDate;
+
+    @Column(name = "license_key_or_plan", length = 255)
+    private String licenseKeyOrPlan;
+
+    @Builder.Default
     @Column(name = "active", nullable = false)
     private Boolean active = true;
 

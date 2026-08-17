@@ -1,5 +1,5 @@
 // EPS API & Real-Time Sync Service
-import { apiGet } from "./apiClient";
+import { apiGet, apiPost } from "./apiClient";
 const API_BASE_URL = "http://localhost:8080/api/v1";
 const LOCAL_STORAGE_KEY = "eps_enterprise_master_requests";
 const BUDGET_STORAGE_KEY = "eps_dept_budget_analytics";
@@ -361,13 +361,13 @@ export const submitApprovalDecision = async (reqId, decision, remarks = "", appr
 
 export const fetchProcurementRequests = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/purchase-requests?status=APPROVED`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.content) {
-        return data.data.content;
-      }
-    }
+    const page = await apiGet("/api/purchase-requests?page=0&size=100&sort=createdAt&direction=desc");
+    // A PR remains UNDER_REVIEW while later approval/assignment stages run.
+    // Procurement must receive it as soon as it is routed to procurement,
+    // rather than waiting for the entire approval chain to become APPROVED.
+    return (page?.content || [])
+      .filter((r) => !["DRAFT", "CANCELLED", "REJECTED", "COMPLETED"].includes(String(r.status || "").toUpperCase()))
+      .map(normalizeProcurementRequest);
   } catch (err) {
     // Failover
   }
@@ -375,12 +375,37 @@ export const fetchProcurementRequests = async () => {
   return all.filter((r) => r.status === "approved" || r.currentStep >= 3);
 };
 
+const normalizeProcurementRequest = (req) => {
+  const status = String(req.status || "").toUpperCase();
+  const isApproved = ["APPROVED", "RFQ_CREATED"].includes(status);
+  const priority = req.priority || "MEDIUM";
+  return {
+    ...req,
+    id: req.id,
+    requestNumber: req.requestNumber || `PR-${req.id}`,
+    requester: req.requesterName || req.requester || "Requester",
+    dept: req.departmentName || req.dept || "Department",
+    product: req.purpose || req.requestNumber || "Purchase request",
+    category: req.categoryName || req.category || "General Procurement",
+    targetCost: req.estimatedAmount != null ? `₹${Number(req.estimatedAmount).toLocaleString("en-IN")}` : (req.targetCost || "₹0"),
+    cost: req.estimatedAmount || req.cost || 0,
+    priority,
+    managerApprovedBy: req.approvalStatus === "APPROVED" ? "Approval flow completed" : "Pending approval flow",
+    currentStep: status === "RFQ_CREATED" ? 4 : isApproved ? 3 : 2,
+    rfqCode: status === "RFQ_CREATED" ? (req.rfqCode || "RFQ created") : req.rfqCode,
+  };
+};
+
 export const submitProcurementExecutiveReview = async (reqId, decision, selectedVendor = "", targetCost = "", notes = "") => {
   try {
-    const statusEnum = decision === "approved" ? "APPROVED" : "REJECTED";
-    await fetch(`${API_BASE_URL}/workflows/request/${reqId}/advance?status=${statusEnum}`, {
-      method: "POST"
-    });
+    const tasks = await apiGet("/api/workflow/my-tasks?status=ASSIGNED&size=100");
+    const task = (tasks?.content || []).find((t) => t.entityType === "PR" && Number(t.entityId) === Number(reqId));
+    if (task) {
+      await apiPost(`/api/workflow/tasks/${task.id}/complete`, {
+        action: decision === "approved" ? "PROCESS" : "REJECT",
+        comment: notes || null,
+      });
+    }
   } catch (err) {
     // Failover
   }
@@ -391,7 +416,7 @@ export const submitProcurementExecutiveReview = async (reqId, decision, selected
       const isApproved = decision === "approved";
       return {
         ...r,
-        status: isApproved ? "approved" : "rejected",
+        status: isApproved ? "rfq_created" : "rejected",
         currentStep: isApproved ? 4 : 2,
         vendor: selectedVendor || r.vendor,
         cost: targetCost || r.cost,

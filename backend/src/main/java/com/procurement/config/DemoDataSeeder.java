@@ -67,10 +67,10 @@ public class DemoDataSeeder {
             CostCenterRepository costCenterRepository
     ) {
         return args -> {
-            if (productRepository.count() > 0 && vendorRepository.count() > 0) {
-                log.info("Demo master data already present, skipping.");
-                return;
-            }
+            // Keep this initializer idempotent, but do not skip the inventory
+            // reconciliation when products already exist. Older installations
+            // may have products without the baseline stock rows used by the
+            // monitoring dashboards.
 
             // ============ UOMs ============
             UnitOfMeasure pcs = uom("PCS", "Pieces", "Individual units", uomRepository);
@@ -184,6 +184,11 @@ public class DemoDataSeeder {
             inventory(bengaluruRegional, "PRD-LAP-001", 9, 2, 0, 5, 50, 10, new BigDecimal("149000"), inventoryRepository, productRepository);
             inventory(bengaluruRegional, "PRD-M365", 40, 5, 0, 10, 200, 25, new BigDecimal("17500"), inventoryRepository, productRepository);
             inventory(bengaluruRegional, "PRD-DESK-1", 2, 0, 0, 5, 40, 8, new BigDecimal("26500"), inventoryRepository, productRepository);
+            // Facilities and software stock/service capacity so category
+            // monitoring shows both available and low-stock states.
+            inventory(mumbaiCentral, "PRD-AC-AMC", 6, 0, 0, 2, 20, 4, new BigDecimal("12000"), inventoryRepository, productRepository);
+            inventory(mumbaiCentral, "PRD-CLEAN", 1, 0, 0, 1, 12, 3, new BigDecimal("18500"), inventoryRepository, productRepository);
+            inventory(bengaluruRegional, "PRD-CLEAN", 0, 0, 0, 1, 12, 3, new BigDecimal("18500"), inventoryRepository, productRepository);
 
             log.info("Transaction sample seeding disabled; PR/RFQ/PO records are created only by user workflow actions.");
 

@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   Bell,
   HelpCircle,
+  Inbox,
 } from "lucide-react";
 
 import ManagerOverview from "./modules/ManagerOverview";
@@ -35,6 +36,10 @@ import ManagerProfile from "./modules/ManagerProfile";
 import ManagerInvoices from "./modules/ManagerInvoices";
 import NotificationsModule from "../employee/modules/NotificationsModule";
 import SupportModule from "../employee/modules/SupportModule";
+import RfqManagement from "../proc_exec/modules/RfqManagement";
+import VendorQuotations from "../proc_exec/modules/VendorQuotations";
+import PurchaseOrders from "../proc_exec/modules/PurchaseOrders";
+import MyApprovals from "../shared_ui/MyApprovals";
 
 const ProcManagerDashboard = () => {
   const navigate = useNavigate();
@@ -48,6 +53,10 @@ const ProcManagerDashboard = () => {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "procurement-overview", label: "Procurement Overview", icon: Layers },
     { id: "procurement-requests", label: "Procurement Requests", icon: FileText },
+    { id: "my-approvals", label: "My Approvals & Tasks", icon: Inbox },
+    { id: "rfq-management", label: "RFQ Management", icon: FileText },
+    { id: "vendor-quotations", label: "Vendor Quotations", icon: FileText },
+    { id: "purchase-orders", label: "Purchase Orders", icon: FileText },
     { id: "po-approvals", label: "PO Approvals", icon: ShieldCheck },
     { id: "vendor-invoices", label: "Vendor Invoices", icon: AlertTriangle },
     { id: "vendor-management", label: "Vendor Management", icon: Users },
@@ -73,6 +82,14 @@ const ProcManagerDashboard = () => {
         return <ProcurementOverview />;
       case "procurement-requests":
         return <ProcurementRequests />;
+      case "my-approvals":
+        return <MyApprovals />;
+      case "rfq-management":
+        return <RfqManagement />;
+      case "vendor-quotations":
+        return <VendorQuotations />;
+      case "purchase-orders":
+        return <PurchaseOrders />;
       case "po-approvals":
         return <PoApprovals />;
       case "vendor-invoices":

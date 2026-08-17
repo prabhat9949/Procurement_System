@@ -10,6 +10,7 @@ import com.procurement.audit.repository.AuditCaseRepository;
 import com.procurement.common.exception.ForbiddenException;
 import com.procurement.common.exception.ResourceNotFoundException;
 import com.procurement.employee.entity.Employee;
+import com.procurement.fulfilment.entity.InternalFulfilmentStatus;
 import com.procurement.goodsreceipt.repository.GoodsReceiptNoteRepository;
 import com.procurement.procurement.timeline.dto.TimelineEvent;
 import com.procurement.procurement.timeline.dto.TimelineResponse;
@@ -18,6 +19,7 @@ import com.procurement.purchaseorder.entity.PurchaseOrderHistory;
 import com.procurement.purchaseorder.repository.PurchaseOrderHistoryRepository;
 import com.procurement.purchaseorder.repository.PurchaseOrderRepository;
 import com.procurement.purchaserequest.entity.PurchaseRequest;
+import com.procurement.purchaserequest.entity.PurchaseRequestStatus;
 import com.procurement.purchaserequest.repository.PurchaseRequestRepository;
 import com.procurement.rfq.repository.RfqRepository;
 import com.procurement.user.entity.User;
@@ -52,6 +54,10 @@ public class ProcurementTimelineService {
     private final GoodsReceiptNoteRepository grns;
     private final AuditCaseRepository auditCases;
     private final UserRepository users;
+    private final com.procurement.fulfilment.repository.InternalFulfilmentRepository internalFulfilments;
+    private final com.procurement.inventory.repository.InventoryTransactionRepository inventoryTransactions;
+    private final com.procurement.invoice.repository.InvoiceRepository invoices;
+    private final com.procurement.payment.repository.PaymentRepository payments;
 
     public ProcurementTimelineService(PurchaseRequestRepository requests,
                                       ApprovalHistoryRepository approvalHistories,
@@ -62,7 +68,11 @@ public class ProcurementTimelineService {
                                       PurchaseOrderHistoryRepository poHistories,
                                       GoodsReceiptNoteRepository grns,
                                       AuditCaseRepository auditCases,
-                                      UserRepository users) {
+                                      UserRepository users,
+                                      com.procurement.fulfilment.repository.InternalFulfilmentRepository internalFulfilments,
+                                      com.procurement.inventory.repository.InventoryTransactionRepository inventoryTransactions,
+                                      com.procurement.invoice.repository.InvoiceRepository invoices,
+                                      com.procurement.payment.repository.PaymentRepository payments) {
         this.requests = requests;
         this.approvalHistories = approvalHistories;
         this.approvalTasks = approvalTasks;
@@ -73,6 +83,10 @@ public class ProcurementTimelineService {
         this.grns = grns;
         this.auditCases = auditCases;
         this.users = users;
+        this.internalFulfilments = internalFulfilments;
+        this.inventoryTransactions = inventoryTransactions;
+        this.invoices = invoices;
+        this.payments = payments;
     }
 
     private String username() {
@@ -191,6 +205,81 @@ public class ProcurementTimelineService {
                                 grn.getReceivedBy(), "WAREHOUSE", grn.getGrnNumber(),
                                 grn.getStatus() == null ? null : grn.getStatus().name(),
                                 grn.getCreatedAt()))));
+
+        // 6.5 Internal fulfilment (stock allocated from internal warehouses)
+        internalFulfilments.findByPurchaseRequestIdOrderByCreatedAtAsc(prId).forEach(f -> {
+            events.add(new TimelineEvent(f.getId(), "INTERNAL_FULFILMENT", "INTERNAL_FULFILMENT",
+                    "Internal fulfilment initiated — " + f.getFulfilmentNumber(),
+                    (f.getProduct() == null ? "" : f.getProduct().getProductName())
+                            + (f.getRemarks() == null ? "" : " · " + f.getRemarks()),
+                    name(f.getAssignedBy()), roleOf(f.getAssignedBy()),
+                    f.getFulfilmentNumber(),
+                    f.getStatus() == null ? null : f.getStatus().name(),
+                    f.getAllocatedAt() != null ? f.getAllocatedAt() : f.getCreatedAt()));
+            if (f.getDispatchedAt() != null) {
+                events.add(new TimelineEvent(f.getId(), "INTERNAL_FULFILMENT_DISPATCHED", "INTERNAL_FULFILMENT",
+                        "Stock dispatched to requester — " + f.getFulfilmentNumber(),
+                        f.getProduct() == null ? "" : f.getProduct().getProductName()
+                                + " · Qty " + f.getAllocatedQuantity(),
+                        name(f.getAssignedBy()), roleOf(f.getAssignedBy()),
+                        f.getFulfilmentNumber(),
+                        InternalFulfilmentStatus.DISPATCHED.name(), f.getDispatchedAt()));
+            }
+            if (f.getCompletedAt() != null) {
+                events.add(new TimelineEvent(f.getId(), "INTERNAL_FULFILMENT_COMPLETED", "INTERNAL_FULFILMENT",
+                        "Internal fulfilment completed — " + f.getFulfilmentNumber(),
+                        f.getProduct() == null ? "" : f.getProduct().getProductName()
+                                + " · Delivered qty " + f.getDeliveredQuantity(),
+                        name(f.getAssignedBy()), roleOf(f.getAssignedBy()),
+                        f.getFulfilmentNumber(),
+                        InternalFulfilmentStatus.COMPLETED.name(), f.getCompletedAt()));
+            }
+        });
+
+        // 6.6 Inventory ledger movements caused by this request
+        inventoryTransactions.findByReferenceTypeAndReferenceIdOrderByCreatedAtAsc("PR", prId).forEach(tx -> {
+            String type = "INVENTORY_" + (tx.getTransactionType() == null ? "MOVEMENT" : tx.getTransactionType().name());
+            events.add(new TimelineEvent(tx.getId(), type, "INVENTORY",
+                    "Stock " + (tx.getTransactionType() == null ? "movement"
+                            : tx.getTransactionType().name().toLowerCase().replace('_', ' ')),
+                    (tx.getProduct() == null ? "" : tx.getProduct().getProductName())
+                            + " · Qty " + tx.getQuantityChanged()
+                            + (tx.getReason() == null ? "" : " · " + tx.getReason()),
+                    name(tx.getPerformedBy()), roleOf(tx.getPerformedBy()),
+                    tx.getTransactionNumber(),
+                    tx.getTransactionType() == null ? null : tx.getTransactionType().name(),
+                    tx.getCreatedAt()));
+        });
+
+        // 6.7 Invoices + payments against the PO(s) of this request
+        purchaseOrders.findByPurchaseRequestIdOrderByCreatedAtAsc(prId).forEach(po -> {
+            invoices.findByPurchaseOrderId(po.getId()).forEach(inv ->
+                    events.add(new TimelineEvent(inv.getId(), "INVOICE_CREATED", "FINANCE",
+                            "Invoice received — " + inv.getInvoiceNumber(),
+                            "Vendor: " + (inv.getVendor() == null ? "" : inv.getVendor().getVendorName())
+                                    + " · Amount " + inv.getGrandTotal(),
+                            inv.getCreatedBy(), "FINANCE", inv.getInvoiceNumber(),
+                            inv.getStatus() == null ? null : inv.getStatus().name(),
+                            inv.getCreatedAt())));
+            payments.findByPurchaseOrderId(po.getId()).forEach(p ->
+                    events.add(new TimelineEvent(p.getId(), "PAYMENT_" + (p.getStatus() == null ? "" : p.getStatus().name()),
+                            "FINANCE", "Payment " + (p.getStatus() == null ? "" : p.getStatus().name().toLowerCase().replace('_', ' '))
+                                    + " — " + p.getPaymentNumber(),
+                            "Amount " + p.getNetAmount()
+                                    + (p.getPaymentReference() == null ? "" : " · " + p.getPaymentReference()),
+                            p.getUpdatedBy(), "FINANCE", p.getPaymentNumber(),
+                            p.getStatus() == null ? null : p.getStatus().name(),
+                            p.getUpdatedAt() != null ? p.getUpdatedAt() : p.getCreatedAt())));
+        });
+
+        // 6.8 Request completed
+        if (pr.getStatus() == PurchaseRequestStatus.COMPLETED) {
+            events.add(new TimelineEvent(pr.getId(), "PR_COMPLETED", "REQUEST",
+                    "Request completed", "The full procurement cycle for this request has been completed",
+                    name(pr.getRequester()), roleOf(pr.getRequester()),
+                    pr.getRequestNumber(), pr.getStatus().name(),
+                    pr.getUpdatedAt() != null ? pr.getUpdatedAt() : pr.getCreatedAt()));
+        }
 
         // 7. Audit cases
         auditCases.findByPurchaseRequestId(prId).forEach(c -> {

@@ -93,6 +93,10 @@ const RealReportsView = ({
 
   useEffect(() => {
     loadData();
+    // Monitoring and global reports stay aligned with live transactions while
+    // the dashboard is open (approval, vendor, finance and inventory changes).
+    const refresh = window.setInterval(loadData, 30000);
+    return () => window.clearInterval(refresh);
   }, [loadData]);
 
   const kpiList = useMemo(() => {

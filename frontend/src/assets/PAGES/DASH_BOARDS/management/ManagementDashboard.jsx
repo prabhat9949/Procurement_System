@@ -59,10 +59,6 @@ const ROLE_META = {
   },
 };
 
-const canApprove = hasPermission("CAN_APPROVE_PR");
-const canReject = hasPermission("CAN_REJECT_PR");
-const canReturn = hasPermission("CAN_RETURN_PR");
-
 const STATUS_STYLE = {
   PENDING: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
   APPROVED: { bg: "rgba(5,150,105,.12)", color: "#059669" },
@@ -87,6 +83,11 @@ const statusBadge = (status) => {
 };
 
 const ManagementDashboard = ({ role = "senior_manager" }) => {
+  // Resolve permissions during render so newly assigned senior-manager/head
+  // permissions are reflected without a stale module-level snapshot.
+  const canApprove = hasPermission("CAN_APPROVE_PR");
+  const canReject = hasPermission("CAN_REJECT_PR");
+  const canReturn = hasPermission("CAN_RETURN_PR");
   const meta = ROLE_META[role] || ROLE_META.senior_manager;
   const Icon = meta.icon;
 

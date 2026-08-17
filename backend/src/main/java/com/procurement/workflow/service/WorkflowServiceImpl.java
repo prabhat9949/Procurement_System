@@ -52,6 +52,7 @@ public class WorkflowServiceImpl implements WorkflowService {
     private final CategoryRepository categories;
     private final AuditLogService auditLogService;
     private final BusinessEventPublisher eventPublisher;
+    private final TaskRoutingService taskRouting;
 
     public WorkflowServiceImpl(WorkflowAssignmentRepository assignments,
                                EmployeeRepository employees,
@@ -61,7 +62,8 @@ public class WorkflowServiceImpl implements WorkflowService {
                                PurchaseRequestLineRepository lines,
                                CategoryRepository categories,
                                AuditLogService auditLogService,
-                               BusinessEventPublisher eventPublisher) {
+                               BusinessEventPublisher eventPublisher,
+                               TaskRoutingService taskRouting) {
         this.assignments = assignments;
         this.employees = employees;
         this.roles = roles;
@@ -71,6 +73,7 @@ public class WorkflowServiceImpl implements WorkflowService {
         this.categories = categories;
         this.auditLogService = auditLogService;
         this.eventPublisher = eventPublisher;
+        this.taskRouting = taskRouting;
     }
 
     // ------------------------------------------------------------------
@@ -408,7 +411,9 @@ public class WorkflowServiceImpl implements WorkflowService {
         String teamRole = resolveTeamRole(pr);
         var role = roles.findByRoleCode(teamRole)
                 .orElseThrow(() -> new ConflictException("Routing role not configured: " + teamRole));
-        return employees.findFirstByRoleIdAndActiveTrue(role.getId())
+        // Round-robin across every active officer in the flow, keyed by the PR:
+        // with four officers a request lands on any of the four, with five on any of the five.
+        return taskRouting.pickActiveByRole(role.getId(), pr.getId())
                 .orElseThrow(() -> new ConflictException("No active employee found for routing role: " + teamRole));
     }
 
@@ -435,10 +440,11 @@ public class WorkflowServiceImpl implements WorkflowService {
     public WorkflowAssignmentResponse assignToTeam(PurchaseRequest pr, String reason) {
         // Final approval always enters the Procurement Manager's scoped queue.
         // The manager must explicitly assign the category-specific officer/team;
-        // never bypass that ownership boundary by selecting the first officer.
+        // the manager themselves is chosen round-robin among every active
+        // procurement manager so no single person owns the whole queue.
         var managerRole = roles.findByRoleCode("PROCUREMENT_MANAGER")
                 .orElseThrow(() -> new ConflictException("Procurement Manager role is not configured"));
-        var officer = employees.findFirstByRoleIdAndActiveTrue(managerRole.getId())
+        var officer = taskRouting.pickActiveByRole(managerRole.getId(), pr.getId())
                 .orElseThrow(() -> new ConflictException("No active Procurement Manager is configured"));
         String stage = "PROCUREMENT_MANAGER";
         // Idempotent: if this PR already has an active team assignment, keep it.

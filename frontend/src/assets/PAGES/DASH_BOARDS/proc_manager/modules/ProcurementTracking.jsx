@@ -54,6 +54,16 @@ const stageLabel = (s) =>
     COMPLETED: "Completed",
   }[s] || s);
 
+// Timeline event colouring — approval/success, rejection, return and neutral states.
+const eventColor = (type = "") => {
+  const t = String(type || "").toUpperCase();
+  if (t.includes("REJECTED")) return "#dc2626";
+  if (t.includes("RETURNED")) return "#d97706";
+  if (t.includes("CANCELLED")) return "#64748b";
+  if (t.includes("APPROVED") || t.includes("COMPLETED") || t.includes("CREATED") || t.includes("SUBMITTED") || t.includes("CONCLUDED")) return "#059669";
+  return "#2563eb";
+};
+
 const ProcurementTracking = () => {
   const [prs, setPrs] = useState([]);
   const [selectedReqId, setSelectedReqId] = useState("");

@@ -1,0 +1,26 @@
+
+> my-frontend-app@0.0.0 dev
+> vite --host 0.0.0.0
+
+
+  [32m[1mVITE[22m v8.1.5[39m  [2mready in [0m[1m1230[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.35:[1m5173[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.30.16.1:[1m5173[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m2:15:33 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/org_admin/OrgAdminDashboard.jsx[22m
+[2m2:15:33 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/DeptManagerDashboard.jsx[22m
+[2m2:15:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/hr/HrDashboard.jsx[22m
+[2m2:16:01 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/hr/HrDashboard.jsx[22m
+[2m2:16:30 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/DeptManagerDashboard.jsx[22m
+[2m2:16:33 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/DeptManagerDashboard.jsx[22m
+[2m2:35:24 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/hr/HrDashboard.jsx[22m
+[2m2:50:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/modules/TrackForms.jsx[22m
+[2m2:50:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/modules/TrackForms.jsx[22m Could not Fast Refresh ("mockApprovedWorkflows" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m2:50:34 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/DeptManagerDashboard.jsx[22m
+[2m2:50:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/proc_exec/modules/PurchaseRequests.jsx, /src/assets/PAGES/DASH_BOARDS/dept_manager/modules/ManagerUserApprovals.jsx, /src/assets/PAGES/DASH_BOARDS/dept_manager/modules/BudgetAnalytics.jsx, /src/assets/PAGES/DASH_BOARDS/dept_manager/modules/TrackForms.jsx, /src/assets/PAGES/DASH_BOARDS/dept_manager/modules/DeptDocuments.jsx, /src/assets/PAGES/DASH_BOARDS/proc_exec/modules/CreateRfqWizardModal.jsx[22m
+[2m2:50:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [33mhmr invalidate [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/modules/TrackForms.jsx[22m Could not Fast Refresh ("mockApprovedWorkflows" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m2:50:53 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/dept_manager/DeptManagerDashboard.jsx[22m
+[2m2:51:06 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/employee/modules/CreateRequest.jsx[22m
+[2m2:52:45 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mhmr update [39m[2m/src/assets/PAGES/DASH_BOARDS/proc_manager/ProcManagerDashboard.jsx[22m

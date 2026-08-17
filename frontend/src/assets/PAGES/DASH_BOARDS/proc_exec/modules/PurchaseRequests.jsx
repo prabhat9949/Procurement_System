@@ -45,7 +45,8 @@ const PurchaseRequests = ({ onNavigate }) => {
 
   const filtered = reqs.filter((req) => {
     const matchesSearch =
-      (req.id && req.id.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (req.requestNumber && req.requestNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (req.id && String(req.id).toLowerCase().includes(searchTerm.toLowerCase())) ||
       (req.product && req.product.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (req.requester && req.requester.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesPriority =
@@ -177,7 +178,7 @@ const PurchaseRequests = ({ onNavigate }) => {
             <tbody>
               {filtered.map((req) => (
                 <tr key={req.id}>
-                  <td style={{ fontWeight: "700", color: "#d97706" }}>{req.id}</td>
+                  <td style={{ fontWeight: "700", color: "#d97706" }}>{req.requestNumber || req.id}</td>
                   <td>
                     <div style={{ display: "flex", flexDirection: "column" }}>
                       <span style={{ fontWeight: "700", color: "#111111" }}>{req.requester}</span>
@@ -190,8 +191,8 @@ const PurchaseRequests = ({ onNavigate }) => {
                   <td style={{ fontWeight: "600", color: "#111111" }}>{req.product}</td>
                   <td style={{ fontWeight: "800", color: "#111111" }}>{req.targetCost}</td>
                   <td>
-                    <span className={`emp-priority ${req.priority.toLowerCase()}`}>
-                      {req.priority}
+                    <span className={`emp-priority ${String(req.priority || "MEDIUM").toLowerCase()}`}>
+                      {req.priority || "MEDIUM"}
                     </span>
                   </td>
                   <td>

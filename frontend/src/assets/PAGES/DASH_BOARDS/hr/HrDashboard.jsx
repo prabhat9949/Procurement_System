@@ -1363,13 +1363,20 @@ function StructureView() {
 
   useEffect(() => {
     let mounted = true;
-    setLoading(true);
-    apiGet("/api/employees?page=0&size=1000&sort=firstName&direction=asc")
-      .then((page) => mounted && setEmployees(page?.content || []))
-      .catch((err) => mounted && setError(err.message || "Failed to load employees."))
-      .finally(() => mounted && setLoading(false));
+    const loadEmployees = () => {
+      setLoading(true);
+      apiGet("/api/employees?page=0&size=1000&sort=firstName&direction=asc")
+        .then((page) => mounted && setEmployees(page?.content || []))
+        .catch((err) => mounted && setError(err.message || "Failed to load employees."))
+        .finally(() => mounted && setLoading(false));
+    };
+    loadEmployees();
+    // Role and reporting-manager edits made by Admin are reflected without
+    // requiring HR to leave and reopen the structure view.
+    const refresh = window.setInterval(loadEmployees, 15000);
     return () => {
       mounted = false;
+      window.clearInterval(refresh);
     };
   }, []);
 
@@ -1399,6 +1406,16 @@ function StructureView() {
   if (error) return <ErrorBox message={error} />;
   if (!tree.length) return <section style={{ background: "#fff", borderRadius: 12, padding: 40, marginTop: 20, border: "1px solid #e7ebf0" }}><EmptyState text="No employees available to build the reporting structure." /></section>;
 
+  // Flatten the hierarchy into explicit levels. A level-based chart is much
+  // easier to scan than a deeply indented tree when there are many reports.
+  const levels = [];
+  const queue = tree.map((node) => ({ node, depth: 0 }));
+  while (queue.length) {
+    const { node, depth } = queue.shift();
+    (levels[depth] ||= []).push(node);
+    node.children.forEach((child) => queue.push({ node: child, depth: depth + 1 }));
+  }
+
   const renderNode = (node, depth) => (
     <div key={node.id} style={{ marginLeft: depth === 0 ? 0 : 26, position: "relative" }}>
       {depth > 0 && <div style={{ position: "absolute", left: -16, top: 0, bottom: "50%", width: 12, borderLeft: "1.5px solid #d8dee7", borderBottom: "1.5px solid #d8dee7", borderBottomLeftRadius: 6 }} />}
@@ -1426,7 +1443,29 @@ function StructureView() {
       <p style={{ color: "#68778a", fontSize: 13, margin: "0 0 18px" }}>
         Built from real manager relationships. Update an employee's manager to see the hierarchy change instantly.
       </p>
-      {tree.map((node) => renderNode(node, 0))}
+      <div style={{ overflowX: "auto", padding: "8px 4px 18px" }}>
+        {levels.map((level, depth) => (
+          <div key={depth} style={{ position: "relative", minWidth: Math.max(720, level.length * 285), marginBottom: depth < levels.length - 1 ? 30 : 0 }}>
+            {depth < levels.length - 1 && <div style={{ position: "absolute", left: 0, right: 0, bottom: -16, borderBottom: "2px solid #dbe3ee" }} />}
+            <div style={{ textAlign: "center", color: "#7a8999", fontSize: 11, fontWeight: 800, letterSpacing: ".08em", textTransform: "uppercase", marginBottom: 9 }}>
+              {depth === 0 ? "Leadership / Root" : `Reporting Level ${depth + 1}`}
+            </div>
+            <div style={{ display: "flex", justifyContent: "center", gap: 18, flexWrap: "nowrap" }}>
+              {level.map((node) => (
+                <div key={node.id} style={{ width: 245, flex: "0 0 245px", background: depth === 0 ? "#0f1b2d" : "#fff", color: depth === 0 ? "#fff" : "#111", border: `1px solid ${depth === 0 ? "#0f1b2d" : "#dbe3ee"}`, borderTop: `4px solid ${depth === 0 ? ACCENT : "#2563eb"}`, borderRadius: 12, padding: "13px 14px", boxShadow: "0 4px 14px rgba(15,27,45,.08)", textAlign: "left" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <div style={{ width: 38, height: 38, borderRadius: "50%", background: depth === 0 ? ACCENT : "#eff6ff", color: depth === 0 ? "#0f1b2d" : "#2563eb", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{initials(fullName(node))}</div>
+                    <div style={{ minWidth: 0 }}><div style={{ fontWeight: 800, fontSize: 13.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{fullName(node)}</div><div style={{ fontSize: 11.5, color: depth === 0 ? "#b7c4d6" : "#526276", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{node.roleName || "Employee"}</div></div>
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 11.5, color: depth === 0 ? "#b7c4d6" : "#68778a" }}>{node.departmentName || "No department"}</div>
+                  <div style={{ marginTop: 5, fontSize: 11.5, color: depth === 0 ? "#d7e0ec" : "#475569" }}>Reports to: {node.managerName || "Top level"}</div>
+                  <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: depth === 0 ? ACCENT : "#2563eb" }}>{node.children.length} direct report{node.children.length === 1 ? "" : "s"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
