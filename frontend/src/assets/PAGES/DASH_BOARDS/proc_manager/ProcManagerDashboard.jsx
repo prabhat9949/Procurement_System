@@ -21,11 +21,14 @@ import {
   Bell,
   HelpCircle,
   Inbox,
+  PackageCheck,
+  Send,
 } from "lucide-react";
 
 import ManagerOverview from "./modules/ManagerOverview";
 import ProcurementOverview from "./modules/ProcurementOverview";
-import ProcurementRequests from "./modules/ProcurementRequests";
+import InternalFulfilment from "./modules/InternalFulfilment";
+import ExternalProcurement from "./modules/ExternalProcurement";
 import PoApprovals from "./modules/PoApprovals";
 import VendorManagement from "./modules/VendorManagement";
 import ProcurementOperations from "./modules/ProcurementOperations";
@@ -52,7 +55,8 @@ const ProcManagerDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "procurement-overview", label: "Procurement Overview", icon: Layers },
-    { id: "procurement-requests", label: "Procurement Requests", icon: FileText },
+    { id: "internal-fulfilment", label: "Internal Fulfilment", icon: PackageCheck },
+    { id: "external-procurement", label: "External Procurement", icon: Send },
     { id: "my-approvals", label: "My Approvals & Tasks", icon: Inbox },
     { id: "rfq-management", label: "RFQ Management", icon: FileText },
     { id: "vendor-quotations", label: "Vendor Quotations", icon: FileText },
@@ -80,8 +84,10 @@ const ProcManagerDashboard = () => {
         return <ManagerOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "procurement-overview":
         return <ProcurementOverview />;
-      case "procurement-requests":
-        return <ProcurementRequests />;
+      case "internal-fulfilment":
+        return <InternalFulfilment />;
+      case "external-procurement":
+        return <ExternalProcurement onNavigate={(tab) => setActiveTab(tab)} />;
       case "my-approvals":
         return <MyApprovals />;
       case "rfq-management":

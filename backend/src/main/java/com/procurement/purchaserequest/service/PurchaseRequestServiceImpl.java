@@ -149,6 +149,37 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResponse<PurchaseRequestResponse> procurementQueue(Pageable pageable) {
+        var statuses = java.util.List.of(
+                PurchaseRequestStatus.APPROVED,
+                PurchaseRequestStatus.INTERNAL_AVAILABILITY_CHECK,
+                PurchaseRequestStatus.INTERNALLY_FULFILLABLE,
+                PurchaseRequestStatus.INTERNAL_FULFILMENT_IN_PROGRESS,
+                PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING,
+                PurchaseRequestStatus.EXTERNAL_PROCUREMENT_REQUIRED,
+                PurchaseRequestStatus.RFQ_CREATED
+        );
+        org.springframework.data.jpa.domain.Specification<PurchaseRequest> spec =
+                (root, query, cb) -> root.get("status").in(statuses);
+
+        String role = currentRoleCode();
+        List<Long> teamCatIds = getSpecializedTeamCategoryIds(role);
+        if (!teamCatIds.isEmpty()) {
+            var teamCatSpec = PurchaseRequestSpecification.categoryIn(teamCatIds);
+            if (teamCatSpec != null) spec = spec.and(teamCatSpec);
+        } else {
+            var categorySpec = PurchaseRequestSpecification.categoryIn(procurementScopeService.myCategoryIds());
+            if (categorySpec != null) spec = spec.and(categorySpec);
+        }
+
+        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(spec, pageable)
+                .map(purchaseRequestMapper::toResponse);
+        return new PageResponse<>(page.getContent(), page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages(), page.isLast());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PurchaseRequestResponse getById(Long id) {
         PurchaseRequest entity = findRequest(id);
         checkSpecializedDomainAccess(entity);

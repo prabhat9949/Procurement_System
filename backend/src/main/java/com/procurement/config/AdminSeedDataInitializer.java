@@ -111,12 +111,15 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_VENDORS", "CAN_VIEW_PO", "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT",
                     "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
-            // Warehouse: GRN, inventory and stock operations.
+            // Warehouse: GRN, inventory, stock operations and catalogue management
+            // (the consolidated inventory dashboard adds products to the catalogue
+            // that employees can then request).
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("WAREHOUSE_MANAGER"),
                     "CAN_CREATE_GRN", "CAN_VERIFY_GRN", "CAN_VIEW_INVENTORY", "CAN_UPDATE_INVENTORY",
                     "CAN_VIEW_PO", "CAN_VIEW_WAREHOUSES", "CAN_MANAGE_WAREHOUSES",
-                    "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_PRODUCTS", "CAN_MANAGE_PRODUCTS", "CAN_VIEW_CATEGORIES",
+                    "CAN_MANAGE_CATEGORIES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
 
             // Department Manager / Senior Manager / Head: PR approval workflow.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
@@ -167,6 +170,17 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_AUDIT_CASES", "CAN_VIEW_AUDIT_TEAM_QUEUE", "CAN_CREATE_AUDIT_CASE",
                     "CAN_CREATE_AUDIT_FINDING", "CAN_CLOSE_FINDING", "CAN_CONCLUDE_AUDIT",
                     "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
+
+            // Support Team: user assistance, system/workflow issue reporting and
+            // read-only monitoring. Support never approves PRs, creates POs, selects
+            // vendors or edits inventory unless separately granted by an admin.
+            assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
+                    List.of("SUPPORT_TEAM"),
+                    "CAN_VIEW_USERS", "CAN_VIEW_EMPLOYEES", "CAN_VIEW_DEPARTMENTS",
+                    "CAN_VIEW_ACTIVE_PRS", "CAN_VIEW_ALL_EMPLOYEE_PR",
+                    "CAN_VIEW_PR_TIMELINE", "CAN_VIEW_APPROVAL_HISTORY",
+                    "CAN_VIEW_RULES", "CAN_VIEW_AUDIT_LOGS", "CAN_VIEW_SYSTEM_MONITORING",
+                    "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS", "CAN_MARK_NOTIFICATION_READ");
 
             // Vendor: own RFQs, quotations, POs, shipments and invoices.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,

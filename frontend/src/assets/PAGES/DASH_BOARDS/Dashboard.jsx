@@ -23,19 +23,24 @@ const ROLE_MAP = {
   SUPER_ADMIN: "super_admin",
   ADMIN: "org_admin",
   HR_MANAGER: "hr_manager",
+  EMPLOYEE: "employee",
+  DEPARTMENT_MANAGER: "dept_manager",
+  // HEAD is not a separate operational role: it maps to the Senior Manager
+  // workflow (its authorization still applies to high-value approval rules).
+  SENIOR_MANAGER: "senior_manager",
+  HEAD: "senior_manager",
   PROCUREMENT_MANAGER: "proc_manager",
   PROCUREMENT_OFFICER: "proc_executive",
-  FINANCE_MANAGER: "finance_manager",
-  WAREHOUSE_MANAGER: "inventory_manager",
-  DEPARTMENT_MANAGER: "dept_manager",
-  SENIOR_MANAGER: "senior_manager",
-  HEAD: "head",
-  EQUIPMENT_ASSET_TEAM: "equipment",
-  IT_SOFTWARE_TEAM: "software",
-  FACILITIES_TEAM: "facilities",
-  EMPLOYEE: "employee",
   VENDOR: "vendor",
+  // Equipment / Software / Facilities / Warehouse all route to the single
+  // consolidated Inventory dashboard (no separate operational dashboards).
+  WAREHOUSE_MANAGER: "inventory_manager",
+  EQUIPMENT_ASSET_TEAM: "inventory_manager",
+  IT_SOFTWARE_TEAM: "inventory_manager",
+  FACILITIES_TEAM: "inventory_manager",
+  FINANCE_MANAGER: "finance_manager",
   AUDITOR: "auditor",
+  SUPPORT_TEAM: "support_team",
 };
 
 const Dashboard = () => {
@@ -137,14 +142,6 @@ const Dashboard = () => {
         return <SupportDashboard />;
       case "senior_manager":
         return <ManagementDashboard role="senior_manager" />;
-      case "head":
-        return <ManagementDashboard role="head" />;
-      case "equipment":
-        return <FulfilmentDashboard team="equipment" />;
-      case "software":
-        return <FulfilmentDashboard team="software" />;
-      case "facilities":
-        return <FulfilmentDashboard team="facilities" />;
       default:
         return <EmployeeDashboard />;
     }

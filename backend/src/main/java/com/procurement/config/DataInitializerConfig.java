@@ -46,6 +46,7 @@ public class DataInitializerConfig {
     private static final String ROLE_IT_SOFTWARE_TEAM = "IT_SOFTWARE_TEAM";
     private static final String ROLE_FACILITIES_TEAM = "FACILITIES_TEAM";
     private static final String ROLE_AUDITOR = "AUDITOR";
+    private static final String ROLE_SUPPORT_TEAM = "SUPPORT_TEAM";
 
     // ===== Development Login Matrix (simple role-based usernames) =====
     private static final String DEFAULT_ADMIN_USERNAME = "admin@123";
@@ -77,6 +78,7 @@ public class DataInitializerConfig {
     private static final String USER_FINANCE = "finance@123";
     private static final String USER_FINANCE2 = "finance2@123";
     private static final String USER_AUDITOR = "auditor@123";
+    private static final String USER_SUPPORT = "support@123";
     private static final String USER_VENDOR = "vendor@123";
 
     private static final String PASSWORD_HR = "Hr@123";
@@ -104,6 +106,7 @@ public class DataInitializerConfig {
     private static final String PASSWORD_FINANCE = "Finance@123";
     private static final String PASSWORD_FINANCE2 = "Finance2@123";
     private static final String PASSWORD_AUDITOR = "Auditor@123";
+    private static final String PASSWORD_SUPPORT = "Support@123";
     private static final String PASSWORD_VENDOR = "Vendor@123";
 
     // Legacy usernames that should be renamed to the new matrix (keeps existing employees).
@@ -180,6 +183,9 @@ public class DataInitializerConfig {
             Role auditorRole = createRoleIfNotExists(
                     roleRepository, ROLE_AUDITOR, "Auditor",
                     "Read-only audit and compliance review");
+            Role supportTeamRole = createRoleIfNotExists(
+                    roleRepository, ROLE_SUPPORT_TEAM, "Support Team",
+                    "Handles support tickets, user issues, and system assistance");
 
             // ==========================
             // 2. Seed Departments
@@ -317,6 +323,11 @@ public class DataInitializerConfig {
                     employeeRepository, "EMP017", "Deepak", "Malhotra",
                     "deepak.malhotra@enterprise.com", "9876543227", adminDept, admCostCenter, auditorRole);
 
+            // 4.15a Support Team
+            Employee support = createEmployeeIfNotExists(
+                    employeeRepository, "EMP030", "Ravi", "Kulkarni",
+                    "ravi.kulkarni@enterprise.com", "9876543240", adminDept, admCostCenter, supportTeamRole);
+
             // 4.15b Additional employees for the multi-user demo matrix
             Employee employee3 = createEmployeeIfNotExists(
                     employeeRepository, "EMP018", "Rohan", "Singh",
@@ -443,6 +454,8 @@ public class DataInitializerConfig {
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_AUDITOR, PASSWORD_AUDITOR, null, auditor, auditorRole);
             createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
+                    USER_SUPPORT, PASSWORD_SUPPORT, null, support, supportTeamRole);
+            createMatrixAccount(userRepository, employeeRepository, passwordEncoder,
                     USER_VENDOR, PASSWORD_VENDOR, LEGACY_VENDOR, vendorEmployee, vendorRole);
 
             // ==========================
@@ -487,6 +500,7 @@ public class DataInitializerConfig {
             logMatrix(log, "Finance", USER_FINANCE, PASSWORD_FINANCE);
             logMatrix(log, "Finance 2", USER_FINANCE2, PASSWORD_FINANCE2);
             logMatrix(log, "Auditor", USER_AUDITOR, PASSWORD_AUDITOR);
+            logMatrix(log, "Support Team", USER_SUPPORT, PASSWORD_SUPPORT);
             logMatrix(log, "Vendor", USER_VENDOR, PASSWORD_VENDOR);
             log.info("====================================");
         };

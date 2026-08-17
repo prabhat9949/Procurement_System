@@ -48,7 +48,10 @@ const SuperRoleManagement = () => {
         apiGet("/api/roles?size=200"),
         apiGet("/api/permissions/all"),
       ]);
-      setRolesList(rolesPage?.content || []);
+      // Equipment / Software / Facilities are inventory categories now, not
+      // operational roles — hide those designations from Role Management.
+      const HIDDEN_ROLE_CODES = ["EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM"];
+      setRolesList((rolesPage?.content || []).filter((r) => !HIDDEN_ROLE_CODES.includes(r.roleCode)));
       setPermissions(perms || []);
     } catch (err) {
       setError(err.message || "Failed to load roles.");

@@ -19,19 +19,24 @@ const ROLE_MAP = {
   SUPER_ADMIN: "super_admin",
   ADMIN: "org_admin",
   HR_MANAGER: "hr_manager",
+  EMPLOYEE: "employee",
+  DEPARTMENT_MANAGER: "dept_manager",
+  // HEAD is not a separate operational role: it maps to the Senior Manager
+  // workflow (its authorization still applies to high-value approval rules).
+  SENIOR_MANAGER: "senior_manager",
+  HEAD: "senior_manager",
   PROCUREMENT_MANAGER: "proc_manager",
   PROCUREMENT_OFFICER: "proc_executive",
-  FINANCE_MANAGER: "finance_manager",
-  WAREHOUSE_MANAGER: "inventory_manager",
-  DEPARTMENT_MANAGER: "dept_manager",
-  SENIOR_MANAGER: "senior_manager",
-  HEAD: "head",
-  EQUIPMENT_ASSET_TEAM: "equipment",
-  IT_SOFTWARE_TEAM: "software",
-  FACILITIES_TEAM: "facilities",
-  EMPLOYEE: "employee",
   VENDOR: "vendor",
+  // Equipment / Software / Facilities / Warehouse all route to the single
+  // consolidated Inventory dashboard (no separate operational dashboards).
+  WAREHOUSE_MANAGER: "inventory_manager",
+  EQUIPMENT_ASSET_TEAM: "inventory_manager",
+  IT_SOFTWARE_TEAM: "inventory_manager",
+  FACILITIES_TEAM: "inventory_manager",
+  FINANCE_MANAGER: "finance_manager",
   AUDITOR: "auditor",
+  SUPPORT_TEAM: "support_team",
 };
 
 // Development-only helper so every role can be tested.
@@ -43,22 +48,20 @@ const FALLBACK_ACCOUNTS = [
   { role: "HR", username: "hr@123", password: "Hr@123" },
   { role: "Employee", username: "employee@123", password: "Employee@123" },
   { role: "Manager", username: "manager@123", password: "Manager@123" },
-  { role: "Senior Manager", username: "seniormanager@123", password: "Senior@123" },
+  { role: "Senior Manager", username: "seniormanager@123", password: "SeniorManager@123" },
   { role: "Head", username: "head@123", password: "Head@123" },
-  { role: "Procurement", username: "procurement@123", password: "Procurement@123" },
-  { role: "Equipment", username: "equipment@123", password: "Equipment@123" },
-  { role: "Software", username: "software@123", password: "Software@123" },
-  { role: "Facilities", username: "facilities@123", password: "Facilities@123" },
-  { role: "Warehouse", username: "warehouse@123", password: "Warehouse@123" },
+  { role: "Procurement Executive", username: "procurement@123", password: "Procurement@123" },
+  { role: "Warehouse / Inventory", username: "warehouse@123", password: "Warehouse@123" },
   { role: "Finance", username: "finance@123", password: "Finance@123" },
   { role: "Auditor", username: "auditor@123", password: "Auditor@123" },
+  { role: "Support Team", username: "support@123", password: "Support@123" },
   { role: "Vendor", username: "vendor@123", password: "Vendor@123" },
 ];
 
 const CATEGORY_ORDER = [
-  "ADMIN", "HR", "EMPLOYEES", "MANAGERS", "SENIOR MANAGERS", "HEAD",
-  "PROCUREMENT", "EQUIPMENT", "SOFTWARE", "FACILITIES", "WAREHOUSE",
-  "FINANCE", "AUDITOR", "VENDORS", "OTHER",
+  "ADMIN", "HR", "EMPLOYEES", "MANAGERS", "SENIOR MANAGERS",
+  "PROCUREMENT EXECUTIVE", "VENDORS", "WAREHOUSE / INVENTORY", "FINANCE", "AUDITOR",
+  "SUPPORT TEAM", "OTHER",
 ];
 
 const SHOW_DEMO_ACCOUNTS = import.meta.env.DEV;
@@ -91,11 +94,21 @@ const Loginout = () => {
         // Backend unavailable: fall back to the static matrix so the panel still works.
         if (!cancelled) {
           const fallback = {};
+          const fallbackCategory = (role) => {
+            const r = (role || "").toUpperCase();
+            if (r === "HR") return "HR";
+            if (r === "EMPLOYEE") return "EMPLOYEES";
+            if (r === "MANAGER") return "MANAGERS";
+            if (r === "SENIOR MANAGER") return "SENIOR MANAGERS";
+            if (r === "PROCUREMENT" || r === "PROCUREMENT EXECUTIVE") return "PROCUREMENT EXECUTIVE";
+            if (r === "WAREHOUSE / INVENTORY") return "WAREHOUSE / INVENTORY";
+            if (r === "VENDOR") return "VENDORS";
+            if (r === "SUPPORT TEAM" || r === "SUPPORT_TEAM") return "SUPPORT TEAM";
+            if (r === "ADMIN" || r === "SUPER_ADMIN") return "ADMIN";
+            return (r === "HEAD" ? "SENIOR MANAGERS" : r + "S");
+          };
           FALLBACK_ACCOUNTS.forEach((acc) => {
-            const cat = acc.role.toUpperCase() === "SENIOR MANAGER" ? "SENIOR MANAGERS"
-              : acc.role.toUpperCase() === "VENDOR" ? "VENDORS"
-              : acc.role.toUpperCase() + "S";
-            const key = cat === "EMPLOYEES" ? "EMPLOYEES" : cat;
+            const key = fallbackCategory(acc.role);
             (fallback[key] = fallback[key] || []).push({
               name: acc.role,
               username: acc.username,
