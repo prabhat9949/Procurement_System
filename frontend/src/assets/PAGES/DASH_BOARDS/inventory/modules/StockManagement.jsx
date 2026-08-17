@@ -8,8 +8,9 @@ import {
   IndianRupee,
   X,
   Eye,
+  Save,
 } from "lucide-react";
-import { apiGet } from "../../../../../services/apiClient";
+import { apiGet, apiPut } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 
 const StockManagement = () => {
@@ -19,6 +20,8 @@ const StockManagement = () => {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState(null);
+  const [edit, setEdit] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(async (status) => {
     setLoading(true);
@@ -55,6 +58,47 @@ const StockManagement = () => {
   };
 
   const inputStyle = { width: "100%", padding: "10px 12px", border: "1px solid #d7dce3", borderRadius: "9px", fontSize: "13.5px", background: "#fff", outline: "none" };
+
+  const openEdit = (item) => {
+    setEdit({
+      ...item,
+      availableQuantity: Number(item.availableQuantity || 0),
+      reservedQuantity: Number(item.reservedQuantity || 0),
+      damagedQuantity: Number(item.damagedQuantity || 0),
+      minimumStock: Number(item.minimumStock || 0),
+      maximumStock: Number(item.maximumStock || 0),
+      reorderLevel: Number(item.reorderLevel || 0),
+      averageUnitCost: Number(item.averageUnitCost || 0),
+      status: item.status || "ACTIVE",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!edit) return;
+    setSaving(true);
+    setError("");
+    try {
+      await apiPut(`/api/inventory/${edit.id}`, {
+        productId: edit.productId,
+        warehouseId: edit.warehouseId,
+        availableQuantity: Number(edit.availableQuantity || 0),
+        reservedQuantity: Number(edit.reservedQuantity || 0),
+        damagedQuantity: Number(edit.damagedQuantity || 0),
+        minimumStock: Number(edit.minimumStock || 0),
+        maximumStock: Number(edit.maximumStock || 0),
+        reorderLevel: Number(edit.reorderLevel || 0),
+        averageUnitCost: Number(edit.averageUnitCost || 0),
+        status: edit.status || "ACTIVE",
+      });
+      setEdit(null);
+      setSelected(null);
+      loadData(statusFilter);
+    } catch (err) {
+      setError(err.message || "Unable to update stock.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <div style={{ padding: "20px" }}>
@@ -147,6 +191,7 @@ const StockManagement = () => {
                     <td><span style={{ fontSize: "11px", fontWeight: "700", padding: "2px 8px", borderRadius: "12px", background: `${statusColor(i.status)}14`, color: statusColor(i.status) }}>{i.status}</span></td>
                     <td style={{ textAlign: "right" }}>
                       <button className="inv-btn-primary-sm" onClick={() => setSelected(i)}><Eye size={14} /> View</button>
+                      <button className="inv-btn-primary-sm" style={{ marginLeft: 6, background: "#2563eb" }} onClick={() => openEdit(i)}><Save size={14} /> Adjust</button>
                     </td>
                   </tr>
                 ))}
@@ -187,7 +232,54 @@ const StockManagement = () => {
               </div>
             )}
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
+              <button className="inv-btn-primary-sm" style={{ marginRight: 8, background: "#2563eb" }} onClick={() => openEdit(selected)}>Adjust Stock</button>
               <button className="inv-btn-primary-sm" onClick={() => setSelected(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {edit && (
+        <div className="inv-modal-overlay">
+          <div className="inv-modal" style={{ maxWidth: "620px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <div>
+                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 800 }}>WAREHOUSE STOCK ADJUSTMENT</span>
+                <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "700", margin: "2px 0 0" }}>{edit.productName}</h3>
+              </div>
+              <button onClick={() => setEdit(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+              {[
+                ["Available", "availableQuantity"],
+                ["Reserved", "reservedQuantity"],
+                ["Damaged", "damagedQuantity"],
+                ["Minimum Stock", "minimumStock"],
+                ["Maximum Stock", "maximumStock"],
+                ["Reorder Level", "reorderLevel"],
+                ["Average Unit Cost", "averageUnitCost"],
+              ].map(([label, key]) => (
+                <label key={key} style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>
+                  {label}
+                  <input type="number" min="0" step={key === "averageUnitCost" ? "0.01" : "1"} value={edit[key]}
+                    onChange={(e) => setEdit({ ...edit, [key]: e.target.value })} style={{ ...inputStyle, marginTop: 6 }} />
+                </label>
+              ))}
+              <label style={{ fontSize: 12, fontWeight: 700, color: "#555" }}>
+                Status
+                <select value={edit.status} onChange={(e) => setEdit({ ...edit, status: e.target.value })} style={{ ...inputStyle, marginTop: 6 }}>
+                  <option value="ACTIVE">Active</option>
+                  <option value="AVAILABLE">Available</option>
+                  <option value="LOW_STOCK">Low Stock</option>
+                  <option value="OUT_OF_STOCK">Out of Stock</option>
+                  <option value="RESERVED">Reserved</option>
+                  <option value="DAMAGED">Damaged</option>
+                </select>
+              </label>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+              <button className="inv-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setEdit(null)} disabled={saving}>Cancel</button>
+              <button className="inv-btn-primary-sm" onClick={saveEdit} disabled={saving}>{saving ? <Loader2 size={14} className="login-spin" /> : <Save size={14} />} Save Stock</button>
             </div>
           </div>
         </div>

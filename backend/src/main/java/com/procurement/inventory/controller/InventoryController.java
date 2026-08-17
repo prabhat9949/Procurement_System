@@ -18,9 +18,39 @@ import org.springframework.web.bind.annotation.*;
 public class InventoryController {
 
     private final InventoryService inventoryService;
+    private final com.procurement.inventory.service.InventoryTransactionService transactionService;
 
-    public InventoryController(InventoryService inventoryService) {
+    public InventoryController(InventoryService inventoryService,
+                               com.procurement.inventory.service.InventoryTransactionService transactionService) {
         this.inventoryService = inventoryService;
+        this.transactionService = transactionService;
+    }
+
+    @PostMapping("/adjust")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('CAN_UPDATE_INVENTORY','CAN_MANAGE_PRODUCTS','SUPER_ADMIN','ADMIN')")
+    public ApiResponse<com.procurement.inventory.dto.response.InventoryTransactionResponse> adjust(
+            @Valid @RequestBody com.procurement.inventory.dto.request.InventoryAdjustmentRequest request) {
+        return ApiResponse.success("Stock updated with transaction log", transactionService.adjustStock(request));
+    }
+
+    @GetMapping("/transactions")
+    public ApiResponse<PageResponse<com.procurement.inventory.dto.response.InventoryTransactionResponse>> getTransactions(
+            @RequestParam(required = false) Long productId,
+            @RequestParam(required = false) Long warehouseId,
+            @RequestParam(required = false) String transactionType,
+            @RequestParam(required = false) String referenceNumber,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
+        return ApiResponse.success(transactionService.search(productId, warehouseId, transactionType, referenceNumber,
+                PageRequest.of(page, size, Sort.by(Sort.Direction.fromString(direction), sort))));
+    }
+
+    @GetMapping("/transactions/product/{productId}")
+    public ApiResponse<java.util.List<com.procurement.inventory.dto.response.InventoryTransactionResponse>> getProductTransactions(
+            @PathVariable Long productId) {
+        return ApiResponse.success(transactionService.getByProduct(productId));
     }
 
     @PostMapping

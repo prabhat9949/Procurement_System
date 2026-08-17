@@ -19,8 +19,11 @@ import java.util.Set;
 @Service
 public class ProcurementScopeService {
 
-    private static final Set<String> OFFICER_ROLES =
-            Set.of("PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER");
+    // Category scoping applies to procurement officers who execute per-category
+    // work. Procurement managers oversee the whole queue and are never hidden
+    // from requests outside their own configured categories.
+    private static final Set<String> SCOPED_ROLES =
+            Set.of("PROCUREMENT_OFFICER");
 
     private final UserRepository users;
     private final OfficerCategoryScopeRepository scopes;
@@ -38,7 +41,7 @@ public class ProcurementScopeService {
     @Transactional(readOnly = true)
     public boolean isProcurementOfficer() {
         return users.findByUsername(username())
-                .map(u -> u.getRole() != null && OFFICER_ROLES.contains(u.getRole().getRoleCode()))
+                .map(u -> u.getRole() != null && SCOPED_ROLES.contains(u.getRole().getRoleCode()))
                 .orElse(false);
     }
 
@@ -62,7 +65,7 @@ public class ProcurementScopeService {
     public ProcurementScopeResponse myScope() {
         var user = users.findByUsername(username()).orElse(null);
         boolean officer = user != null && user.getRole() != null
-                && OFFICER_ROLES.contains(user.getRole().getRoleCode());
+                && SCOPED_ROLES.contains(user.getRole().getRoleCode());
         if (!officer || user.getEmployee() == null) {
             return new ProcurementScopeResponse(
                     null, null, user == null || user.getRole() == null ? null : user.getRole().getRoleCode(),

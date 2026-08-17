@@ -36,6 +36,7 @@ import {
 import { apiGet } from "../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../utils/format";
 import RoleShell from "../shared_ui/RoleShell";
+import MyApprovals from "../shared_ui/MyApprovals";
 
 const TEAM_META = {
   equipment: {
@@ -160,6 +161,7 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
   const navItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "queue", label: "Fulfilment Queue", icon: ClipboardList },
+    { id: "my-tasks", label: "My Approvals & Tasks", icon: ClipboardList },
     { id: "analytics", label: "Analytics", icon: BarChart3 },
   ];
 
@@ -285,8 +287,11 @@ const FulfilmentDashboard = ({ team = "equipment" }) => {
             })}
           </div>
 
+          {/* My approvals & tasks (assigned to this user) */}
+          {activeTab === "my-tasks" && <MyApprovals />}
+
           {/* Fulfilment queue */}
-          {activeTab !== "analytics" && (
+          {activeTab !== "analytics" && activeTab !== "my-tasks" && (
             <div className="ful-card" style={{ marginBottom: "20px" }}>
               <h3 style={{ margin: "0 0 14px", fontSize: "15px", fontWeight: "800", color: "#111" }}>
                 <PackageCheck size={15} style={{ verticalAlign: "-2px", marginRight: "6px", color: "#059669" }} />

@@ -15,8 +15,6 @@ import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 import { hasPermission } from "../../../../../utils/permissions";
 
-const canCreatePo = hasPermission("CAN_CREATE_PO");
-
 const STATUS_STYLE = {
   DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
   GENERATED: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
@@ -28,6 +26,9 @@ const STATUS_STYLE = {
 };
 
 const PurchaseOrders = () => {
+  // Resolve permissions at render time so admin grants/revocations are
+  // reflected without a stale module-level snapshot.
+  const canCreatePo = hasPermission("CAN_CREATE_PO");
   const [pos, setPos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

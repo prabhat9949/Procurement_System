@@ -17,9 +17,6 @@ import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 import { hasPermission } from "../../../../../utils/permissions";
 
-const canCreateRfq = hasPermission("CAN_CREATE_RFQ");
-const canInviteVendor = hasPermission("CAN_INVITE_VENDOR");
-
 const RFQ_STATUS_STYLE = {
   DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
   OPEN: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
@@ -28,6 +25,10 @@ const RFQ_STATUS_STYLE = {
 };
 
 const RfqManagement = () => {
+  // Resolve permissions at render time so admin grants/revocations are
+  // reflected without a stale module-level snapshot.
+  const canCreateRfq = hasPermission("CAN_CREATE_RFQ");
+  const canInviteVendor = hasPermission("CAN_INVITE_VENDOR");
   const [tab, setTab] = useState("rfqs"); // 'rfqs' | 'vendors'
   const [rfqs, setRfqs] = useState([]);
   const [vendors, setVendors] = useState([]);

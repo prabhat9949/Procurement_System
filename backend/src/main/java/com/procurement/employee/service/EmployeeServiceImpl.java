@@ -159,6 +159,12 @@ public class EmployeeServiceImpl implements EmployeeService {
                     userRepository.save(user);
                 }
             });
+            // Deactivation: every open approval/workflow task of this employee is
+            // reassigned to another active person in the same flow.
+            if (!active) {
+                roleChangeTaskService.handleAccountDisabled(saved.getId(),
+                        "Employee deactivated via employee update (HR/Admin)");
+            }
         }
 
         String operation = "UPDATE";

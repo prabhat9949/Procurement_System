@@ -26,6 +26,8 @@ import com.procurement.purchaserequest.repository.PurchaseRequestRepository;
 import com.procurement.purchaserequestline.repository.PurchaseRequestLineRepository;
 import com.procurement.user.entity.User;
 import com.procurement.user.repository.UserRepository;
+import com.procurement.fulfilment.service.InternalFulfilmentService;
+import com.procurement.assignment.service.AssignmentService;
 import org.springframework.data.domain.*;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -54,6 +56,9 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
     private final BusinessEventPublisher eventPublisher;
     private final com.procurement.costcenter.repository.CostCenterRepository costCenters;
     private final com.procurement.workflow.service.WorkflowService workflowService;
+    private final com.procurement.workflow.service.TaskRoutingService taskRouting;
+    private final InternalFulfilmentService internalFulfilmentService;
+private final com.procurement.assignment.service.AssignmentService assignmentService;
 
     public ApprovalTaskServiceImpl(ApprovalTaskRepository tasks, ApprovalStageRepository stages,
                                    ApprovalRuleRepository rules, ApprovalHistoryRepository history,
@@ -62,12 +67,17 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
                                    UserRepository users, ApprovalTaskMapper mapper,
                                    BusinessEventPublisher eventPublisher,
                                    com.procurement.costcenter.repository.CostCenterRepository costCenters,
-                                   com.procurement.workflow.service.WorkflowService workflowService) {
+                                   com.procurement.workflow.service.WorkflowService workflowService,
+                                   com.procurement.workflow.service.TaskRoutingService taskRouting,
+                                   InternalFulfilmentService internalFulfilmentService, com.procurement.assignment.service.AssignmentService assignmentService) {
         this.tasks=tasks; this.stages=stages; this.rules=rules; this.history=history;
         this.requests=requests; this.lines=lines; this.employees=employees; this.users=users; this.mapper=mapper;
         this.eventPublisher = eventPublisher;
         this.costCenters = costCenters;
         this.workflowService = workflowService;
+        this.taskRouting = taskRouting;
+        this.internalFulfilmentService = internalFulfilmentService;
+        this.assignmentService = assignmentService;
     }
     private void releaseBudget(com.procurement.purchaserequest.entity.PurchaseRequest pr){
         if(!Boolean.TRUE.equals(pr.getBudgetCommitted()))return;
@@ -86,24 +96,12 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
     private ApprovalTask newTask(PurchaseRequest pr,ApprovalStage stage,Employee employee){return tasks.save(ApprovalTask.builder().taskNumber("AT-"+Year.now().getValue()+"-"+String.format("%06d",tasks.count()+1)).purchaseRequest(pr).approvalStage(stage).assignedEmployee(employee).assignedRole(stage.getApproverRole()).status(ApprovalTaskStatus.PENDING).approvedAmount(pr.getEstimatedAmount()).build());}
 
     /**
-     * Reporting-chain routing: an approval for stage N is assigned to the Nth
-     * person up the requester's manager chain (manager -> senior manager -> head).
-     * The chain is database-driven (Employee.manager); role-first lookup is used
-     * only as a fallback when the chain is incomplete or the chain member does
-     * not hold the stage's approver role.
+     * Flow-based routing: any active employee holding the stage's approver role
+     * is part of the flow. Tasks are distributed round-robin by the PR id, so a
+     * stage lands on one of the eligible approvers — never on a fixed person.
      */
-    private Employee resolveApprover(Employee requester, ApprovalStage stage){
-        Employee cursor = requester;
-        for(int i=0;i<stage.getSequence();i++){
-            if(cursor==null||cursor.getManager()==null)return fallbackApprover(stage);
-            cursor=cursor.getManager();
-        }
-        if(cursor.getRole()!=null&&cursor.getRole().getId().equals(stage.getApproverRole().getId())
-                &&Boolean.TRUE.equals(cursor.getActive()))return cursor;
-        return fallbackApprover(stage);
-    }
-    private Employee fallbackApprover(ApprovalStage stage){
-        return employees.findFirstByRoleIdAndActiveTrue(stage.getApproverRole().getId())
+    private Employee resolveApprover(PurchaseRequest pr, ApprovalStage stage){
+        return taskRouting.pickActiveByRole(stage.getApproverRole().getId(), pr.getId())
                 .orElseThrow(()->new ConflictException("No active approver found for role: "+stage.getApproverRole().getRoleName()));
     }
     private String usernameOf(Employee employee){
@@ -132,7 +130,7 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
         if(matching.isEmpty())throw new ConflictException("No active approval rule matches this purchase request");
         var stage=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(matching.get(0).getId()).stream().findFirst().orElseThrow(()->new ConflictException("Approval rule has no active stages"));
         // Route to the requester's actual manager from the reporting chain (not a role-wide pick).
-        var employee=resolveApprover(pr.getRequester(),stage);
+        var employee=resolveApprover(pr,stage);
         pr.setStatus(PurchaseRequestStatus.UNDER_REVIEW);pr.setApprovalStatus(ApprovalStatus.PENDING);requests.save(pr);var task=newTask(pr,stage,employee);record(pr,task,ApprovalAction.SUBMITTED,currentEmployee(),"Purchase request submitted");
         eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_SUBMITTED,"ApprovalTask","ApprovalTask",task.getId(),task.getTaskNumber(),"Approval task created and assigned to you",usernameOf(employee),NotificationType.APPROVAL);
     }
@@ -154,11 +152,27 @@ public class ApprovalTaskServiceImpl implements ApprovalTaskService {
             throw new ForbiddenException("Approval limit exceeded — this request requires higher-level authorization");
         task.setStatus(target);task.setComments(d==null?null:d.comments());task.setCompletedDate(LocalDateTime.now());var pr=task.getPurchaseRequest();record(pr,task,action,employee,task.getComments());
         if(target==ApprovalTaskStatus.REJECTED){releaseBudget(pr);pr.setStatus(PurchaseRequestStatus.REJECTED);pr.setApprovalStatus(ApprovalStatus.REJECTED);requests.save(pr);eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_REJECTED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Your PR "+pr.getRequestNumber()+" was rejected by "+employee.getFirstName()+" "+(employee.getLastName()==null?"":employee.getLastName()),usernameOf(pr.getRequester()),NotificationType.APPROVAL);        }else if(target==ApprovalTaskStatus.RETURNED){releaseBudget(pr);pr.setStatus(PurchaseRequestStatus.DRAFT);pr.setApprovalStatus(ApprovalStatus.RETURNED);requests.save(pr);eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_REJECTED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Your PR "+pr.getRequestNumber()+" was returned for correction by "+employee.getFirstName()+" "+(employee.getLastName()==null?"":employee.getLastName()),usernameOf(pr.getRequester()),NotificationType.APPROVAL);        }else{var next=stages.findByApprovalRuleIdAndActiveTrueOrderBySequenceAsc(task.getApprovalStage().getApprovalRule().getId()).stream().filter(s->s.getSequence()>task.getApprovalStage().getSequence()).findFirst();if(next.isPresent()){// Route the next stage to the next person in the requester's reporting chain.
-            var ae=resolveApprover(pr.getRequester(),next.get());
+            var ae=resolveApprover(pr,next.get());
             var nextTask=newTask(pr,next.get(),ae);
             eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_APPROVED,"ApprovalTask","ApprovalTask",nextTask.getId(),nextTask.getTaskNumber(),"PR "+pr.getRequestNumber()+" has been assigned to you for approval",usernameOf(ae),NotificationType.APPROVAL);
-            eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_APPROVED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Your PR was approved by "+employee.getFirstName()+" "+(employee.getLastName()==null?"":employee.getLastName()),usernameOf(pr.getRequester()),NotificationType.APPROVAL);
-        }else{pr.setStatus(PurchaseRequestStatus.APPROVED);pr.setApprovalStatus(ApprovalStatus.APPROVED);requests.save(pr);
+            eventPublisher.publish(BusinessEventType.PURCHASE_REQUEST_APPROVED,"ApprovalTask","PurchaseRequest",pr.getId(),pr.getRequestNumber(),"Your PR was approved by "+employee.getFirstName()+" "+(employee.getLastName()==null?"":employee.getLastName()),usernameOf(pr.getRequester()),NotificationType.APPROVAL);}else{pr.setStatus(PurchaseRequestStatus.APPROVED);pr.setApprovalStatus(ApprovalStatus.APPROVED);requests.save(pr);
+            // Internal availability check before any external procurement
+            var check = internalFulfilmentService.checkAvailability(pr.getId());
+            String actionName = check.recommendedAction();
+            if ("INTERNAL_FULFILMENT".equalsIgnoreCase(actionName)) {
+                pr.setStatus(PurchaseRequestStatus.INTERNAL_FULFILMENT_IN_PROGRESS);
+            } else if ("PARTIAL_FULFILMENT_AND_EXTERNAL_PROCUREMENT".equalsIgnoreCase(actionName)) {
+                pr.setStatus(PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING);
+            } else if ("EXTERNAL_PROCUREMENT_REQUIRED".equalsIgnoreCase(actionName)) {
+                pr.setStatus(PurchaseRequestStatus.EXTERNAL_PROCUREMENT_REQUIRED);
+            } else {
+                // Fallback to fully approved without internal fulfilment
+            }
+            requests.save(pr);
+            // Create assignment if external procurement needed or partial fulfilment
+            if (pr.getStatus() == PurchaseRequestStatus.EXTERNAL_PROCUREMENT_REQUIRED || pr.getStatus() == PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING) {
+                assignmentService.createAssignment(pr);
+            }
             // Category routing engine: route the fully approved PR to the team officer
             // that owns the PR's category (database-driven teamRoleCode mapping).
             workflowService.assignToTeam(pr,"PR fully approved — routed via category routing engine");

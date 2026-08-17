@@ -16,13 +16,14 @@ import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 import { hasPermission } from "../../../../../utils/permissions";
 
-const canCompare = hasPermission("CAN_COMPARE_QUOTATIONS");
-const canSelect = hasPermission("CAN_SELECT_VENDOR");
-const canCreatePo = hasPermission("CAN_CREATE_PO");
-
 const METHOD_LABEL = { LOWEST_PRICE: "Lowest Price", BEST_VALUE: "Best Value", WEIGHTED_SCORE: "Weighted Score", TECHNICAL: "Technical" };
 
 const VendorSelection = () => {
+  // Resolve permissions at render time so admin grants/revocations are
+  // reflected without a stale module-level snapshot.
+  const canCompare = hasPermission("CAN_COMPARE_QUOTATIONS");
+  const canSelect = hasPermission("CAN_SELECT_VENDOR");
+  const canCreatePo = hasPermission("CAN_CREATE_PO");
   const [rfqs, setRfqs] = useState([]);
   const [selectedRfqId, setSelectedRfqId] = useState("");
   const [quotations, setQuotations] = useState([]);

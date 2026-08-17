@@ -188,6 +188,7 @@ public class UserAdminController {
         User user = findUser(id);
         assertNotProtectedAdmin(user, authentication);
         String old = userDetails(user);
+        boolean wasEnabled = Boolean.TRUE.equals(user.getEnabled());
         Role oldRole = user.getRole();
         Role newRole = null;
 
@@ -250,6 +251,7 @@ public class UserAdminController {
         if (request.managerId() != null) {
             employee.setManager(findEmployee(request.managerId()));
         }
+        employee.setActive(Boolean.TRUE.equals(user.getEnabled()) && !Boolean.TRUE.equals(user.getAccountLocked()));
 
         employeeRepository.save(employee);
         User saved = userRepository.save(user);
@@ -265,6 +267,12 @@ public class UserAdminController {
             roleChangeTaskService.handleRoleChange(saved.getEmployee().getId(), oldRole, newRole,
                     "Role changed by " + authentication.getName());
         }
+        // Disabled accounts can no longer act: hand every open approval and
+        // workflow assignment to another active person in the same flow.
+        if (wasEnabled && !Boolean.TRUE.equals(saved.getEnabled())) {
+            roleChangeTaskService.handleAccountDisabled(saved.getEmployee().getId(),
+                    "Account disabled by " + authentication.getName());
+        }
         return ApiResponse.success("User updated successfully", toResponse(saved));
     }
 
@@ -277,6 +285,7 @@ public class UserAdminController {
         User user = findUser(id);
         assertNotProtectedAdmin(user, authentication);
         String old = userDetails(user);
+        boolean wasEnabled = Boolean.TRUE.equals(user.getEnabled());
 
         if (request.username() != null && !request.username().isBlank()
                 && !request.username().equalsIgnoreCase(user.getUsername())
@@ -296,7 +305,16 @@ public class UserAdminController {
         if (request.accountLocked() != null) {
             user.setAccountLocked(request.accountLocked());
         }
+        user.getEmployee().setActive(Boolean.TRUE.equals(user.getEnabled()) && !Boolean.TRUE.equals(user.getAccountLocked()));
+        employeeRepository.save(user.getEmployee());
         User saved = userRepository.save(user);
+
+        // A disabled account loses access in the same transaction; its open
+        // approvals are reassigned to other active people in the flow.
+        if (wasEnabled && !Boolean.TRUE.equals(saved.getEnabled())) {
+            roleChangeTaskService.handleAccountDisabled(saved.getEmployee().getId(),
+                    "Account disabled by " + authentication.getName());
+        }
 
         auditLogService.record("User", "User", saved.getId(), "CREDENTIALS_UPDATED",
                 saved.getUsername(), "USER", true, old, userDetails(saved),
@@ -312,13 +330,24 @@ public class UserAdminController {
         User user = findUser(id);
         assertNotProtectedAdmin(user, authentication);
         String old = "{enabled=" + user.getEnabled() + ", locked=" + user.getAccountLocked() + "}";
+        boolean wasEnabled = Boolean.TRUE.equals(user.getEnabled());
         if (request.enabled() != null) {
             user.setEnabled(request.enabled());
         }
         if (request.accountLocked() != null) {
             user.setAccountLocked(request.accountLocked());
         }
+        user.getEmployee().setActive(Boolean.TRUE.equals(user.getEnabled()) && !Boolean.TRUE.equals(user.getAccountLocked()));
+        employeeRepository.save(user.getEmployee());
         User saved = userRepository.save(user);
+
+        // Disabling an account reassigns all of its open approvals to other
+        // active people in the flow, so nothing is left stuck with a user who
+        // can no longer sign in.
+        if (wasEnabled && !Boolean.TRUE.equals(saved.getEnabled())) {
+            roleChangeTaskService.handleAccountDisabled(saved.getEmployee().getId(),
+                    "Account disabled by " + (authentication == null ? "admin" : authentication.getName()));
+        }
         auditLogService.record("User", "User", saved.getId(),
                 Boolean.TRUE.equals(request.enabled()) ? "ACTIVATE"
                         : Boolean.FALSE.equals(request.enabled()) ? "DEACTIVATE" : "STATUS_UPDATED",

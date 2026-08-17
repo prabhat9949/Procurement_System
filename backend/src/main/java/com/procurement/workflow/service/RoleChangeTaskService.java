@@ -43,19 +43,38 @@ public class RoleChangeTaskService {
     private final UserRepository users;
     private final AuditLogService auditLogService;
     private final BusinessEventPublisher eventPublisher;
+    private final TaskRoutingService taskRouting;
 
     public RoleChangeTaskService(ApprovalTaskRepository approvalTasks,
                                  WorkflowAssignmentRepository workflowAssignments,
                                  EmployeeRepository employees,
                                  UserRepository users,
                                  AuditLogService auditLogService,
-                                 BusinessEventPublisher eventPublisher) {
+                                 BusinessEventPublisher eventPublisher,
+                                 TaskRoutingService taskRouting) {
         this.approvalTasks = approvalTasks;
         this.workflowAssignments = workflowAssignments;
         this.employees = employees;
         this.users = users;
         this.auditLogService = auditLogService;
         this.eventPublisher = eventPublisher;
+        this.taskRouting = taskRouting;
+    }
+
+    /**
+     * Account-disabled handler: the account can no longer act, so every open
+     * approval task and workflow assignment is handed to another active person
+     * in the same flow (round-robin among the required role). Nothing is lost —
+     * the old record is marked REASSIGNED and the chain is preserved in history.
+     */
+    @Transactional
+    public void handleAccountDisabled(Long employeeId, String reason) {
+        var employee = employees.findById(employeeId).orElse(null);
+        if (employee == null) return;
+        String change = "Account disabled"
+                + (reason == null || reason.isBlank() ? "" : " — " + reason);
+        reassignOpenApprovalTasks(employee, change);
+        reassignOpenWorkflowAssignments(employee, change);
     }
 
     @Transactional
@@ -101,22 +120,28 @@ public class RoleChangeTaskService {
     private Employee findReplacementApprover(ApprovalTask task) {
         var stage = task.getApprovalStage();
         var pr = task.getPurchaseRequest();
-        // Prefer the requester's reporting chain (same resolution the routing
-        // engine uses), skipping the user whose role changed.
-        Employee cursor = pr.getRequester();
-        for (int i = 0; i < stage.getSequence(); i++) {
-            if (cursor == null || cursor.getManager() == null) break;
-            cursor = cursor.getManager();
+        // Anyone active in the flow is a candidate; round-robin by PR id and
+        // never back to the assignee being replaced.
+        return taskRouting.pickActiveByRole(
+                stage.getApproverRole().getId(), pr.getId(), task.getAssignedEmployee().getId())
+                .orElse(null);
+    }
+
+    /** Disabled account: reassign every open approval task to someone else in the flow. */
+    private void reassignOpenApprovalTasks(Employee employee, String change) {
+        List<ApprovalTask> open = approvalTasks.findByAssignedEmployeeIdAndStatus(
+                employee.getId(), ApprovalTaskStatus.PENDING);
+        for (ApprovalTask task : open) {
+            Employee replacement = findReplacementApprover(task);
+            if (replacement == null) {
+                auditLogService.record("WORKFLOW", "ApprovalTask", task.getId(), "NO_REPLACEMENT_ON_DISABLE",
+                        task.getTaskNumber(), "PR", true, null, employee.getEmployeeCode(),
+                        "No active replacement found for stage " + task.getApprovalStage().getStageName()
+                                + " — task left pending for admin review (" + change + ")");
+                continue;
+            }
+            reassignApprovalTask(task, replacement, change);
         }
-        if (cursor != null && cursor.getRole() != null
-                && cursor.getRole().getId().equals(stage.getApproverRole().getId())
-                && Boolean.TRUE.equals(cursor.getActive())
-                && !cursor.getId().equals(task.getAssignedEmployee().getId())) {
-            return cursor;
-        }
-        // Fallback: first active employee with the stage role, excluding the user.
-        return employees.findFirstByRoleIdAndActiveTrueAndIdNot(
-                stage.getApproverRole().getId(), task.getAssignedEmployee().getId()).orElse(null);
     }
 
     private void reassignApprovalTask(ApprovalTask task, Employee replacement, String change) {
@@ -124,7 +149,7 @@ public class RoleChangeTaskService {
         task.setStatus(ApprovalTaskStatus.REASSIGNED);
         task.setCompletedDate(LocalDateTime.now());
         task.setComments((task.getComments() == null ? "" : task.getComments() + " ")
-                + "Reassigned due to role change (" + change + ")");
+                + "Reassigned (" + change + ")");
         approvalTasks.save(task);
 
         ApprovalTask fresh = approvalTasks.save(ApprovalTask.builder()
@@ -148,7 +173,7 @@ public class RoleChangeTaskService {
                         replacement.getRole().getRoleCode() + ") for stage " +
                         task.getApprovalStage().getStageName() + " — " + change);
         notifyUser(replacement, pr.getRequestNumber() + " has been assigned to you for " +
-                task.getApprovalStage().getStageName() + " approval (reassigned due to a role change).",
+                task.getApprovalStage().getStageName() + " approval (reassigned — " + change + ").",
                 pr.getRequestNumber());
     }
 
@@ -172,13 +197,37 @@ public class RoleChangeTaskService {
                     continue;
                 }
                 Employee replacement = requiredRole == null ? null
-                        : employees.findFirstByRoleIdAndActiveTrueAndIdNot(
-                                requiredRole.getId(), employee.getId()).orElse(null);
+                        : taskRouting.pickActiveByRole(
+                                requiredRole.getId(), wa.getEntityId(), employee.getId()).orElse(null);
                 if (replacement == null) {
                     auditLogService.record("WORKFLOW", "WorkflowAssignment", wa.getId(), "NO_REPLACEMENT_ON_ROLE_CHANGE",
                             wa.getAssignmentNumber(), wa.getEntityType(), true,
                             oldRole.getRoleCode(), newRole.getRoleCode(),
                             "No active replacement for stage " + wa.getStage() + " — assignment left active for admin review (" + change + ")");
+                    continue;
+                }
+                reassignWorkflowAssignment(wa, replacement, change);
+            }
+        }
+    }
+
+    /** Disabled account: reassign every open workflow assignment to someone else in the flow. */
+    private void reassignOpenWorkflowAssignments(Employee employee, String change) {
+        for (WorkflowAssignmentStatus status : List.of(
+                WorkflowAssignmentStatus.ASSIGNED, WorkflowAssignmentStatus.IN_PROGRESS)) {
+            List<WorkflowAssignment> open =
+                    workflowAssignments.findByAssignedEmployeeIdAndStatusOrderByAssignedAtAsc(employee.getId(), status);
+            for (WorkflowAssignment wa : open) {
+                var requiredRole = wa.getAssignedRole();
+                Employee replacement = requiredRole == null ? null
+                        : taskRouting.pickActiveByRole(
+                                requiredRole.getId(), wa.getEntityId(), employee.getId()).orElse(null);
+                if (replacement == null) {
+                    auditLogService.record("WORKFLOW", "WorkflowAssignment", wa.getId(), "NO_REPLACEMENT_ON_DISABLE",
+                            wa.getAssignmentNumber(), wa.getEntityType(), true,
+                            null, employee.getEmployeeCode(),
+                            "No active replacement for stage " + wa.getStage()
+                                    + " — assignment left active for admin review (" + change + ")");
                     continue;
                 }
                 reassignWorkflowAssignment(wa, replacement, change);
@@ -216,7 +265,7 @@ public class RoleChangeTaskService {
                 oldAssignee.getEmployeeCode(), replacement.getEmployeeCode(),
                 "Assignment for stage " + wa.getStage() + " reassigned to " + replacement.getFirstName() + " " +
                         (replacement.getLastName() == null ? "" : replacement.getLastName()) + " — " + change);
-        notifyUser(replacement, "A task (stage: " + wa.getStage() + ") was reassigned to you due to a role change.",
+        notifyUser(replacement, "A task (stage: " + wa.getStage() + ") was reassigned to you — " + change + ".",
                 ref);
     }
 

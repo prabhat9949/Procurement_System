@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Inbox,
 } from "lucide-react";
 
 import ExecOverview from "./modules/ExecOverview";
@@ -32,6 +33,7 @@ import ProcurementTracking from "./modules/ProcurementTracking";
 import ProcurementAnalytics from "./modules/ProcurementAnalytics";
 import ExecReports from "./modules/ExecReports";
 import ExecProfile from "./modules/ExecProfile";
+import MyApprovals from "../shared_ui/MyApprovals";
 
 const ProcExecDashboard = () => {
   const navigate = useNavigate();
@@ -53,6 +55,7 @@ const ProcExecDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "purchase-requests", label: "Purchase Requests", icon: FileText },
+    { id: "my-approvals", label: "My Approvals & Tasks", icon: Inbox },
     { id: "rfq-management", label: "RFQ Management", icon: Send },
     { id: "vendor-quotations", label: "Vendor Quotations", icon: FileCheck2 },
     { id: "vendor-selection", label: "Vendor Selection", icon: Award },
@@ -75,6 +78,8 @@ const ProcExecDashboard = () => {
         return <ExecOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "purchase-requests":
         return <PurchaseRequests onNavigate={(tab) => setActiveTab(tab)} />;
+      case "my-approvals":
+        return <MyApprovals />;
       case "rfq-management":
         return <RfqManagement />;
       case "vendor-quotations":
