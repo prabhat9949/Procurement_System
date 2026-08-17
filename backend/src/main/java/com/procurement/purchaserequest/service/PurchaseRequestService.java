@@ -27,6 +27,13 @@ public interface PurchaseRequestService {
 
     PurchaseRequestResponse getById(Long id);
 
+    /**
+     * PRs that have passed final approval and are in the procurement pipeline
+     * (internal availability check, internal fulfilment, partial fulfilment,
+     * external procurement / RFQ). Scoped by the caller's role.
+     */
+    PageResponse<PurchaseRequestResponse> procurementQueue(Pageable pageable);
+
     PurchaseRequestResponse update(Long id, PurchaseRequestRequest request);
 
     void delete(Long id);

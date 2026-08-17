@@ -306,9 +306,17 @@ public class InternalFulfilmentServiceImpl implements InternalFulfilmentService 
         PurchaseRequest pr = requestRepository.findById(purchaseRequestId)
                 .orElseThrow(() -> new ResourceNotFoundException("Purchase request not found: " + purchaseRequestId));
 
+        // A purchase request can enter fulfilment initiation from any post-approval
+        // state. Final approval (ApprovalTaskServiceImpl) already runs the availability
+        // check and pre-flags the PR as INTERNAL_FULFILMENT_IN_PROGRESS,
+        // PARTIAL_FULFILMENT_PENDING or EXTERNAL_PROCUREMENT_REQUIRED, so the
+        // Procurement Manager must be able to pick up the request from those states.
         if (pr.getStatus() != PurchaseRequestStatus.APPROVED
                 && pr.getStatus() != PurchaseRequestStatus.INTERNAL_AVAILABILITY_CHECK
-                && pr.getStatus() != PurchaseRequestStatus.INTERNALLY_FULFILLABLE) {
+                && pr.getStatus() != PurchaseRequestStatus.INTERNALLY_FULFILLABLE
+                && pr.getStatus() != PurchaseRequestStatus.INTERNAL_FULFILMENT_IN_PROGRESS
+                && pr.getStatus() != PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING
+                && pr.getStatus() != PurchaseRequestStatus.EXTERNAL_PROCUREMENT_REQUIRED) {
             throw new ConflictException("Purchase request is not in a valid state for fulfilment initiation: " + pr.getStatus());
         }
 
@@ -331,7 +339,7 @@ public class InternalFulfilmentServiceImpl implements InternalFulfilmentService 
                     pr.getId(),
                     LocalDate.now().plusDays(7), // closing date
                     LocalDate.now().plusDays(9), // quotation opening date
-                    "USD",
+                    "INR",
                     "Auto-generated RFQ after external procurement trigger"
             );
             rfqService.generate(rfqReq);
@@ -355,22 +363,15 @@ public class InternalFulfilmentServiceImpl implements InternalFulfilmentService 
             warehouse = warehouseRepository.findAll().stream().findFirst().orElse(null);
         }
 
+        boolean externalShortage = false;
         for (AvailabilityLineDetail lineDetail : check.lines()) {
             PurchaseRequestLine prLine = requestLineRepository.findById(lineDetail.lineId()).orElse(null);
             Product product = productRepository.findById(lineDetail.productId()).orElseThrow();
 
             BigDecimal reqQty = lineDetail.requestedQuantity();
             BigDecimal availQty = lineDetail.availableQuantity();
-            BigDecimal allocateQty;
-            BigDecimal shortageQty;
-
-            if ("FULL_INTERNAL".equals(actionType)) {
-                allocateQty = reqQty.min(availQty);
-                shortageQty = reqQty.subtract(allocateQty).max(BigDecimal.ZERO);
-            } else { // PARTIAL_FULFILMENT
-                allocateQty = reqQty.min(availQty);
-                shortageQty = reqQty.subtract(allocateQty).max(BigDecimal.ZERO);
-            }
+            BigDecimal allocateQty = reqQty.min(availQty);
+            BigDecimal shortageQty = reqQty.subtract(allocateQty).max(BigDecimal.ZERO);
 
             if (allocateQty.compareTo(BigDecimal.ZERO) > 0) {
                 // Reserve / Allocate stock in database transactionally
@@ -403,22 +404,31 @@ public class InternalFulfilmentServiceImpl implements InternalFulfilmentService 
 
                 createdFulfilments.add(fulfilmentRepository.save(fulfilment));
             }
-            // If there is shortage and external procurement quantity specified, generate RFQ for shortage
-            if (shortageQty.compareTo(BigDecimal.ZERO) > 0 && request.quantityForExternalProcurement() != null && request.quantityForExternalProcurement().compareTo(BigDecimal.ZERO) > 0) {
-                RfqRequest rfqReq = new RfqRequest(
-                        pr.getId(),
-                        LocalDate.now().plusDays(7),
-                        LocalDate.now().plusDays(9),
-                        "USD",
-                        "Auto-generated RFQ for shortage quantity"
-                );
-                rfqService.generate(rfqReq);
+            if (shortageQty.compareTo(BigDecimal.ZERO) > 0) {
+                externalShortage = true;
             }
+        }
+
+        // A single RFQ for the whole request — it only ever covers the shortage
+        // quantity (requested minus internally allocated), never the full amount.
+        boolean rfqGenerated = false;
+        if (externalShortage && request.quantityForExternalProcurement() != null
+                && request.quantityForExternalProcurement().compareTo(BigDecimal.ZERO) > 0) {
+            RfqRequest rfqReq = new RfqRequest(
+                    pr.getId(),
+                    LocalDate.now().plusDays(7),
+                    LocalDate.now().plusDays(9),
+                    "INR",
+                    "Auto-generated RFQ for shortage quantity"
+            );
+            rfqService.generate(rfqReq); // sets PR status to RFQ_CREATED and saves it
+            rfqGenerated = true;
         }
 
         if ("FULL_INTERNAL".equals(actionType) && check.totalShortageQuantity().compareTo(BigDecimal.ZERO) == 0) {
             pr.setStatus(PurchaseRequestStatus.INTERNAL_FULFILMENT_IN_PROGRESS);
-        } else {
+        } else if (!rfqGenerated) {
+            // Shortage remains but no RFQ was requested — stay in the partial queue.
             pr.setStatus(PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING);
         }
         requestRepository.save(pr);
@@ -514,6 +524,15 @@ public class InternalFulfilmentServiceImpl implements InternalFulfilmentService 
     @Transactional(readOnly = true)
     public PageResponse<InternalFulfilmentResponse> getTeamTasks(String teamRole, Pageable pageable) {
         String role = currentRoleCode();
+        // Procurement managers and admins oversee every fulfilment team, so they
+        // see the full task pool; specialised teams only see their own queue.
+        if ("SUPER_ADMIN".equals(role) || "ADMIN".equals(role) || "PROCUREMENT_MANAGER".equals(role)) {
+            Page<InternalFulfilmentResponse> all =
+                    fulfilmentRepository.findAll(pageable).map(this::toResponse);
+            return new PageResponse<>(all.getContent(), all.getNumber(), all.getSize(),
+                    all.getTotalElements(), all.getTotalPages(), all.isLast());
+        }
+
         String effectiveTeam = teamRole;
         if ("EQUIPMENT_ASSET_TEAM".equals(role)) effectiveTeam = "EQUIPMENT_ASSET_TEAM";
         else if ("IT_SOFTWARE_TEAM".equals(role)) effectiveTeam = "IT_SOFTWARE_TEAM";

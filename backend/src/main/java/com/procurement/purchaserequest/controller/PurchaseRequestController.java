@@ -66,6 +66,18 @@ public class PurchaseRequestController {
                 createdDateFrom, createdDateTo, pageable));
     }
 
+    /** PRs in the post-approval procurement pipeline (internal/external/partial). */
+    @GetMapping("/procurement-queue")
+    public ApiResponse<PageResponse<PurchaseRequestResponse>> procurementQueue(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(defaultValue = "createdAt") String sort,
+            @RequestParam(defaultValue = "desc") String direction) {
+        Pageable pageable = PageRequest.of(page, size,
+                Sort.by(Sort.Direction.fromString(direction), sort));
+        return ApiResponse.success(purchaseRequestService.procurementQueue(pageable));
+    }
+
     @GetMapping("/search")
     public ApiResponse<PageResponse<PurchaseRequestResponse>> searchEndpoint(
             @RequestParam(required = false) String keyword,

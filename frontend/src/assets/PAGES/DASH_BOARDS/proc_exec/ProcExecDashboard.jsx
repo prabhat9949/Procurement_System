@@ -20,10 +20,14 @@ import {
   ChevronRight,
   AlertTriangle,
   Inbox,
+  PackageCheck,
 } from "lucide-react";
 
+import "../proc_manager/ProcManagerDashboard.css";
 import ExecOverview from "./modules/ExecOverview";
 import PurchaseRequests from "./modules/PurchaseRequests";
+import InternalFulfilment from "../proc_manager/modules/InternalFulfilment";
+import ExternalProcurement from "../proc_manager/modules/ExternalProcurement";
 import RfqManagement from "./modules/RfqManagement";
 import VendorQuotations from "./modules/VendorQuotations";
 import VendorSelection from "./modules/VendorSelection";
@@ -55,6 +59,8 @@ const ProcExecDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "purchase-requests", label: "Purchase Requests", icon: FileText },
+    { id: "internal-fulfilment", label: "Internal Fulfilment", icon: PackageCheck },
+    { id: "external-procurement", label: "External Procurement", icon: Send },
     { id: "my-approvals", label: "My Approvals & Tasks", icon: Inbox },
     { id: "rfq-management", label: "RFQ Management", icon: Send },
     { id: "vendor-quotations", label: "Vendor Quotations", icon: FileCheck2 },
@@ -78,6 +84,10 @@ const ProcExecDashboard = () => {
         return <ExecOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "purchase-requests":
         return <PurchaseRequests onNavigate={(tab) => setActiveTab(tab)} />;
+      case "internal-fulfilment":
+        return <InternalFulfilment />;
+      case "external-procurement":
+        return <ExternalProcurement />;
       case "my-approvals":
         return <MyApprovals />;
       case "rfq-management":

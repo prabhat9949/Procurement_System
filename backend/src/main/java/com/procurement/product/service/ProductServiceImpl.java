@@ -5,6 +5,7 @@ import com.procurement.category.repository.CategoryRepository;
 import com.procurement.common.exception.ConflictException;
 import com.procurement.common.exception.ResourceNotFoundException;
 import com.procurement.common.response.PageResponse;
+import com.procurement.product.dto.request.NewCatalogueItemRequest;
 import com.procurement.product.dto.request.ProductRequest;
 import com.procurement.product.dto.response.ProductResponse;
 import com.procurement.product.entity.Product;
@@ -23,6 +24,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
 
 @Service
 public class ProductServiceImpl implements ProductService {
@@ -56,6 +59,43 @@ public class ProductServiceImpl implements ProductService {
         Product product = productMapper.toEntity(request, findCategory(request.categoryId()),
                 findVendor(request.vendorId()), findUnitOfMeasure(request.unitOfMeasureId()));
         applyDefaults(product);
+        String username = currentUsername();
+        product.setCreatedBy(username);
+        product.setUpdatedBy(username);
+        return productMapper.toResponse(productRepository.save(product));
+    }
+
+    @Override
+    @Transactional
+    public ProductResponse requestNewCatalogueItem(NewCatalogueItemRequest request) {
+        Category category = categoryRepository.findById(request.categoryId())
+                .orElseThrow(() -> new ResourceNotFoundException("Category not found: " + request.categoryId()));
+        // Sensible defaults: first vendor, first/"PCS" UoM, INR, zero stock levels.
+        Vendor vendor = vendorRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("No vendor is configured to associate the catalogue item"));
+        UnitOfMeasure uom = unitOfMeasureRepository.findByUomCode("PCS")
+                .orElseGet(() -> unitOfMeasureRepository.findAll().stream().findFirst()
+                        .orElseThrow(() -> new ResourceNotFoundException("No unit of measure is configured")));
+        String suffix = String.valueOf(System.currentTimeMillis());
+        Product product = new Product();
+        product.setProductCode("PRD-" + suffix);
+        product.setSku("SKU-" + suffix);
+        product.setProductName(request.productName().trim());
+        product.setDescription(request.description());
+        product.setBrand(request.brand());
+        product.setManufacturer(request.brand());
+        product.setCategory(category);
+        product.setVendor(vendor);
+        product.setUnitOfMeasure(uom);
+        product.setUnitPrice(request.unitPrice());
+        product.setCurrency(request.currency() == null || request.currency().isBlank() ? "INR" : request.currency().trim().toUpperCase());
+        product.setMinimumStock(0);
+        product.setMaximumStock(0);
+        product.setReorderLevel(0);
+        product.setLeadTimeDays(7);
+        product.setTaxPercentage(new BigDecimal("18.00"));
+        product.setIsDigital(Boolean.TRUE.equals(request.isDigital()));
+        product.setActive(true);
         String username = currentUsername();
         product.setCreatedBy(username);
         product.setUpdatedBy(username);

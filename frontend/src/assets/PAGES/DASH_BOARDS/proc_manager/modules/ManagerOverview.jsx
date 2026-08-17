@@ -20,7 +20,7 @@ const ManagerOverview = ({ onNavigate }) => {
       ]}
       endpoints={{
         dash: "/api/dashboard/procurement",
-        approved: "/api/purchase-requests?status=APPROVED&page=0&size=20",
+        approved: "/api/purchase-requests/procurement-queue?page=0&size=20&sort=createdAt&direction=desc",
         rfqs: "/api/rfqs?page=0&size=20&sort=createdAt&direction=desc",
         pos: "/api/purchase-orders?page=0&size=20&sort=orderDate&direction=desc",
       }}
@@ -42,8 +42,8 @@ const ManagerOverview = ({ onNavigate }) => {
       tables={[
         {
           key: "approved",
-          title: "Approved Requisitions Awaiting Sourcing",
-          emptyText: "No approved requisitions awaiting sourcing right now.",
+          title: "Procurement Queue — Post-Approval Requests",
+          emptyText: "No requests are awaiting procurement action right now.",
           maxRows: 8,
           columns: [
             { header: "Request", render: (r) => <strong style={{ color: "#059669" }}>{r.requestNumber}</strong> },

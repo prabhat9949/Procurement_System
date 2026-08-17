@@ -394,6 +394,8 @@
   margin: 0 auto;
 }
 
+.pman-fulfilment-container { padding: 24px 28px; }
+
 /* PAGE HEADER */
 .pman-page-header {
   margin-bottom: 28px;
