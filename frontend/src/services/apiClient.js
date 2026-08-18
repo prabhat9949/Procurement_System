@@ -69,9 +69,22 @@ export const apiFetch = async (path, { method = "GET", body, headers = {}, auth 
   return payload;
 };
 
+/**
+ * Build a URL query string from an object, filtering out null/undefined values.
+ * Example: buildQuery({ page: 0, size: 20, keyword: null }) => "?page=0&size=20"
+ */
+export const buildQuery = (params = {}) => {
+  const entries = Object.entries(params).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ""
+  );
+  return entries.length ? "?" + new URLSearchParams(entries).toString() : "";
+};
+
 export const apiGet = (path, options) => apiFetch(path, { ...options, method: "GET" });
 export const apiPost = (path, body, options) =>
   apiFetch(path, { ...options, method: "POST", body });
 export const apiPut = (path, body, options) =>
   apiFetch(path, { ...options, method: "PUT", body });
+export const apiPatch = (path, body, options) =>
+  apiFetch(path, { ...options, method: "PATCH", body });
 export const apiDelete = (path, options) => apiFetch(path, { ...options, method: "DELETE" });
