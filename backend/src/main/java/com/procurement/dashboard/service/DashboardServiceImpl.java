@@ -137,13 +137,13 @@ public class DashboardServiceImpl implements DashboardService {
         addCount(kpis, "TOTAL_REQUESTS", "Total Requests", "select count(*) from purchase_requests where" + scope, emp);
         addCount(kpis, "DRAFTS", "Draft", "select count(*) from purchase_requests where" + scope + " and status = 'DRAFT'", emp);
         addCount(kpis, "PENDING", "Pending Approval", "select count(*) from purchase_requests where" + scope + " and status in ('SUBMITTED','UNDER_REVIEW')", emp);
-        addCount(kpis, "APPROVED", "Approved", "select count(*) from purchase_requests where" + scope + " and status = 'APPROVED'", emp);
+        addCount(kpis, "APPROVED", "Approved", "select count(*) from purchase_requests where" + scope + " and status in ('APPROVED','COMPLETED','INTERNAL_FULFILMENT_IN_PROGRESS','PARTIAL_FULFILMENT_PENDING','EXTERNAL_PROCUREMENT_REQUIRED','FULFILMENT_COMPLETED')", emp);
         addCount(kpis, "REJECTED", "Rejected", "select count(*) from purchase_requests where" + scope + " and status = 'REJECTED'", emp);
         addCount(kpis, "RETURNED", "Returned for Correction", "select count(*) from purchase_requests where" + scope + " and approval_status = 'RETURNED'", emp);
         addCount(kpis, "CANCELLED", "Cancelled", "select count(*) from purchase_requests where" + scope + " and status = 'CANCELLED'", emp);
         addCount(kpis, "RFQ_CREATED", "In Sourcing", "select count(*) from purchase_requests where" + scope + " and status = 'RFQ_CREATED'", emp);
         addAmount(kpis, "TOTAL_VALUE", "Estimated Request Value", "select coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " and status <> 'CANCELLED'", emp);
-        addAmount(kpis, "APPROVED_VALUE", "Approved Value", "select coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " and status = 'APPROVED'", emp);
+        addAmount(kpis, "APPROVED_VALUE", "Approved Value", "select coalesce(sum(estimated_amount),0) from purchase_requests where" + scope + " and status in ('APPROVED','COMPLETED','INTERNAL_FULFILMENT_IN_PROGRESS','PARTIAL_FULFILMENT_PENDING','EXTERNAL_PROCUREMENT_REQUIRED','FULFILMENT_COMPLETED')", emp);
         return response("employee", kpis, List.of(
                 hrChart("REQUESTS_BY_STATUS", "Requests by Status", "select status, count(*) from purchase_requests where" + scope + " group by status order by 2 desc", emp),
                 hrChart("REQUESTS_BY_MONTH", "Monthly Requests", "select date_format(request_date, '%Y-%m'), count(*) from purchase_requests where" + scope + " group by date_format(request_date, '%Y-%m') order by 1", emp),

@@ -10,9 +10,7 @@ import {
   Lock,
   Activity,
   ShoppingBag,
-  IndianRupee,
   Boxes,
-  Truck,
   FileText,
   Bell,
   FolderKanban,
@@ -32,9 +30,7 @@ import SuperUserManagement from "./modules/SuperUserManagement";
 import SuperRoleManagement from "./modules/SuperRoleManagement";
 import SuperPermissionManagement from "./modules/SuperPermissionManagement";
 import SuperProcurementMonitoring from "./modules/SuperProcurementMonitoring";
-import SuperFinancialMonitoring from "./modules/SuperFinancialMonitoring";
 import SuperInventoryMonitoring from "./modules/SuperInventoryMonitoring";
-import SuperVendorMonitoring from "./modules/SuperVendorMonitoring";
 import SuperNotificationsCenter from "./modules/SuperNotificationsCenter";
 import AdminSupport from "./modules/AdminSupport";
 import OrgMasterDataPanel from "../org_admin/modules/OrgMasterDataPanel";
@@ -58,9 +54,7 @@ const SuperAdminDashboard = () => {
     { id: "role-management", label: "Role Management", icon: ShieldCheck },
     { id: "permission-management", label: "Permission Management", icon: Lock },
     { id: "procurement-monitoring", label: "Procurement Monitoring", icon: ShoppingBag },
-    { id: "financial-monitoring", label: "Financial Monitoring", icon: IndianRupee },
     { id: "inventory-monitoring", label: "Inventory Monitoring", icon: Boxes },
-    { id: "vendor-monitoring", label: "Vendor Monitoring", icon: Truck },
     { id: "master-data", label: "Master Data Management", icon: Globe },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "support", label: "Support & Help", icon: LifeBuoy },
@@ -94,12 +88,8 @@ const SuperAdminDashboard = () => {
         return <SuperPermissionManagement />;
       case "procurement-monitoring":
         return <SuperProcurementMonitoring />;
-      case "financial-monitoring":
-        return <SuperFinancialMonitoring />;
       case "inventory-monitoring":
         return <SuperInventoryMonitoring />;
-      case "vendor-monitoring":
-        return <SuperVendorMonitoring />;
       case "support":
         return <AdminSupport />;
       case "notifications":
