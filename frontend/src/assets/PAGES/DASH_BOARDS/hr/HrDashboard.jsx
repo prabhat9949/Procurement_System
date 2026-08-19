@@ -2115,7 +2115,18 @@ function HelpSupportView({ userId }) {
     try {
       const data = await apiGet("/api/support-tickets/counts");
       setCounts(data || { open: 0, inProgress: 0, resolved: 0 });
-    } catch { /* ignore */ }
+    } catch {
+      /* counts endpoint may not be accessible for non-admin roles; use ticket list counts */
+      try {
+        const mine = await apiGet("/api/support-tickets/my?page=0&size=100");
+        const list = mine?.content || [];
+        setCounts({
+          open: list.filter((t) => t.status === "OPEN" || t.status === "IN_PROGRESS").length,
+          inProgress: list.filter((t) => t.status === "IN_PROGRESS").length,
+          resolved: list.filter((t) => t.status === "RESOLVED" || t.status === "CLOSED").length,
+        });
+      } catch { /* ignore */ }
+    }
   }, []);
 
   useEffect(() => {

@@ -16,10 +16,26 @@ import { apiGet } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
 
 const ACTION_LABEL = {
-  SUBMITTED: { label: "Submitted", icon: Send, color: "#2563eb" },
+  SUBMITTED: { label: "Submitted", icon: Send, color: "#059669" },
   APPROVED: { label: "Approved", icon: CheckCircle2, color: "#059669" },
   REJECTED: { label: "Rejected", icon: XCircle, color: "#dc2626" },
-  RETURNED: { label: "Returned for Correction", icon: RotateCcw, color: "#d97706" },
+  RETURNED: { label: "Returned for Correction", icon: RotateCcw, color: "#2563eb" },
+  CREATED: { label: "PR Submitted", icon: Send, color: "#059669" },
+  MANAGER_APPROVAL: { label: "Manager Approved", icon: CheckCircle2, color: "#059669" },
+  SENIOR_APPROVAL: { label: "Senior Manager Approved", icon: CheckCircle2, color: "#059669" },
+  HEAD_APPROVAL: { label: "Head Approved", icon: CheckCircle2, color: "#059669" },
+  ASSIGNMENT: { label: "Assigned", icon: UserCheck, color: "#059669" },
+  PROCUREMENT_ASSIGNMENT: { label: "Procurement Assignment", icon: UserCheck, color: "#059669" },
+  RFQ_CREATED: { label: "RFQ Created", icon: FileText, color: "#059669" },
+  VENDOR_INVITED: { label: "Vendor Invited", icon: Send, color: "#059669" },
+  QUOTATION_RECEIVED: { label: "Quotation Received", icon: FileText, color: "#059669" },
+  QUOTATION_SELECTED: { label: "Quotation Selected", icon: CheckCircle2, color: "#059669" },
+  PO_CREATED: { label: "PO Created", icon: FileText, color: "#059669" },
+  WAREHOUSE_RECEIPT: { label: "Warehouse Receipt", icon: Truck, color: "#059669" },
+  GRN: { label: "GRN Completed", icon: CheckCircle2, color: "#059669" },
+  AUDIT: { label: "Audit Completed", icon: CheckCircle2, color: "#059669" },
+  FINANCE: { label: "Finance Completed", icon: CheckCircle2, color: "#059669" },
+  COMPLETED: { label: "Completed", icon: CheckCircle2, color: "#059669" },
 };
 
 const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
@@ -265,26 +281,41 @@ const RequestTracking = ({ initialTrackingId, onNotifyRefresh }) => {
               {/* Timeline */}
               <h4 style={{ margin: "0 0 14px", fontSize: 13.5, fontWeight: 800, color: "#111" }}>Approval &amp; Workflow Timeline</h4>
               <div className="emp-timeline-container" style={{ position: "relative", paddingLeft: 28 }}>
-                {[
-                  { label: "Request Created", at: detail.createdAt, kind: "created" },
-                  ...history.map((h) => ({ label: h.title || ACTION_LABEL[h.action]?.label || h.action, at: h.performedAt, who: h.performedByName, comment: h.comments, kind: h.action })),
-                ].map((step, idx) => {
-                  const meta = ACTION_LABEL[step.kind];
-                  const color = meta?.color || "#2563eb";
-                  const Icon = meta?.icon || FileText;
-                  return (
-                    <div key={idx} className="emp-timeline-item" style={{ position: "relative", paddingBottom: 18 }}>
-                      <div style={{ position: "absolute", left: -28, top: 2, width: 30, height: 30, borderRadius: "50%", background: `${color}14`, color, display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${color}` }}>
-                        <Icon size={13} />
+                {(() => {
+                  const isDraft = detail?.status === "DRAFT";
+                  const timelineSteps = [
+                    {
+                      label: isDraft ? "Request Draft (Not Submitted)" : "Request Submitted",
+                      at: detail.createdAt,
+                      // DRAFT = yellow, SUBMITTED = green
+                      color: isDraft ? "#d97706" : "#059669",
+                      icon: isDraft ? Clock : Send,
+                    },
+                    ...history.map((h) => ({
+                      label: h.title || ACTION_LABEL[h.action]?.label || h.action,
+                      at: h.performedAt,
+                      who: h.performedByName,
+                      comment: h.comments,
+                      color: ACTION_LABEL[h.action]?.color || "#2563eb",
+                      icon: ACTION_LABEL[h.action]?.icon || FileText,
+                    })),
+                  ];
+                  return timelineSteps.map((step, idx) => {
+                    const { color, icon: Icon } = step;
+                    return (
+                      <div key={idx} className="emp-timeline-item" style={{ position: "relative", paddingBottom: 18 }}>
+                        <div style={{ position: "absolute", left: -28, top: 2, width: 30, height: 30, borderRadius: "50%", background: `${color}14`, color, display: "flex", alignItems: "center", justifyContent: "center", border: `2px solid ${color}` }}>
+                          <Icon size={13} />
+                        </div>
+                        <div style={{ fontSize: 13.5, fontWeight: 800, color: "#111" }}>{step.label}</div>
+                        <div style={{ fontSize: 12, color: "#64748b" }}>
+                          {formatDateIN(step.at)} {step.who ? `· ${step.who}` : ""}
+                        </div>
+                        {step.comment && <div style={{ fontSize: 12.5, color: "#475569", marginTop: 4, background: "#f8fafc", borderRadius: 8, padding: "8px 10px" }}>“{step.comment}”</div>}
                       </div>
-                      <div style={{ fontSize: 13.5, fontWeight: 800, color: "#111" }}>{step.label}</div>
-                      <div style={{ fontSize: 12, color: "#64748b" }}>
-                        {formatDateIN(step.at)} {step.who ? `· ${step.who}` : ""}
-                      </div>
-                      {step.comment && <div style={{ fontSize: 12.5, color: "#475569", marginTop: 4, background: "#f8fafc", borderRadius: 8, padding: "8px 10px" }}>“{step.comment}”</div>}
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
               </div>
 
               {/* Assignment history: who owned each stage, when, and why */}
