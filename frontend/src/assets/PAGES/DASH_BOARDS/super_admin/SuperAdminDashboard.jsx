@@ -6,11 +6,10 @@ import {
   Globe,
   Building2,
   Users,
-  ShieldCheck,
-  Lock,
+
   Activity,
   ShoppingBag,
-  Boxes,
+
   FileText,
   Bell,
   FolderKanban,
@@ -27,13 +26,12 @@ import {
 import SuperSystemOverview from "./modules/SuperSystemOverview";
 import SuperOrgManagement from "./modules/SuperOrgManagement";
 import SuperUserManagement from "./modules/SuperUserManagement";
-import SuperRoleManagement from "./modules/SuperRoleManagement";
-import SuperPermissionManagement from "./modules/SuperPermissionManagement";
+
 import SuperProcurementMonitoring from "./modules/SuperProcurementMonitoring";
 import SuperInventoryMonitoring from "./modules/SuperInventoryMonitoring";
 import SuperNotificationsCenter from "./modules/SuperNotificationsCenter";
 import AdminSupport from "./modules/AdminSupport";
-import OrgMasterDataPanel from "../org_admin/modules/OrgMasterDataPanel";
+
 import OrgSystemHealth from "../org_admin/modules/OrgSystemHealth";
 
 import SuperSettings from "./modules/SuperSettings";
@@ -47,18 +45,14 @@ const SuperAdminDashboard = () => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const navMenuItems = [
-    { id: "system-overview", label: "System Overview", icon: Globe },
+    { id: "system-overview", label: "Dashboard", icon: Globe },
     { id: "system-health", label: "System Health", icon: Server },
     { id: "organization-management", label: "Organization Management", icon: Building2 },
     { id: "user-management", label: "User Management", icon: Users },
-    { id: "role-management", label: "Role Management", icon: ShieldCheck },
-    { id: "permission-management", label: "Permission Management", icon: Lock },
     { id: "procurement-monitoring", label: "Procurement Monitoring", icon: ShoppingBag },
-    { id: "inventory-monitoring", label: "Inventory Monitoring", icon: Boxes },
-    { id: "master-data", label: "Master Data Management", icon: Globe },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "support", label: "Support & Help", icon: LifeBuoy },
-    { id: "settings", label: "Account & Security", icon: Settings },
+    { id: "settings", label: "Profile", icon: Settings },
     ];
 
   const handleLogout = () => {
@@ -82,20 +76,12 @@ const SuperAdminDashboard = () => {
         return <SuperOrgManagement />;
       case "user-management":
         return <SuperUserManagement />;
-      case "role-management":
-        return <SuperRoleManagement />;
-      case "permission-management":
-        return <SuperPermissionManagement />;
       case "procurement-monitoring":
         return <SuperProcurementMonitoring />;
-      case "inventory-monitoring":
-        return <SuperInventoryMonitoring />;
       case "support":
         return <AdminSupport />;
       case "notifications":
         return <SuperNotificationsCenter />;
-      case "master-data":
-        return <OrgMasterDataPanel />;
       case "profile":
       case "settings":
         return <SuperSettings />;

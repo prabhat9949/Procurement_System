@@ -53,8 +53,6 @@ const InventoryDashboard = () => {
     { id: "inventory-tracking", label: "Inventory Tracking", icon: Barcode },
     { id: "delivery-monitoring", label: "Delivery Monitoring", icon: Clock },
     { id: "warehouse-management", label: "Warehouse Management", icon: Warehouse },
-    { id: "inventory-analytics", label: "Inventory Analytics", icon: BarChart3 },
-    { id: "reports", label: "Reports", icon: FolderKanban },
     ];
 
   const handleLogout = () => {
@@ -81,10 +79,6 @@ const InventoryDashboard = () => {
         return <DeliveryMonitoring />;
       case "warehouse-management":
         return <WarehouseManagement />;
-      case "inventory-analytics":
-        return <InventoryAnalytics />;
-      case "reports":
-        return <InventoryReports />;
       case "profile":
         return <InventoryProfile />;
       default:

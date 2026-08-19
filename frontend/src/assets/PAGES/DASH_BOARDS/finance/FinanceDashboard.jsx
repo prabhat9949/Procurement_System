@@ -46,9 +46,7 @@ const FinanceDashboard = () => {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "payment-approvals", label: "Payment Approvals", icon: CreditCard },
     { id: "invoice-management", label: "Invoice Management", icon: FileCheck2 },
-    { id: "budget-management", label: "Budget Management", icon: PieChart },
-    { id: "expense-management", label: "Expense Management", icon: TrendingUp },
-    { id: "financial-analytics", label: "Financial Analytics", icon: BarChart3 },
+
     { id: "procurement-payments", label: "Procurement Payments", icon: IndianRupee },
     { id: "reports", label: "Financial Reports", icon: FolderKanban },
   ];
@@ -67,12 +65,7 @@ const FinanceDashboard = () => {
         return <PaymentApprovals onNavigate={(tab) => setActiveTab(tab)} />;
       case "invoice-management":
         return <FinanceInvoiceMgmt />;
-      case "budget-management":
-        return <FinanceBudgetMgmt />;
-      case "expense-management":
-        return <FinanceExpenseMgmt />;
-      case "financial-analytics":
-        return <FinancialAnalytics />;
+
       case "procurement-payments":
         return <ProcurementPaymentTracking />;
       case "reports":

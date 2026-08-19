@@ -68,8 +68,6 @@ const ProcExecDashboard = () => {
     { id: "purchase-orders", label: "Purchase Orders", icon: ShoppingBag },
     { id: "invoices", label: "Invoices", icon: FileCheck2 },
     { id: "procurement-tracking", label: "Procurement Tracking", icon: Clock },
-    { id: "analytics", label: "Procurement Analytics", icon: BarChart3 },
-    { id: "reports", label: "Documents", icon: FolderKanban },
     ];
 
   const handleLogout = () => {
@@ -98,10 +96,6 @@ const ProcExecDashboard = () => {
       case "purchase-orders": return <PurchaseOrders onNavigate={setActiveTab} />;
       case "invoices": return <ExecInvoices onNavigate={setActiveTab} />;
       case "procurement-tracking": return <ProcurementTracking onNavigate={setActiveTab} />;
-      case "analytics":
-        return <ProcurementAnalytics />;
-      case "reports":
-        return <ExecReports />;
       case "profile":
         return <ExecProfile />;
       default:
