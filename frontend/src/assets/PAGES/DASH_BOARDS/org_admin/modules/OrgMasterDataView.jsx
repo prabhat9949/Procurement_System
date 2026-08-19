@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Database, Users, Briefcase, Boxes, DollarSign, ShieldCheck } from "lucide-react";
+import { Database, Users, Briefcase, Boxes, IndianRupee, ShieldCheck } from "lucide-react";
 import {
   getStoredUsers,
   getStoredMasterRequests,
@@ -101,7 +101,7 @@ const OrgMasterDataView = () => {
 
         {/* Finance */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: "12px", padding: "20px" }}>
-          <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}><DollarSign size={18} color="#10b981" /> Finance Management</h3>
+          <h3 style={{ fontSize: "16px", fontWeight: "700", marginBottom: "16px", display: "flex", alignItems: "center", gap: "8px" }}><IndianRupee size={18} color="#10b981" /> Finance Management</h3>
           <div style={{ maxHeight: "200px", overflowY: "auto" }}>
             {payments.map(p => (
               <div key={p.payId} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid #f3f4f6", fontSize: "13px" }}>

@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/payments")
-@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','FINANCE_MANAGER')")
+@PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','FINANCE_MANAGER','PROCUREMENT_MANAGER','AUDITOR')")
 public class PaymentController {
     private final PaymentService service;
     public PaymentController(PaymentService service){this.service=service;}

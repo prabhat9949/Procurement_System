@@ -1,8 +1,4 @@
-import React, { useState, useEffect } from "react";
-import ReactDOM from "react-dom";
-import VendorProfileModal from "../../shared_ui/VendorProfileModal";
-import CreateRfqWizardModal from "./CreateRfqWizardModal";
-import { epsEventBus, fetchActiveRfqs, awardVendorContract, revokeVendorContract } from "../../../../../services/epsApiService";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Send,
   PlusCircle,
@@ -12,1051 +8,439 @@ import {
   FileText,
   X,
   Search,
-  ArrowRight,
   Eye,
   Building,
-  Filter,
-  ShieldCheck,
-  Award,
-  DollarSign
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
+import { apiGet, apiPost } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
 
-const mockPurchaseRequests = {
-  "REQ-2026-8921": {
-    id: "REQ-2026-8921",
-    requester: "Alex Morgan",
-    role: "Senior Frontend Architect",
-    dept: "Engineering & IT",
-    item: "MacBook Pro M3 Max 64GB Workstations (x10)",
-    qty: 10,
-    estimatedCost: "$38,990.00",
-    priority: "Urgent",
-    date: "2026-07-24",
-    justification: "High-performance Mobile compilation & Local LLM AI testing hardware setup required for Q3 project releases.",
-    specificationsFile: "Hardware_Specs_MacBook_Pro.pdf",
-    approvedBy: "Sarah Jenkins (VP Eng)",
-  },
-  "REQ-2026-8945": {
-    id: "REQ-2026-8945",
-    requester: "David Miller",
-    role: "DevOps Lead",
-    dept: "Engineering & IT",
-    item: "Datadog APM Enterprise Monitoring License",
-    qty: 1,
-    estimatedCost: "$8,500.00",
-    priority: "High",
-    date: "2026-07-25",
-    justification: "Annual renewal for production microservice observability and latency telemetry dashboards.",
-    specificationsFile: "Datadog_License_Terms.pdf",
-    approvedBy: "Sarah Jenkins (VP Eng)",
-  },
-  "REQ-2026-8972": {
-    id: "REQ-2026-8972",
-    requester: "Elena Rostova",
-    role: "Network Architect",
-    dept: "Engineering & IT",
-    item: "Cisco Catalyst 9300 Core Rack Switches (x2)",
-    qty: 2,
-    estimatedCost: "$6,200.00",
-    priority: "High",
-    date: "2026-07-26",
-    justification: "Secondary data center rack switch redundancy upgrade to eliminate single point of failure.",
-    specificationsFile: "Cisco_Switch_Topology.pdf",
-    approvedBy: "Sarah Jenkins (VP Eng)",
-  },
+const RFQ_STATUS_STYLE = {
+  DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
+  OPEN: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
+  CLOSED: { bg: "rgba(5,150,105,.12)", color: "#059669" },
+  CANCELLED: { bg: "rgba(220,38,38,.12)", color: "#dc2626" },
 };
 
-const availableVendorsList = [
-  {
-    id: "VND-101",
-    name: "Apple Business Direct",
-    category: "Hardware & IT",
-    rating: "4.9 ⭐",
-    compliance: "100% Certified",
-    email: "enterprise@apple.com",
-    phone: "+1 (800) 692-7753",
-    leadTime: "2-3 Days",
-    preferredTier: "Gold Preferred",
-  },
-  {
-    id: "VND-102",
-    name: "CDW Direct",
-    category: "Hardware & IT",
-    rating: "4.7 ⭐",
-    compliance: "100% Certified",
-    email: "bids@cdw.com",
-    phone: "+1 (800) 800-4239",
-    leadTime: "1-2 Days",
-    preferredTier: "Silver Partner",
-  },
-  {
-    id: "VND-103",
-    name: "Insight Tech Solutions",
-    category: "Hardware & IT",
-    rating: "4.6 ⭐",
-    compliance: "98% Certified",
-    email: "enterprise@insight.com",
-    phone: "+1 (800) 467-4448",
-    leadTime: "3-5 Days",
-    preferredTier: "Verified Supplier",
-  },
-  {
-    id: "VND-104",
-    name: "Datadog Direct",
-    category: "Software & SaaS",
-    rating: "5.0 ⭐",
-    compliance: "100% Certified",
-    email: "sales@datadoghq.com",
-    phone: "+1 (866) 329-4448",
-    leadTime: "Instant Provisioning",
-    preferredTier: "Strategic SaaS Partner",
-  },
-  {
-    id: "VND-105",
-    name: "SoftwareOne Reseller",
-    category: "Software & SaaS",
-    rating: "4.8 ⭐",
-    compliance: "99% Certified",
-    email: "quotes@softwareone.com",
-    phone: "+1 (800) 444-9988",
-    leadTime: "1 Day",
-    preferredTier: "Gold Partner",
-  },
-  {
-    id: "VND-106",
-    name: "Cisco Systems Direct",
-    category: "Hardware & IT",
-    rating: "4.9 ⭐",
-    compliance: "100% Certified",
-    email: "commercial@cisco.com",
-    phone: "+1 (800) 553-6387",
-    leadTime: "3-4 Days",
-    preferredTier: "Primary OEM",
-  },
-];
-
-const initialRfqs = [
-  {
-    id: "RFQ-2026-901",
-    reqId: "REQ-2026-8921",
-    item: "MacBook Pro M3 Max 64GB Workstations (x10)",
-    category: "Hardware & IT",
-    targetQty: 10,
-    deadline: "2026-07-28",
-    invitedVendors: ["Apple Business Direct", "CDW Direct", "Insight Tech Solutions"],
-    bidsReceived: 3,
-    status: "Active Bidding",
-  },
-  {
-    id: "RFQ-2026-898",
-    reqId: "REQ-2026-8945",
-    item: "Datadog APM Enterprise Monitoring License",
-    category: "Software & SaaS",
-    targetQty: 1,
-    deadline: "2026-07-29",
-    invitedVendors: ["Datadog Direct", "SoftwareOne Reseller"],
-    bidsReceived: 2,
-    status: "Reviewing Bids",
-  },
-  {
-    id: "RFQ-2026-912",
-    reqId: "REQ-2026-8972",
-    item: "Cisco Catalyst 9300 Core Rack Switches (x2)",
-    category: "Hardware & IT",
-    targetQty: 2,
-    deadline: "2026-07-30",
-    invitedVendors: ["Cisco Systems Direct", "CDW Direct", "Insight Tech Solutions"],
-    bidsReceived: 1,
-    status: "Active Bidding",
-  },
-];
-
 const RfqManagement = () => {
-  const [rfqs, setRfqs] = useState(initialRfqs);
-  const [activeTabSection, setActiveTabSection] = useState("rfqs"); // 'rfqs' | 'vendors'
-  const [vendorSearchTerm, setVendorSearchTerm] = useState("");
-  const [selectedVendorCategory, setSelectedVendorCategory] = useState("all");
+  // Resolve permissions at render time so admin grants/revocations are
+  // reflected without a stale module-level snapshot.
+  const canCreateRfq = hasPermission("CAN_CREATE_RFQ");
+  const canInviteVendor = hasPermission("CAN_INVITE_VENDOR");
+  const [tab, setTab] = useState("rfqs"); // 'rfqs' | 'vendors'
+  const [rfqs, setRfqs] = useState([]);
+  const [vendors, setVendors] = useState([]);
+  const [approvedPrs, setApprovedPrs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [toastMsg, setToastMsg] = useState("");
+  const [vendorSearch, setVendorSearch] = useState("");
 
-  // Modals state
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [viewReqDetails, setViewReqDetails] = useState(null);
-  const [viewVendorDetails, setViewVendorDetails] = useState(null);
-  const [editRfqModal, setEditRfqModal] = useState(null); // Post-creation RFQ Editing
-  const [editRfqDeadline, setEditRfqDeadline] = useState("");
-  const [editRfqStatus, setEditRfqStatus] = useState("Active Bidding");
-  const [bidsMatrixRfq, setBidsMatrixRfq] = useState(null); // Side-by-side Bids Matrix Modal
-  const [confirmQuoteApproval, setConfirmQuoteApproval] = useState(null); // Quotation Approval Confirmation Modal
+  // Create modal state
+  const [showCreate, setShowCreate] = useState(false);
+  const [form, setForm] = useState({ purchaseRequestId: "", closingDate: "", quotationOpeningDate: "", selectedVendors: [], remarks: "" });
+  const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      const data = await fetchActiveRfqs();
-      if (data && data.length) {
-        setRfqs(data);
-      }
-    };
-    load();
-    const unsub = epsEventBus.subscribe(async () => {
-      const data = await fetchActiveRfqs();
-      if (data && data.length) {
-        setRfqs(data);
-      }
-    });
-    return unsub;
+  // Detail state
+  const [rfqVendors, setRfqVendors] = useState(null);
+  const [prDetail, setPrDetail] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [rfqRes, vendorRes, prRes] = await Promise.all([
+        apiGet("/api/rfqs?page=0&size=100&sort=createdAt&direction=desc").catch(() => null),
+        apiGet("/api/vendors?page=0&size=200").catch(() => null),
+        apiGet("/api/purchase-requests?status=APPROVED&page=0&size=50&sort=createdAt&direction=desc").catch(() => null),
+      ]);
+      setRfqs(rfqRes?.content || []);
+      setVendors(vendorRes?.content || []);
+      setApprovedPrs(prRes?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load RFQ data.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // New RFQ Form state with selectable vendors
-  const [newRfq, setNewRfq] = useState({
-    reqId: "REQ-2026-8921",
-    item: "MacBook Pro M3 Max 64GB Workstations (x10)",
-    targetQty: 10,
-    category: "Hardware & IT",
-    deadline: "2026-08-05",
-    selectedVendors: ["Apple Business Direct", "CDW Direct"],
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const toast = (text) => {
+    setToastMsg(text);
+    setTimeout(() => setToastMsg(""), 5000);
+  };
+
+  const activeVendors = vendors.filter((v) => (v.status || "ACTIVE").toUpperCase() === "ACTIVE" || v.approved);
+  const filteredVendors = activeVendors.filter((v) => {
+    const q = vendorSearch.toLowerCase();
+    if (!q) return true;
+    return (
+      (v.vendorName || "").toLowerCase().includes(q) ||
+      (v.vendorCode || "").toLowerCase().includes(q) ||
+      (v.vendorType || "").toLowerCase().includes(q) ||
+      (v.city || "").toLowerCase().includes(q)
+    );
   });
 
-  const [toastMsg, setToastMsg] = useState("");
+  const toggleVendor = (id) => {
+    setForm((f) => ({
+      ...f,
+      selectedVendors: f.selectedVendors.includes(id) ? f.selectedVendors.filter((x) => x !== id) : [...f.selectedVendors, id],
+    }));
+  };
 
-  const filteredVendors = availableVendorsList.filter((v) => {
-    const matchesSearch =
-      v.name.toLowerCase().includes(vendorSearchTerm.toLowerCase()) ||
-      v.category.toLowerCase().includes(vendorSearchTerm.toLowerCase());
-    const matchesCategory =
-      selectedVendorCategory === "all" || v.category === selectedVendorCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const handleToggleVendorSelection = (vendorName) => {
-    if (newRfq.selectedVendors.includes(vendorName)) {
-      setNewRfq({
-        ...newRfq,
-        selectedVendors: newRfq.selectedVendors.filter((v) => v !== vendorName),
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!form.purchaseRequestId) { setError("Please select an approved purchase request."); return; }
+    if (!form.closingDate) { setError("Please set the quotation closing date."); return; }
+    setCreating(true);
+    setError("");
+    try {
+      const rfq = await apiPost("/api/rfqs", {
+        purchaseRequestId: Number(form.purchaseRequestId),
+        closingDate: form.closingDate,
+        quotationOpeningDate: form.quotationOpeningDate || form.closingDate,
+        currency: "INR",
+        remarks: form.remarks.trim() || null,
       });
-    } else {
-      setNewRfq({
-        ...newRfq,
-        selectedVendors: [...newRfq.selectedVendors, vendorName],
-      });
+      let invited = 0;
+      for (const vendorId of form.selectedVendors) {
+        if (!canInviteVendor) continue;
+        await apiPost(`/api/rfqs/${rfq.id}/vendors`, { vendorId: Number(vendorId), remarks: "Invited for quotation" }).catch(() => null);
+        invited += 1;
+      }
+      setShowCreate(false);
+      setForm({ purchaseRequestId: "", closingDate: "", quotationOpeningDate: "", selectedVendors: [], remarks: "" });
+      toast(`${rfq.rfqNumber} created and sent to ${invited} invited vendor(s).`);
+      load();
+    } catch (err) {
+      setError(err.message || "Unable to create the RFQ.");
+    } finally {
+      setCreating(false);
     }
   };
 
-  const handleCreateAndSendRfq = (e) => {
-    e.preventDefault();
-    if (newRfq.selectedVendors.length === 0) {
-      alert("Please select at least 1 available vendor to invite.");
-      return;
+  const openRfqVendors = async (rfq) => {
+    const res = await apiGet(`/api/rfqs/${rfq.id}/vendors?page=0&size=50`).catch(() => null);
+    setRfqVendors({ rfq, vendors: res?.content || [] });
+  };
+
+  const openPrDetail = async (id) => {
+    const [pr, lineRes] = await Promise.all([
+      apiGet(`/api/purchase-requests/${id}`).catch(() => null),
+      apiGet(`/api/purchase-request-lines?purchaseRequestId=${id}&size=20`).catch(() => null),
+    ]);
+    setPrDetail({ pr, lines: lineRes?.content || [] });
+  };
+
+  const closeRfq = async (rfq) => {
+    try {
+      await apiPost(`/api/rfqs/${rfq.id}/close`);
+      toast(`${rfq.rfqNumber} closed.`);
+      load();
+    } catch (err) {
+      setError(err.message || "Unable to close the RFQ.");
     }
-
-    const createdId = `RFQ-2026-${Math.floor(920 + Math.random() * 75)}`;
-    const created = {
-      id: createdId,
-      reqId: newRfq.reqId,
-      item: newRfq.item,
-      category: newRfq.category,
-      targetQty: newRfq.targetQty,
-      deadline: newRfq.deadline || "2026-08-05",
-      invitedVendors: newRfq.selectedVendors,
-      bidsReceived: 0,
-      status: "Active Bidding",
-    };
-
-    setRfqs([created, ...rfqs]);
-    setShowCreateModal(false);
-    setToastMsg(
-      `RFQ ${createdId} created and successfully sent/broadcasted to ${newRfq.selectedVendors.length} invited suppliers!`
-    );
-    setTimeout(() => setToastMsg(""), 5000);
   };
 
   return (
     <div className="pe-rfq-management-container">
-      {/* Header */}
       <div className="pe-page-header">
         <div>
           <h1 className="pe-page-title">
             <Send color="#f8b400" /> Request for Quotations (RFQ) Management Hub
           </h1>
           <p className="pe-page-subtitle">
-            Create, issue, and broadcast competitive bidding requests to verified enterprise suppliers.
+            Create RFQs against approved requisitions, invite eligible vendors and track quotation responses — all from the database.
           </p>
         </div>
-
         <div style={{ display: "flex", gap: "12px" }}>
           <button
             className="pe-btn-primary-sm"
-            style={{
-              background: activeTabSection === "vendors" ? "#f8b400" : "#ffffff",
-              color: "#111111",
-              border: "1px solid #d9d9d9",
-            }}
-            onClick={() =>
-              setActiveTabSection(activeTabSection === "rfqs" ? "vendors" : "rfqs")
-            }
+            style={{ background: tab === "vendors" ? "#f8b400" : "#fff", color: "#111", border: "1px solid #d9d9d9" }}
+            onClick={() => setTab(tab === "rfqs" ? "vendors" : "rfqs")}
           >
-            <Users size={16} />{" "}
-            {activeTabSection === "rfqs" ? "Search Available Vendors" : "View Active RFQs"}
+            <Users size={16} /> {tab === "rfqs" ? "Vendor Directory" : "Active RFQs"}
           </button>
-
-          <button
-            className="pe-btn-primary-sm"
-            onClick={() => setShowCreateModal(true)}
-          >
-            <PlusCircle size={16} /> Create & Send New RFQ
-          </button>
+          {canCreateRfq && (
+            <button className="pe-btn-primary-sm" onClick={() => setShowCreate(true)}>
+              <PlusCircle size={16} /> Create &amp; Send New RFQ
+            </button>
+          )}
         </div>
       </div>
 
       {toastMsg && (
-        <div
-          style={{
-            background: "rgba(5, 150, 105, 0.12)",
-            border: "1px solid #059669",
-            color: "#059669",
-            padding: "14px 20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-            fontWeight: "700",
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
+        <div style={{ background: "rgba(5,150,105,.12)", border: "1px solid #059669", color: "#059669", padding: "14px 20px", borderRadius: 12, marginBottom: 20, fontWeight: 700, fontSize: 14, display: "flex", alignItems: "center", gap: 10 }}>
           <CheckCircle2 size={18} /> {toastMsg}
         </div>
       )}
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 13 }}>
+          <AlertTriangle size={17} /> {error}
+        </div>
+      )}
 
-      {/* SECTION 1: SEARCH AVAILABLE VENDORS DIRECTORY TAB */}
-      {activeTabSection === "vendors" ? (
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "80px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading RFQ data...
+        </div>
+      ) : tab === "vendors" ? (
         <div>
-          <div className="pe-card" style={{ marginBottom: "24px", padding: "20px" }}>
-            <h3 style={{ fontSize: "16px", color: "#111", fontWeight: "700", marginBottom: "14px" }}>
-              Search Available Vendors & Supplier Profiles
-            </h3>
-
-            <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
-              <div style={{ position: "relative", flex: 1, minWidth: "260px" }}>
-                <Search
-                  size={16}
-                  color="#666666"
-                  style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
-                />
-                <input
-                  type="text"
-                  placeholder="Search available vendors by name or category..."
-                  value={vendorSearchTerm}
-                  onChange={(e) => setVendorSearchTerm(e.target.value)}
-                  className="pe-form-input"
-                  style={{ paddingLeft: "42px", height: "42px" }}
-                />
-              </div>
-
-              <select
-                value={selectedVendorCategory}
-                onChange={(e) => setSelectedVendorCategory(e.target.value)}
-                className="pe-form-select"
-                style={{ width: "200px", height: "42px" }}
-              >
-                <option value="all">All Vendor Categories</option>
-                <option value="Hardware & IT">Hardware & IT</option>
-                <option value="Software & SaaS">Software & SaaS</option>
-              </select>
+          <div className="pe-card" style={{ marginBottom: 24, padding: 20 }}>
+            <h3 style={{ fontSize: 16, color: "#111", fontWeight: 700, marginBottom: 14 }}>Eligible Vendor Directory</h3>
+            <div style={{ position: "relative", maxWidth: 420 }}>
+              <Search size={16} color="#666" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
+              <input
+                type="text"
+                placeholder="Search vendors by name, code, type or city..."
+                value={vendorSearch}
+                onChange={(e) => setVendorSearch(e.target.value)}
+                className="pe-form-input"
+                style={{ paddingLeft: 42, height: 42 }}
+              />
             </div>
           </div>
-
-          {/* Vendors Grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: "20px" }}>
-            {filteredVendors.map((v) => (
-              <div key={v.id} className="pe-card pe-card-gold-glow">
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-                  <span style={{ fontSize: "12px", color: "#d97706", fontWeight: "800" }}>{v.id}</span>
-                  <span style={{ background: "rgba(5,150,105,0.12)", color: "#059669", padding: "2px 8px", borderRadius: "10px", fontSize: "11px", fontWeight: "700" }}>
-                    {v.compliance}
-                  </span>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 20 }}>
+            {filteredVendors.length === 0 ? (
+              <div className="pe-card" style={{ padding: 40, textAlign: "center", color: "#9aa8b8" }}>No eligible vendors found.</div>
+            ) : (
+              filteredVendors.map((v) => (
+                <div key={v.id} className="pe-card pe-card-gold-glow">
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                    <span style={{ fontSize: 12, color: "#d97706", fontWeight: 800 }}>{v.vendorCode || `VND-${v.id}`}</span>
+                    <span style={{ background: "rgba(5,150,105,.12)", color: "#059669", padding: "2px 8px", borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                      {v.status || "ACTIVE"}
+                    </span>
+                  </div>
+                  <h3 style={{ fontSize: 17, color: "#111", fontWeight: 700 }}>{v.vendorName}</h3>
+                  <p style={{ fontSize: 13, color: "#555" }}>{v.vendorType || "Supplier"}{v.city ? ` · ${v.city}` : ""}</p>
+                  <div style={{ background: "#f8f9fb", padding: 12, borderRadius: 10, margin: "14px 0", fontSize: 13, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {v.contactPerson && <div>Contact: <strong>{v.contactPerson}</strong></div>}
+                    {v.email && <div>Email: <span style={{ color: "#3b82f6" }}>{v.email}</span></div>}
+                    {v.phone && <div>Phone: <strong>{v.phone}</strong></div>}
+                    {v.rating != null && <div>Rating: <strong>{Number(v.rating).toFixed(1)} / 5.0</strong></div>}
+                  </div>
                 </div>
-
-                <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700" }}>{v.name}</h3>
-                <p style={{ fontSize: "13px", color: "#555555" }}>Category: <strong>{v.category}</strong></p>
-
-                <div style={{ background: "#f8f9fb", padding: "12px", borderRadius: "10px", margin: "14px 0", fontSize: "13px", display: "flex", flexDirection: "column", gap: "6px" }}>
-                  <div>Rating: <strong>{v.rating}</strong> ({v.preferredTier})</div>
-                  <div>SLA Lead Time: <strong>{v.leadTime}</strong></div>
-                  <div>Contact: <span style={{ color: "#3b82f6" }}>{v.email}</span></div>
-                </div>
-
-                <div style={{ display: "flex", justifyContent: "flex-end" }}>
-                  <button
-                    className="pe-btn-primary-sm"
-                    onClick={() => setViewVendorDetails(v)}
-                  >
-                    <Eye size={15} /> View Vendor Details
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       ) : (
-        /* SECTION 2: ACTIVE RFQS LIST */
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {rfqs.map((rfq) => (
-            <div key={rfq.id} className="pe-card pe-card-gold-glow">
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "flex-start",
-                  justifyContent: "space-between",
-                  flexWrap: "wrap",
-                  gap: "16px",
-                  marginBottom: "16px",
-                }}
-              >
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{ fontWeight: "800", color: "#d97706", fontSize: "16px" }}>
-                      {rfq.id}
-                    </span>
-                    <span style={{ fontSize: "12px", color: "#666666" }}>
-                      Purchase Req Ref: <strong>{rfq.reqId}</strong>
-                    </span>
-                    {rfq.status === "Awarded" || rfq.status === "Approved" || rfq.winnerVendor ? (
-                      <span
-                        style={{
-                          background: "rgba(5, 150, 105, 0.12)",
-                          color: "#059669",
-                          border: "1px solid rgba(5, 150, 105, 0.3)",
-                          padding: "4px 12px",
-                          borderRadius: "12px",
-                          fontSize: "12px",
-                          fontWeight: "800",
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: "5px"
-                        }}
-                      >
-                        <CheckCircle2 size={14} /> Quotation Approved & Awarded ({rfq.winnerVendor || "Apple Business Direct"})
-                      </span>
-                    ) : (
-                      <span className="pe-badge rfq">{rfq.status}</span>
+        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+          {rfqs.length === 0 ? (
+            <div className="pe-card" style={{ padding: 60, textAlign: "center", color: "#9aa8b8" }}>
+              <Send size={30} style={{ opacity: 0.5, marginBottom: 8 }} />
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#475569" }}>No RFQs yet</div>
+              <div style={{ fontSize: 13, marginTop: 4 }}>{canCreateRfq ? "Create an RFQ against an approved requisition to start sourcing." : "No RFQs have been created."}</div>
+            </div>
+          ) : (
+            rfqs.map((rfq) => {
+              const s = RFQ_STATUS_STYLE[rfq.status] || RFQ_STATUS_STYLE.DRAFT;
+              return (
+                <div key={rfq.id} className="pe-card pe-card-gold-glow">
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 16 }}>
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <span style={{ fontWeight: 800, color: "#d97706", fontSize: 16 }}>{rfq.rfqNumber}</span>
+                        <span style={{ fontSize: 12, color: "#666" }}>Purchase Req Ref: <strong>{rfq.purchaseRequestNumber}</strong></span>
+                        <span className="pe-badge rfq" style={{ background: s.bg, color: s.color }}>{rfq.status}</span>
+                      </div>
+                      <h3 style={{ fontSize: 17, color: "#111", fontWeight: 700, marginTop: 4 }}>
+                        {rfq.departmentName || "Department requisition"}
+                      </h3>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontSize: 11, color: "#666", textTransform: "uppercase", fontWeight: 700 }}>Quotation Deadline</span>
+                      <p style={{ fontSize: 15, color: "#dc2626", fontWeight: 800, margin: "2px 0 0" }}>{formatDateIN(rfq.closingDate, { withTime: false })}</p>
+                      <span style={{ fontSize: 11, color: "#666" }}>Currency: {rfq.currency || "INR"}</span>
+                    </div>
+                  </div>
+                  {rfq.remarks && <p style={{ fontSize: 13, color: "#555", marginBottom: 12 }}>{rfq.remarks}</p>}
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, flexWrap: "wrap", borderTop: "1px solid #ececec", paddingTop: 14 }}>
+                    <button className="pe-btn-primary-sm" style={{ background: "#fff", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => openRfqVendors(rfq)}>
+                      <Users size={15} /> Invited Vendors
+                    </button>
+                    <button className="pe-btn-primary-sm" style={{ background: "#fff", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => openPrDetail(rfq.purchaseRequestId)}>
+                      <FileText size={15} /> View Purchase Request
+                    </button>
+                    {rfq.status === "OPEN" && (
+                      <button className="pe-btn-primary-sm" onClick={() => closeRfq(rfq)}>
+                        <Clock size={15} /> Close RFQ
+                      </button>
                     )}
                   </div>
-
-                  <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "700", marginTop: "4px" }}>
-                    {rfq.item}
-                  </h3>
                 </div>
-
-                <div style={{ textAlign: "right" }}>
-                  <span style={{ fontSize: "11px", color: "#666666", textTransform: "uppercase", fontWeight: "700" }}>
-                    Bidding Deadline
-                  </span>
-                  <p style={{ fontSize: "16px", color: "#dc2626", fontWeight: "800" }}>
-                    {rfq.deadline}
-                  </p>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 2fr",
-                  gap: "16px",
-                  padding: "14px",
-                  background: "#f8f9fb",
-                  borderRadius: "10px",
-                  border: "1px solid #ececec",
-                  marginBottom: "18px",
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666666", textTransform: "uppercase", fontWeight: "700" }}>
-                    Vendor Bids Received
-                  </span>
-                  <p style={{ fontSize: "18px", color: "#059669", fontWeight: "800", marginTop: "2px" }}>
-                    {rfq.bids ? new Set(rfq.bids.map((b) => b.vendor)).size : (rfq.bidsReceived || 1)} Unique Supplier Quotations
-                  </p>
-                </div>
-
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666666", textTransform: "uppercase", fontWeight: "700" }}>
-                    Selected / Invited Vendors ({(rfq.invitedVendors || ["Apple Business Direct", "CDW Direct"]).length})
-                  </span>
-                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "6px" }}>
-                    {(rfq.invitedVendors || ["Apple Business Direct", "CDW Direct"]).map((vName, idx) => {
-                      const vendorObj = availableVendorsList.find((x) => x.name === vName);
-                      return (
-                        <button
-                          key={idx}
-                          onClick={() =>
-                            setViewVendorDetails(
-                              vendorObj || {
-                                name: vName,
-                                category: rfq.category,
-                                rating: "4.8 ⭐",
-                                compliance: "Verified",
-                                email: "sales@vendor.com",
-                                phone: "+1 (800) 555-0199",
-                                leadTime: "3 Days",
-                                preferredTier: "Preferred Vendor",
-                              }
-                            )
-                          }
-                          style={{
-                            fontSize: "12px",
-                            background: "#ffffff",
-                            border: "1px solid #d9d9d9",
-                            padding: "4px 10px",
-                            borderRadius: "12px",
-                            color: "#111111",
-                            fontWeight: "600",
-                            cursor: "pointer",
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "6px",
-                          }}
-                          title="Click to View Vendor Details"
-                        >
-                          <Building size={13} color="#f8b400" /> {vName}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Buttons for Sub-features */}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", flexWrap: "wrap" }}>
-                <button
-                  className="pe-btn-primary-sm"
-                  style={{ background: "#ffffff", color: "#d97706", border: "1px solid #f8b400" }}
-                  onClick={() => {
-                    setEditRfqModal(rfq);
-                    setEditRfqDeadline(rfq.deadline || "2026-08-05");
-                    setEditRfqStatus(rfq.status || "Active Bidding");
-                  }}
-                >
-                  <FileText size={15} /> Edit RFQ Details
-                </button>
-
-                <button
-                  className="pe-btn-primary-sm"
-                  style={{ background: "#ffffff", color: "#111111", border: "1px solid #d9d9d9" }}
-                  onClick={() =>
-                    setViewReqDetails(
-                      mockPurchaseRequests[rfq.reqId] || mockPurchaseRequests["REQ-2026-8921"]
-                    )
-                  }
-                >
-                  <FileText size={15} /> View Purchase Request Details
-                </button>
-
-                <button
-                  className="pe-btn-primary-sm"
-                  onClick={() => setBidsMatrixRfq(rfq)}
-                >
-                  View Bids Matrix <ArrowRight size={15} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* EDIT RFQ MODAL */}
-      {editRfqModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 1000000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
-          <div style={{ background: "#fff", borderRadius: "16px", padding: "28px", maxWidth: "520px", width: "100%", boxShadow: "0 20px 50px rgba(0,0,0,0.25)" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <h3 style={{ fontSize: "18px", color: "#111", fontWeight: "800" }}>Edit Sourcing RFQ: {editRfqModal.id}</h3>
-              <button onClick={() => setEditRfqModal(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "22px" }}>
-              <div>
-                <label className="pe-form-label">RFQ Title <span style={{ fontSize: "10px", color: "#666" }}>(Read-Only)</span></label>
-                <input type="text" className="pe-form-input" value={editRfqModal.item} readOnly style={{ background: "#f8f9fb" }} />
-              </div>
-              <div>
-                <label className="pe-form-label">Sourcing Submission Deadline *</label>
-                <input type="date" className="pe-form-input" value={editRfqDeadline} onChange={(e) => setEditRfqDeadline(e.target.value)} />
-              </div>
-              <div>
-                <label className="pe-form-label">RFQ Status *</label>
-                <select className="pe-form-select" value={editRfqStatus} onChange={(e) => setEditRfqStatus(e.target.value)}>
-                  <option value="Active Bidding">Active Bidding</option>
-                  <option value="Reviewing Bids">Reviewing Bids</option>
-                  <option value="Awarded">Awarded</option>
-                  <option value="Closed">Closed</option>
-                </select>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-              <button className="pe-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111" }} onClick={() => setEditRfqModal(null)}>Cancel</button>
-              <button className="pe-btn-primary-sm" onClick={() => {
-                setRfqs(rfqs.map(r => r.id === editRfqModal.id ? { ...r, deadline: editRfqDeadline, status: editRfqStatus } : r));
-                setEditRfqModal(null);
-                setToastMsg(`RFQ ${editRfqModal.id} sourcing specifications updated successfully!`);
-                setTimeout(() => setToastMsg(""), 4000);
-              }}>Save RFQ Updates</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 1: VIEW PURCHASE REQUEST DETAILS */}
-      {viewReqDetails && (
-        <div className="pe-modal-overlay">
-          <div className="pe-modal" style={{ maxWidth: "600px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>EMPLOYEE PURCHASE REQUISITION DETAILS</span>
-                <h3 style={{ fontSize: "20px", color: "#111111", fontWeight: "800" }}>{viewReqDetails.id}</h3>
-              </div>
-              <button onClick={() => setViewReqDetails(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}>
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px", fontSize: "14px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", background: "#f8f9fb", padding: "14px", borderRadius: "10px", border: "1px solid #ececec" }}>
-                <div>
-                  <span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase" }}>Employee Requester</span>
-                  <p style={{ fontWeight: "700", color: "#111" }}>{viewReqDetails.requester}</p>
-                  <span style={{ fontSize: "11px", color: "#666" }}>{viewReqDetails.role} ({viewReqDetails.dept})</span>
-                </div>
-                <div>
-                  <span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase" }}>Allocated Budget</span>
-                  <p style={{ fontWeight: "800", color: "#059669", fontSize: "16px" }}>{viewReqDetails.estimatedCost}</p>
-                  <span style={{ fontSize: "11px", color: "#666" }}>Signed off by: {viewReqDetails.approvedBy}</span>
-                </div>
-              </div>
-
-              <div>
-                <span style={{ fontSize: "12px", color: "#666", fontWeight: "700", textTransform: "uppercase" }}>Requested Item Specification:</span>
-                <p style={{ fontWeight: "700", color: "#111", fontSize: "16px", marginTop: "2px" }}>{viewReqDetails.item}</p>
-              </div>
-
-              <div>
-                <span style={{ fontSize: "12px", color: "#666", fontWeight: "700", textTransform: "uppercase" }}>Business Justification:</span>
-                <p style={{ background: "#f8f9fb", padding: "12px", borderRadius: "8px", border: "1px solid #ececec", color: "#333", marginTop: "4px", fontStyle: "italic" }}>
-                  "{viewReqDetails.justification}"
-                </p>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
-              <button className="pe-btn-primary-sm" onClick={() => setViewReqDetails(null)}>
-                Close Details
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 2: VIEW VENDOR DETAILS - EXACT VENDOR PROFILE SCHEMA */}
-      {viewVendorDetails && (
-        <VendorProfileModal
-          vendor={{
-            companyName: viewVendorDetails.name || "ABC Technologies Pvt. Ltd.",
-            vendorId: viewVendorDetails.id || "VEN-2026-001",
-            vendorType: viewVendorDetails.category || "Electronics Supplier",
-            email: viewVendorDetails.email || "sales@abctech.com",
-            phone: viewVendorDetails.phone || "+91 98765 43210",
-            location: viewVendorDetails.location || "Chennai, Tamil Nadu, India",
-            productsServices: [
-              "Laptops",
-              "Desktop Computers",
-              "Printers",
-              "Computer Accessories",
-              "Office Equipment",
-            ],
-            performance: {
-              rating: viewVendorDetails.rating || "4.8 / 5",
-              totalOrdersCompleted: 185,
-              onTimeDeliveries: "97%",
-              successfulTransactions: "98%",
-              responseTime: "Within 4 Hours",
-            },
-            pricingInfo: [
-              "Competitive Pricing",
-              "Bulk Order Discounts Available",
-              "GST Included",
-              "Negotiable Prices",
-            ],
-            deliveryInfo: {
-              deliveryTime: viewVendorDetails.leadTime || "3 - 5 Business Days",
-              shippingAvailability: "PAN India",
-            },
-            certifications: [
-              "GST Verified",
-              "ISO Certified",
-              "Company Verified",
-              "Approved Vendor",
-            ],
-            recentProcurement: {
-              lastOrderValue: "₹2,50,000",
-              lastOrderDate: "12 July 2026",
-              totalTransactions: 356,
-            },
-          }}
-          onClose={() => setViewVendorDetails(null)}
-          onAction={(actionName, vendorData) => {
-            setToastMsg(`Action Executed: [ ${actionName} ] for ${vendorData.companyName}`);
-            setTimeout(() => setToastMsg(""), 4000);
-          }}
-        />
-      )}
-
-      {/* MODAL 3: 8-SECTION CREATE & BROADCAST NEW RFQ WIZARD */}
-      {showCreateModal && (
-        <CreateRfqWizardModal
-          onClose={() => setShowCreateModal(false)}
-          onRfqCreated={(createdRfqObj) => {
-            setRfqs([createdRfqObj, ...rfqs]);
-            setToastMsg(`RFQ ${createdRfqObj.id} created & broadcasted successfully!`);
-            setTimeout(() => setToastMsg(""), 4000);
-          }}
-        />
-      )}
-
-      {/* MODAL 4: INTERACTIVE SIDE-BY-SIDE VENDOR BIDS COMPARISON MATRIX */}
-      {bidsMatrixRfq && ReactDOM.createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0, 0, 0, 0.7)",
-            backdropFilter: "blur(6px)",
-            zIndex: 999999,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "28px",
-              maxWidth: "1000px",
-              width: "100%",
-              maxHeight: "88vh",
-              overflowY: "auto",
-              boxShadow: "0 25px 60px rgba(0, 0, 0, 0.35)",
-              border: "1px solid #e5e7eb",
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "20px",
-                paddingBottom: "16px",
-                borderBottom: "1px solid #ececec",
-              }}
-            >
-              <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800", letterSpacing: "1px", textTransform: "uppercase" }}>
-                  COMMERCIAL EVALUATION MATRIX
-                </span>
-                <h2 style={{ fontSize: "22px", color: "#111111", fontWeight: "800", margin: "2px 0 0" }}>
-                  Vendor Bids Comparison Matrix ({bidsMatrixRfq.id})
-                </h2>
-                <p style={{ fontSize: "13px", color: "#666666", margin: "2px 0 0" }}>
-                  Item: <strong style={{ color: "#111" }}>{bidsMatrixRfq.item}</strong>
-                </p>
-              </div>
-              <button
-                onClick={() => setBidsMatrixRfq(null)}
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid #d9d9d9",
-                  borderRadius: "8px",
-                  width: "36px",
-                  height: "36px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  color: "#555",
-                  cursor: "pointer",
-                }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {/* Bids Table Matrix */}
-            {(() => {
-              const rawBids = bidsMatrixRfq.bids || [];
-              if (rawBids.length === 0) {
-                return <div style={{ padding: "20px", textAlign: "center", color: "#666" }}>No vendor quotations have been created yet.</div>;
-              }
-
-              // Deduplicate confirmed vendor bids by vendor name
-              const confirmedBids = Array.from(
-                new Map(rawBids.map((b) => [ (b.vendor || "Vendor").toLowerCase().trim(), b ])).values()
               );
+            })
+          )}
+        </div>
+      )}
 
-              return (
-                <div style={{ overflowX: "auto", marginBottom: "24px" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      {/* Create RFQ modal */}
+      {showCreate && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.6)", zIndex: 1000000, display: "flex", alignItems: "center", justifyContent: "center", padding: 20, overflow: "auto" }}>
+          <div style={{ background: "#fff", borderRadius: 16, padding: 28, maxWidth: 640, width: "100%", boxShadow: "0 20px 50px rgba(0,0,0,.25)", maxHeight: "92vh", overflow: "auto" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+              <h3 style={{ fontSize: 18, color: "#111", fontWeight: 800 }}>Create &amp; Send New RFQ</h3>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCreate}>
+              <div className="pe-form-group" style={{ marginBottom: 16 }}>
+                <label className="pe-form-label">Approved Purchase Request *</label>
+                <select
+                  className="pe-form-select"
+                  value={form.purchaseRequestId}
+                  onChange={(e) => setForm({ ...form, purchaseRequestId: e.target.value })}
+                >
+                  <option value="">Select an approved requisition…</option>
+                  {approvedPrs.map((pr) => (
+                    <option key={pr.id} value={pr.id}>{pr.requestNumber} — {pr.purpose?.slice(0, 60)} ({formatINR(pr.estimatedAmount)})</option>
+                  ))}
+                </select>
+                {approvedPrs.length === 0 && (
+                  <div style={{ fontSize: 12, color: "#b45309", marginTop: 6 }}>No approved purchase requests are currently waiting for sourcing.</div>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                <div className="pe-form-group">
+                  <label className="pe-form-label">Quotation Closing Date *</label>
+                  <input type="date" className="pe-form-input" value={form.closingDate} onChange={(e) => setForm({ ...form, closingDate: e.target.value })} required />
+                </div>
+                <div className="pe-form-group">
+                  <label className="pe-form-label">Quotation Opening Date</label>
+                  <input type="date" className="pe-form-input" value={form.quotationOpeningDate} onChange={(e) => setForm({ ...form, quotationOpeningDate: e.target.value })} />
+                </div>
+              </div>
+              <div className="pe-form-group" style={{ marginBottom: 16 }}>
+                <label className="pe-form-label">Invite Vendors {canInviteVendor ? `(${form.selectedVendors.length} selected)` : "(permission required)"}</label>
+                {canInviteVendor ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflow: "auto", border: "1px solid #d9d9d9", borderRadius: 10, padding: 10 }}>
+                    {activeVendors.length === 0 ? (
+                      <div style={{ fontSize: 12.5, color: "#9aa8b8" }}>No active vendors found in the database.</div>
+                    ) : (
+                      activeVendors.map((v) => (
+                        <label key={v.id} style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13, cursor: "pointer" }}>
+                          <input type="checkbox" checked={form.selectedVendors.includes(v.id)} onChange={() => toggleVendor(v.id)} />
+                          <Building size={14} color="#f8b400" /> {v.vendorName} ({v.vendorCode || `VND-${v.id}`})
+                        </label>
+                      ))
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12.5, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "10px 12px" }}>
+                    You do not have the CAN_INVITE_VENDOR permission. Vendors can be invited later by an authorized user.
+                  </div>
+                )}
+              </div>
+              <div className="pe-form-group" style={{ marginBottom: 20 }}>
+                <label className="pe-form-label">Remarks / Terms</label>
+                <textarea className="pe-form-input" rows={2} value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} placeholder="Delivery terms, specifications notes, etc." />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                <button type="button" className="pe-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setShowCreate(false)}>Cancel</button>
+                <button type="submit" className="pe-btn-primary-sm" disabled={creating}>
+                  {creating ? <Loader2 size={16} className="login-spin" /> : <Send size={16} />} Create &amp; Send RFQ
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Invited vendors modal */}
+      {rfqVendors && (
+        <div className="pe-modal-overlay">
+          <div className="pe-modal" style={{ maxWidth: 560 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 800 }}>INVITED VENDORS</span>
+                <h3 style={{ fontSize: 18, color: "#111", fontWeight: 800, margin: "2px 0 0" }}>{rfqVendors.rfq.rfqNumber}</h3>
+              </div>
+              <button onClick={() => setRfqVendors(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            {rfqVendors.vendors.length === 0 ? (
+              <div style={{ padding: 30, textAlign: "center", color: "#9aa8b8" }}>No vendors have been invited to this RFQ yet.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {rfqVendors.vendors.map((v) => (
+                  <div key={v.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#f8f9fb", border: "1px solid #ececec", borderRadius: 10, padding: "12px 14px" }}>
+                    <div>
+                      <strong style={{ fontSize: 14, color: "#111" }}>{v.vendorName}</strong>
+                      <div style={{ fontSize: 12, color: "#666" }}>{v.vendorCode} · Invited {formatDateIN(v.invitationDate)}</div>
+                    </div>
+                    <span style={{ fontSize: 11.5, fontWeight: 800, color: v.responseStatus === "ACCEPTED" ? "#059669" : v.responseStatus === "DECLINED" ? "#dc2626" : "#d97706", background: "rgba(217,119,6,.1)", padding: "4px 10px", borderRadius: 999 }}>
+                      {v.responseStatus || "PENDING"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button className="pe-btn-primary-sm" onClick={() => setRfqVendors(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PR detail modal */}
+      {prDetail && (
+        <div className="pe-modal-overlay">
+          <div className="pe-modal" style={{ maxWidth: 600 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 800 }}>PURCHASE REQUEST DETAILS</span>
+                <h3 style={{ fontSize: 18, color: "#111", fontWeight: 800, margin: "2px 0 0" }}>{prDetail.pr?.requestNumber || ""}</h3>
+              </div>
+              <button onClick={() => setPrDetail(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            {prDetail.pr ? (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, background: "#f8f9fb", padding: 14, borderRadius: 10, border: "1px solid #ececec", fontSize: 13 }}>
+                  <div><span style={{ color: "#666", fontSize: 11, textTransform: "uppercase" }}>Requester</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{prDetail.pr.requesterName}</p></div>
+                  <div><span style={{ color: "#666", fontSize: 11, textTransform: "uppercase" }}>Department</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{prDetail.pr.departmentName}</p></div>
+                  <div><span style={{ color: "#666", fontSize: 11, textTransform: "uppercase" }}>Estimated Amount</span><p style={{ fontWeight: 800, color: "#059669", fontSize: 15, margin: "2px 0 0" }}>{formatINR(prDetail.pr.estimatedAmount)}</p></div>
+                  <div><span style={{ color: "#666", fontSize: 11, textTransform: "uppercase" }}>Priority</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{prDetail.pr.priority} · {prDetail.pr.status}</p></div>
+                </div>
+                {prDetail.pr.purpose && (
+                  <p style={{ background: "#f8f9fb", padding: 12, borderRadius: 8, border: "1px solid #ececec", color: "#333", marginTop: 10, fontStyle: "italic", fontSize: 13 }}>
+                    "{prDetail.pr.purpose}"
+                  </p>
+                )}
+                {prDetail.lines.length > 0 && (
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 12 }}>
                     <thead>
-                      <tr style={{ background: "#f8f9fb", borderBottom: "2px solid #ececec" }}>
-                        <th style={{ padding: "14px 12px", textAlign: "left", color: "#111", fontWeight: "800" }}>Evaluation Criteria</th>
-                        {confirmedBids.map((b, idx) => (
-                          <th key={idx} style={{ padding: "14px 12px", textAlign: "left", color: "#d97706", fontWeight: "800" }}>
-                            {b.vendor}
-                          </th>
-                        ))}
+                      <tr style={{ color: "#666", fontSize: 11, textTransform: "uppercase", textAlign: "left" }}>
+                        <th style={{ padding: "8px 10px" }}>Item</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right" }}>Qty</th>
+                        <th style={{ padding: "8px 10px", textAlign: "right" }}>Amount</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Vendor Rating</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", color: "#111" }}>{b.rating || "4.8 ⭐ (Tier 1)"}</td>
-                        ))}
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Unit Price</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", fontWeight: "800", color: "#059669" }}>
-                            {b.unitPrice || `$${(parseFloat(b.amount?.replace(/[^0-9.]/g, '') || 36990) / 10).toLocaleString()}`}
-                          </td>
-                        ))}
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Total Offer Cost</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", fontWeight: "800", color: "#059669" }}>{b.amount || "$36,990.00"}</td>
-                        ))}
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Delivery Lead Time</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", color: "#111" }}>{b.leadTime || "3 Business Days"}</td>
-                        ))}
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Warranty Coverage</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", color: "#111" }}>{b.warranty || "3 Years Standard Warranty"}</td>
-                        ))}
-                      </tr>
-                      <tr style={{ borderBottom: "1px solid #eee" }}>
-                        <td style={{ padding: "12px", fontWeight: "700", color: "#333" }}>Technical Score</td>
-                        {confirmedBids.map((b, idx) => (
-                          <td key={idx} style={{ padding: "12px", fontWeight: "800", color: "#059669" }}>{b.score || "95.5% (Verified)"}</td>
-                        ))}
-                      </tr>
-                      <tr>
-                        <td style={{ padding: "14px", fontWeight: "800", color: "#111" }}>Contract Selection</td>
-                        {confirmedBids.map((b, idx) => {
-                          const isThisVendorAwarded = bidsMatrixRfq.status === "Awarded" && bidsMatrixRfq.winnerVendor === b.vendor;
-                          const isAnotherVendorAwarded = bidsMatrixRfq.status === "Awarded" && bidsMatrixRfq.winnerVendor && bidsMatrixRfq.winnerVendor !== b.vendor;
-
-                          if (isThisVendorAwarded) {
-                            return (
-                              <td key={idx} style={{ padding: "14px" }}>
-                                <div style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "center" }}>
-                                  <span
-                                    style={{
-                                      background: "rgba(5, 150, 105, 0.12)",
-                                      color: "#059669",
-                                      border: "1px solid rgba(5, 150, 105, 0.3)",
-                                      padding: "6px 12px",
-                                      borderRadius: "8px",
-                                      fontSize: "12px",
-                                      fontWeight: "800",
-                                      display: "inline-flex",
-                                      alignItems: "center",
-                                      gap: "5px"
-                                    }}
-                                  >
-                                    <CheckCircle2 size={14} /> Approved Vendor
-                                  </span>
-                                  <button
-                                    className="pe-btn-primary-sm"
-                                    style={{ background: "#dc2626", color: "#fff", border: "none", width: "100%", justifyContent: "center", fontWeight: "700" }}
-                                    onClick={async () => {
-                                      await revokeVendorContract(bidsMatrixRfq.id);
-                                      setRfqs((prev) =>
-                                        prev.map((r) =>
-                                          r.id === bidsMatrixRfq.id
-                                            ? { ...r, status: "Active Bidding", winnerVendor: null, bidStatus: "Bids Received" }
-                                            : r
-                                        )
-                                      );
-                                      setBidsMatrixRfq((prev) => (prev ? { ...prev, status: "Active Bidding", winnerVendor: null } : null));
-                                      setToastMsg(`Approval cancelled for ${bidsMatrixRfq.id}. Reset to Active Bidding.`);
-                                      setTimeout(() => setToastMsg(""), 4000);
-                                    }}
-                                  >
-                                    <X size={14} /> Cancel Approval
-                                  </button>
-                                </div>
-                              </td>
-                            );
-                          }
-
-                          if (isAnotherVendorAwarded) {
-                            return (
-                              <td key={idx} style={{ padding: "14px", textAlign: "center", color: "#888", fontStyle: "italic", fontSize: "12px" }}>
-                                Not Selected
-                              </td>
-                            );
-                          }
-
-                          return (
-                            <td key={idx} style={{ padding: "14px" }}>
-                              <button
-                                className="pe-btn-primary-sm"
-                                style={{ background: "#059669", color: "#fff", border: "none", width: "100%", justifyContent: "center", fontWeight: "700" }}
-                                onClick={() => {
-                                  setConfirmQuoteApproval({
-                                    rfqId: bidsMatrixRfq.id,
-                                    reqId: bidsMatrixRfq.reqId,
-                                    item: bidsMatrixRfq.item,
-                                    vendorName: b.vendor,
-                                    unitPrice: b.unitPrice || `$${(parseFloat(b.amount?.replace(/[^0-9.]/g, '') || 36990) / 10).toLocaleString()}`,
-                                    totalPrice: b.amount || "$36,990.00",
-                                    leadTime: b.leadTime || "3 Business Days",
-                                    warranty: b.warranty || "3 Years Standard Warranty",
-                                    score: b.score || "95.5% Verified"
-                                  });
-                                }}
-                              >
-                                <Award size={15} /> Select Vendor
-                              </button>
-                            </td>
-                          );
-                        })}
-                      </tr>
+                      {prDetail.lines.map((l) => (
+                        <tr key={l.id} style={{ borderTop: "1px solid #eee" }}>
+                          <td style={{ padding: "8px 10px", fontWeight: 700 }}>{l.productName}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right" }}>{l.quantity}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: 700 }}>{formatINR(l.estimatedAmount)}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
-                </div>
-              );
-            })()}
-
-            <div style={{ display: "flex", justifyContent: "flex-end" }}>
-              <button
-                className="pe-btn-primary-sm"
-                style={{ background: "#ffffff", color: "#111", border: "1px solid #d9d9d9", padding: "8px 18px", fontSize: "13px" }}
-                onClick={() => setBidsMatrixRfq(null)}
-              >
-                Close Matrix
-              </button>
+                )}
+              </>
+            ) : (
+              <div style={{ padding: 30, textAlign: "center", color: "#9aa8b8" }}>Unable to load this request.</div>
+            )}
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button className="pe-btn-primary-sm" onClick={() => setPrDetail(null)}>Close</button>
             </div>
           </div>
-        </div>,
-        document.body
-      )}
-
-      {/* MODAL 5: QUOTATION REVIEW & APPROVAL CONFIRMATION MODAL */}
-      {confirmQuoteApproval && ReactDOM.createPortal(
-        <div
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            width: "100vw",
-            height: "100vh",
-            background: "rgba(0,0,0,0.75)",
-            backdropFilter: "blur(6px)",
-            zIndex: 1000000,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
-          <div
-            style={{
-              background: "#ffffff",
-              borderRadius: "16px",
-              padding: "30px",
-              maxWidth: "600px",
-              width: "100%",
-              boxShadow: "0 25px 60px rgba(0,0,0,0.35)",
-              border: "1px solid #ececec",
-            }}
-          >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px", borderBottom: "1px solid #ececec", paddingBottom: "14px" }}>
-              <div>
-                <span style={{ fontSize: "11px", color: "#059669", fontWeight: "800", textTransform: "uppercase", letterSpacing: "1px" }}>QUOTATION APPROVAL FORM</span>
-                <h3 style={{ fontSize: "20px", color: "#111", fontWeight: "800", margin: "2px 0 0" }}>Confirm Vendor Award: {confirmQuoteApproval.vendorName}</h3>
-              </div>
-              <button onClick={() => setConfirmQuoteApproval(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={22} /></button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "24px" }}>
-              <div style={{ background: "#f8f9fb", padding: "16px", borderRadius: "10px", border: "1px solid #ececec", fontSize: "13px", display: "flex", flexDirection: "column", gap: "8px" }}>
-                <div><strong>RFQ Code:</strong> <span style={{ color: "#d97706", fontWeight: "700" }}>{confirmQuoteApproval.rfqId}</span></div>
-                <div><strong>Purchase Request Ref:</strong> {confirmQuoteApproval.reqId || "REQ-2026-8921"}</div>
-                <div><strong>Item Sourced:</strong> <strong style={{ color: "#111" }}>{confirmQuoteApproval.item}</strong></div>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "10px", fontSize: "13px" }}>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>Selected Vendor</span><p style={{ fontWeight: "800", color: "#059669", fontSize: "15px", margin: "2px 0 0" }}>{confirmQuoteApproval.vendorName}</p></div>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>Contract Offer Cost</span><p style={{ fontWeight: "800", color: "#059669", fontSize: "15px", margin: "2px 0 0" }}>{confirmQuoteApproval.totalPrice}</p></div>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>Unit Offered Price</span><p style={{ fontWeight: "700", color: "#111", margin: "2px 0 0" }}>{confirmQuoteApproval.unitPrice}</p></div>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>SLA Lead Time</span><p style={{ fontWeight: "700", color: "#111", margin: "2px 0 0" }}>{confirmQuoteApproval.leadTime}</p></div>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>Warranty Coverage</span><p style={{ fontWeight: "700", color: "#111", margin: "2px 0 0" }}>{confirmQuoteApproval.warranty}</p></div>
-                <div><span style={{ color: "#666", fontSize: "11px", textTransform: "uppercase", fontWeight: "700" }}>Technical Compliance</span><p style={{ fontWeight: "700", color: "#059669", margin: "2px 0 0" }}>{confirmQuoteApproval.score}</p></div>
-              </div>
-            </div>
-
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
-              <button
-                className="pe-btn-primary-sm"
-                style={{ background: "#ffffff", color: "#111", border: "1px solid #d9d9d9", padding: "10px 18px", fontSize: "13px" }}
-                onClick={() => setConfirmQuoteApproval(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="pe-btn-primary-sm"
-                style={{ background: "#059669", color: "#ffffff", padding: "10px 20px", fontSize: "13px", fontWeight: "800", cursor: "pointer" }}
-                onClick={async () => {
-                  const targetRfqId = confirmQuoteApproval.rfqId;
-                  const winnerName = confirmQuoteApproval.vendorName;
-                  const finalCost = confirmQuoteApproval.totalPrice;
-
-                  // 1. Persist to API / Local Storage & Database
-                  await awardVendorContract(targetRfqId, winnerName, finalCost);
-
-                  // 2. Instantly update local RFQ state
-                  setRfqs((prevRfqs) =>
-                    prevRfqs.map((r) =>
-                      r.id === targetRfqId
-                        ? { ...r, status: "Awarded", bidStatus: "Awarded", winnerVendor: winnerName, awardedVendor: winnerName, awardedAmount: finalCost }
-                        : r
-                    )
-                  );
-
-                  // 3. Emit real-time bus event for all subscriber modules
-                  epsEventBus.publish({ type: "QUOTATION_APPROVED", rfqId: targetRfqId, vendorName: winnerName, amount: finalCost });
-
-                  // 4. Close modals & show success toast
-                  setConfirmQuoteApproval(null);
-                  setBidsMatrixRfq(null);
-                  setToastMsg(`✓ Quotation Approved! Contract awarded to ${winnerName} (${finalCost}). Workflow advanced to Stage 4.`);
-                  setTimeout(() => setToastMsg(""), 5000);
-                }}
-              >
-                <CheckCircle2 size={16} /> Confirm & Approve Quotation
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+        </div>
       )}
     </div>
   );

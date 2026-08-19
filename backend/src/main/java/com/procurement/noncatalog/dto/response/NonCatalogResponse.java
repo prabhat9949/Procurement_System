@@ -1,0 +1,43 @@
+package com.procurement.noncatalog.dto.response;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+public record NonCatalogResponse(
+        Long id,
+        String requestNumber,
+        String itemName,
+        String description,
+        Long categoryId,
+        String categoryName,
+        BigDecimal quantity,
+        Long unitOfMeasureId,
+        String unitOfMeasureCode,
+        BigDecimal estimatedUnitPrice,
+        BigDecimal estimatedTotalAmount,
+        String businessJustification,
+        String specifications,
+        String preferredVendor,
+        LocalDate requiredDate,
+        Long requesterId,
+        String requesterName,
+        Long departmentId,
+        String departmentName,
+        Long purchaseRequestId,
+        String purchaseRequestNumber,
+        String status,
+        Long hrReviewerId,
+        String hrReviewerName,
+        String hrRemarks,
+        LocalDateTime hrReviewedAt,
+        Long procurementReviewerId,
+        String procurementReviewerName,
+        String procurementRemarks,
+        LocalDateTime procurementReviewedAt,
+        Long createdProductId,
+        String createdProductCode,
+        String createdProductName,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {}

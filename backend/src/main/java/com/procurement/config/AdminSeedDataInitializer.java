@@ -6,6 +6,10 @@ import com.procurement.category.entity.Category;
 import com.procurement.category.repository.CategoryRepository;
 import com.procurement.department.entity.Department;
 import com.procurement.department.repository.DepartmentRepository;
+import com.procurement.employee.entity.Employee;
+import com.procurement.employee.repository.EmployeeRepository;
+import com.procurement.procurement.scope.entity.OfficerCategoryScope;
+import com.procurement.procurement.scope.repository.OfficerCategoryScopeRepository;
 import com.procurement.permission.entity.Permission;
 import com.procurement.permission.repository.PermissionRepository;
 import com.procurement.product.entity.Product;
@@ -57,7 +61,9 @@ public class AdminSeedDataInitializer {
             ProductRepository productRepository,
             WarehouseRepository warehouseRepository,
             ApprovalRuleRepository approvalRuleRepository,
-            DepartmentRepository departmentRepository) {
+            DepartmentRepository departmentRepository,
+            EmployeeRepository employeeRepository,
+            OfficerCategoryScopeRepository officerCategoryScopeRepository) {
         return args -> {
 
             // ============ 1. PERMISSIONS ============
@@ -72,73 +78,146 @@ public class AdminSeedDataInitializer {
             assignAllPermissions(roleRepository, rolePermissionRepository, "SUPER_ADMIN", allPermissions);
             assignAllPermissions(roleRepository, rolePermissionRepository, "ADMIN", allPermissions);
 
+            // HR: employee lifecycle, access administration and employee
+            // procurement monitoring (read-only; HR never holds approval/procurement
+            // mutation permissions by default).
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("HR_MANAGER"),
-                    "CAN_VIEW_USERS", "CAN_CREATE_USER", "CAN_UPDATE_USER", "CAN_DEACTIVATE_USER",
-                    "CAN_RESET_PASSWORD", "CAN_ASSIGN_ROLE", "CAN_VIEW_EMPLOYEES", "CAN_MANAGE_EMPLOYEES",
-                    "CAN_VIEW_ROLES", "CAN_VIEW_DEPARTMENTS", "CAN_MANAGE_DEPARTMENTS",
-                    "CAN_VIEW_COST_CENTERS", "CAN_MANAGE_COST_CENTERS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_MANAGE_USERS", "CAN_ASSIGN_ROLE", "CAN_VIEW_EMPLOYEES", "CAN_MANAGE_EMPLOYEES",
+                    "CAN_VIEW_DEPARTMENTS", "CAN_MANAGE_DEPARTMENTS",
+                    "CAN_VIEW_COST_CENTERS", "CAN_MANAGE_COST_CENTERS",
+                    "CAN_VIEW_ACTIVE_PRS", "CAN_VIEW_ALL_EMPLOYEE_PR",
+                    "CAN_VIEW_APPROVAL_HISTORY", "CAN_VIEW_PR_TIMELINE",
+                    "CAN_VIEW_NOTIFICATIONS", "CAN_MARK_NOTIFICATION_READ", "CAN_VIEW_REPORTS");
 
+            // Procurement: sourcing, quotations, vendor selection and PO operations.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER"),
-                    "CAN_VIEW_VENDORS", "CAN_MANAGE_VENDORS", "CAN_VERIFY_KYC",
+                    "CAN_VIEW_DEPARTMENT_PR", "CAN_CREATE_RFQ", "CAN_VIEW_RFQ", "CAN_INVITE_VENDOR",
+                    "CAN_VIEW_QUOTATIONS", "CAN_COMPARE_QUOTATIONS", "CAN_SELECT_VENDOR",
+                    "CAN_CREATE_PO", "CAN_VIEW_PO", "CAN_APPROVE_PO", "CAN_SHIP_PO",
+                    "CAN_VIEW_VENDORS", "CAN_MANAGE_VENDORS", "CAN_APPROVE_VENDOR",
                     "CAN_VIEW_CATEGORIES", "CAN_MANAGE_CATEGORIES",
                     "CAN_VIEW_PRODUCTS", "CAN_MANAGE_PRODUCTS",
-                    "CAN_VIEW_WAREHOUSES", "CAN_VIEW_BUDGETS", "CAN_VIEW_RULES",
-                    "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_WAREHOUSES", "CAN_VIEW_BUDGETS", "CAN_VIEW_RULES", "CAN_MANAGE_APPROVAL_RULES",
+                    "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT", "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT",
+                    "CAN_VIEW_NOTIFICATIONS");
 
+            // Finance: budgets, invoices, three-way match and payments.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("FINANCE_MANAGER"),
-                    "CAN_VIEW_BUDGETS", "CAN_MANAGE_BUDGETS", "CAN_VIEW_VENDORS",
-                    "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_BUDGETS", "CAN_MANAGE_BUDGETS", "CAN_UPLOAD_INVOICE", "CAN_VIEW_INVOICE",
+                    "CAN_VERIFY_INVOICE", "CAN_THREE_WAY_MATCH", "CAN_PROCESS_PAYMENT", "CAN_VIEW_PAYMENT",
+                    "CAN_VIEW_VENDORS", "CAN_VIEW_PO", "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT",
+                    "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
+            // Warehouse: GRN, inventory, stock operations and catalogue management
+            // (the consolidated inventory dashboard adds products to the catalogue
+            // that employees can then request).
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("WAREHOUSE_MANAGER"),
-                    "CAN_VIEW_WAREHOUSES", "CAN_MANAGE_WAREHOUSES", "CAN_VIEW_PRODUCTS",
-                    "CAN_VIEW_CATEGORIES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_CREATE_GRN", "CAN_VERIFY_GRN", "CAN_VIEW_INVENTORY", "CAN_UPDATE_INVENTORY",
+                    "CAN_VIEW_PO", "CAN_VIEW_WAREHOUSES", "CAN_MANAGE_WAREHOUSES",
+                    "CAN_VIEW_PRODUCTS", "CAN_MANAGE_PRODUCTS", "CAN_VIEW_CATEGORIES",
+                    "CAN_MANAGE_CATEGORIES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
 
+            // Department Manager / Senior Manager / Head: PR approval workflow.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD"),
+                    "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_ASSIGNED_APPROVAL", "CAN_APPROVE_PR",
+                    "CAN_REJECT_PR", "CAN_RETURN_PR", "CAN_VIEW_APPROVAL_HISTORY",
                     "CAN_VIEW_EMPLOYEES", "CAN_VIEW_DEPARTMENTS", "CAN_VIEW_COST_CENTERS",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_BUDGETS",
-                    "CAN_VIEW_RULES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_RULES", "CAN_VIEW_REPORTS", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
+            // Employee: create and track own purchase requests.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("EMPLOYEE"),
+                    "CAN_CREATE_PR", "CAN_EDIT_PR", "CAN_SUBMIT_PR", "CAN_CANCEL_PR",
+                    "CAN_VIEW_OWN_PR", "CAN_VIEW_APPROVAL_HISTORY",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_DEPARTMENTS",
-                    "CAN_VIEW_COST_CENTERS", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_COST_CENTERS", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
+
+            // Fulfilment teams: equipment, software and facilities operations.
+            assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
+                    List.of("EQUIPMENT_ASSET_TEAM"),
+                    "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_CREATE_GRN", "CAN_VIEW_INVENTORY",
+                    "CAN_UPDATE_INVENTORY", "CAN_CREATE_ASSET", "CAN_ASSIGN_ASSET",
+                    "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
+                    "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
-                    List.of("EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM"),
+                    List.of("IT_SOFTWARE_TEAM"),
+                    "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_VIEW_INVENTORY", "CAN_UPDATE_INVENTORY",
+                    "CAN_MANAGE_SOFTWARE_LICENSE", "CAN_ASSIGN_SOFTWARE",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
-                    "CAN_VIEW_WAREHOUSES", "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
+            assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
+                    List.of("FACILITIES_TEAM"),
+                    "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_MANAGE_FACILITY_REQUEST",
+                    "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
+                    "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
+
+            // Auditor: independent review — read the full procurement record and
+            // record findings/clarifications/conclusions; never operational editing.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("AUDITOR"),
                     "CAN_VIEW_USERS", "CAN_VIEW_EMPLOYEES", "CAN_VIEW_VENDORS",
-                    "CAN_VIEW_BUDGETS", "CAN_VIEW_REPORTS", "CAN_VIEW_AUDIT_LOGS",
-                    "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_BUDGETS", "CAN_VIEW_PO", "CAN_VIEW_INVOICE", "CAN_VIEW_PAYMENT",
+                    "CAN_VIEW_APPROVAL_HISTORY", "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT",
+                    "CAN_VIEW_AUDIT_LOGS", "CAN_VIEW_SYSTEM_MONITORING",
+                    "CAN_VIEW_AUDIT_CASES", "CAN_VIEW_AUDIT_TEAM_QUEUE", "CAN_CREATE_AUDIT_CASE",
+                    "CAN_CREATE_AUDIT_FINDING", "CAN_CLOSE_FINDING", "CAN_CONCLUDE_AUDIT",
+                    "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
+            // Support Team: user assistance, system/workflow issue reporting and
+            // read-only monitoring. Support never approves PRs, creates POs, selects
+            // vendors or edits inventory unless separately granted by an admin.
+            assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
+                    List.of("SUPPORT_TEAM"),
+                    "CAN_VIEW_USERS", "CAN_VIEW_EMPLOYEES", "CAN_VIEW_DEPARTMENTS",
+                    "CAN_VIEW_ACTIVE_PRS", "CAN_VIEW_ALL_EMPLOYEE_PR",
+                    "CAN_VIEW_PR_TIMELINE", "CAN_VIEW_APPROVAL_HISTORY",
+                    "CAN_VIEW_RULES", "CAN_VIEW_AUDIT_LOGS", "CAN_VIEW_SYSTEM_MONITORING",
+                    "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS", "CAN_MARK_NOTIFICATION_READ");
+
+            // Vendor: own RFQs, quotations, POs, shipments and invoices.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("VENDOR"),
-                    "CAN_VIEW_VENDORS", "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES",
-                    "CAN_VIEW_NOTIFICATIONS");
+                    "CAN_VIEW_RFQ", "CAN_VIEW_QUOTATIONS", "CAN_VIEW_PO", "CAN_SHIP_PO",
+                    "CAN_UPLOAD_INVOICE", "CAN_VIEW_INVOICE", "CAN_VIEW_PAYMENT",
+                    "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
+                    "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             // ============ 3. CATEGORIES ============
+            // teamRoleCode drives the category routing engine: after final
+            // approval the PR is assigned to the team owning that category.
             Category hardware = createCategory(categoryRepository, "HW", "Hardware & IT Equipment",
-                    "Laptops, desktops, networking and peripherals", null);
+                    "Laptops, desktops, networking and peripherals", null, "EQUIPMENT_ASSET_TEAM");
             Category software = createCategory(categoryRepository, "SW", "Software & Digital Services",
-                    "Software licences, SaaS and digital subscriptions", null);
+                    "Software licences, SaaS and digital subscriptions", null, "IT_SOFTWARE_TEAM");
             Category facilities = createCategory(categoryRepository, "FAC", "Facilities & Infrastructure",
-                    "Furniture, maintenance and facility services", null);
+                    "Furniture, maintenance and facility services", null, "FACILITIES_TEAM");
             Category supplies = createCategory(categoryRepository, "SUP", "Office Supplies",
-                    "Stationery and general office consumables", null);
-            createCategory(categoryRepository, "HW-LAP", "Laptops & Desktops", "Portable and desktop computing", hardware);
-            createCategory(categoryRepository, "HW-NET", "Networking Equipment", "Switches, routers and access points", hardware);
-            createCategory(categoryRepository, "SW-SaaS", "SaaS Subscriptions", "Subscription software services", software);
-            createCategory(categoryRepository, "SW-DEV", "Development Tools", "IDEs and developer utilities", software);
-            createCategory(categoryRepository, "FAC-FUR", "Furniture", "Office furniture and seating", facilities);
-            createCategory(categoryRepository, "SUP-PRN", "Print & Stationery", "Printing and stationery items", supplies);
+                    "Stationery and general office consumables", null, "PROCUREMENT_OFFICER");
+            createCategory(categoryRepository, "HW-LAP", "Laptops & Desktops", "Portable and desktop computing", hardware, "EQUIPMENT_ASSET_TEAM");
+            createCategory(categoryRepository, "HW-NET", "Networking Equipment", "Switches, routers and access points", hardware, "EQUIPMENT_ASSET_TEAM");
+            createCategory(categoryRepository, "SW-SaaS", "SaaS Subscriptions", "Subscription software services", software, "IT_SOFTWARE_TEAM");
+            createCategory(categoryRepository, "SW-DEV", "Development Tools", "IDEs and developer utilities", software, "IT_SOFTWARE_TEAM");
+            createCategory(categoryRepository, "FAC-FUR", "Furniture", "Office furniture and seating", facilities, "FACILITIES_TEAM");
+            createCategory(categoryRepository, "SUP-PRN", "Print & Stationery", "Printing and stationery items", supplies, "PROCUREMENT_OFFICER");
+
+            // ============ 3b. PROCUREMENT OFFICER CATEGORY SCOPES ============
+            // Per-officer category scoping: each procurement officer only sees
+            // PRs/RFQs/POs belonging to their assigned categories. Officers with
+            // no scope see everything (safe default).
+            scopeOfficer(officerCategoryScopeRepository, employeeRepository, categoryRepository,
+                    "EMP009", "HW", "Procurement Officer 1 -> Hardware & IT Equipment");
+            scopeOfficer(officerCategoryScopeRepository, employeeRepository, categoryRepository,
+                    "EMP023", "SW", "Procurement Officer 2 -> Software & Digital Services");
+            scopeOfficer(officerCategoryScopeRepository, employeeRepository, categoryRepository,
+                    "EMP024", "FAC", "Procurement Officer 3 -> Facilities & Infrastructure");
 
             // ============ 4. UNITS OF MEASURE ============
             UnitOfMeasure pcs = createUom(unitOfMeasureRepository, "PCS", "Piece", "Individual unit");
@@ -217,25 +296,29 @@ public class AdminSeedDataInitializer {
 
     private void seedPermissions(PermissionRepository repository) {
         List<Permission> permissions = List.of(
-                perm("CAN_VIEW_USERS", "View Users", "Users"),
-                perm("CAN_CREATE_USER", "Create User", "Users"),
-                perm("CAN_UPDATE_USER", "Update User", "Users"),
-                perm("CAN_DEACTIVATE_USER", "Deactivate User", "Users"),
-                perm("CAN_RESET_PASSWORD", "Reset Password", "Users"),
-                perm("CAN_ASSIGN_ROLE", "Assign Role", "Users"),
-                perm("CAN_VIEW_EMPLOYEES", "View Employees", "Employees"),
-                perm("CAN_MANAGE_EMPLOYEES", "Manage Employees", "Employees"),
-                perm("CAN_VIEW_ROLES", "View Roles", "Roles"),
-                perm("CAN_CREATE_ROLE", "Create Role", "Roles"),
-                perm("CAN_UPDATE_ROLE", "Update Role", "Roles"),
-                perm("CAN_MANAGE_PERMISSIONS", "Manage Permissions", "Roles"),
-                perm("CAN_VIEW_DEPARTMENTS", "View Departments", "Departments"),
-                perm("CAN_MANAGE_DEPARTMENTS", "Manage Departments", "Departments"),
-                perm("CAN_VIEW_COST_CENTERS", "View Cost Centers", "Cost Centers"),
-                perm("CAN_MANAGE_COST_CENTERS", "Manage Cost Centers", "Cost Centers"),
+                // --- Administration ---
+                perm("CAN_VIEW_USERS", "View Users", "Administration"),
+                perm("CAN_MANAGE_USERS", "Manage Users", "Administration"),
+                perm("CAN_ASSIGN_ROLE", "Assign Role", "Administration"),
+                perm("CAN_VIEW_EMPLOYEES", "View Employees", "Administration"),
+                perm("CAN_MANAGE_EMPLOYEES", "Manage Employees", "Administration"),
+                perm("CAN_VIEW_ROLES", "View Roles", "Administration"),
+                perm("CAN_CREATE_ROLE", "Create Role", "Administration"),
+                perm("CAN_UPDATE_ROLE", "Update Role", "Administration"),
+                perm("CAN_MANAGE_PERMISSIONS", "Manage Permissions", "Administration"),
+                perm("CAN_VIEW_DEPARTMENTS", "View Departments", "Administration"),
+                perm("CAN_MANAGE_DEPARTMENTS", "Manage Departments", "Administration"),
+                perm("CAN_VIEW_COST_CENTERS", "View Cost Centers", "Administration"),
+                perm("CAN_MANAGE_COST_CENTERS", "Manage Cost Centers", "Administration"),
+                perm("CAN_MANAGE_APPROVAL_RULES", "Configure Approval Rules", "Administration"),
+                perm("CAN_VIEW_RULES", "View Approval Rules", "Administration"),
+
+                // --- Vendors ---
                 perm("CAN_VIEW_VENDORS", "View Vendors", "Vendors"),
                 perm("CAN_MANAGE_VENDORS", "Manage Vendors", "Vendors"),
-                perm("CAN_VERIFY_KYC", "Verify Vendor KYC", "Vendors"),
+                perm("CAN_APPROVE_VENDOR", "Approve Vendor KYC", "Vendors"),
+
+                // --- Catalogue ---
                 perm("CAN_VIEW_CATEGORIES", "View Categories", "Categories"),
                 perm("CAN_MANAGE_CATEGORIES", "Manage Categories", "Categories"),
                 perm("CAN_VIEW_PRODUCTS", "View Products", "Products"),
@@ -244,14 +327,93 @@ public class AdminSeedDataInitializer {
                 perm("CAN_MANAGE_WAREHOUSES", "Manage Warehouses", "Warehouses"),
                 perm("CAN_VIEW_BUDGETS", "View Budgets", "Budgets"),
                 perm("CAN_MANAGE_BUDGETS", "Manage Budgets", "Budgets"),
-                perm("CAN_CONFIGURE_RULES", "Configure Approval Rules", "Approval Rules"),
-                perm("CAN_VIEW_RULES", "View Approval Rules", "Approval Rules"),
-                perm("CAN_VIEW_REPORTS", "View Reports", "Reports"),
-                perm("CAN_VIEW_AUDIT_LOGS", "View Audit Logs", "Audit"),
+
+                // --- Purchase Requests ---
+                perm("CAN_CREATE_PR", "Create Purchase Request", "Purchase Requests"),
+                perm("CAN_EDIT_PR", "Edit Purchase Request", "Purchase Requests"),
+                perm("CAN_SUBMIT_PR", "Submit Purchase Request", "Purchase Requests"),
+                perm("CAN_CANCEL_PR", "Cancel Purchase Request", "Purchase Requests"),
+                perm("CAN_VIEW_OWN_PR", "View Own Purchase Requests", "Purchase Requests"),
+                perm("CAN_VIEW_DEPARTMENT_PR", "View Department Purchase Requests", "Purchase Requests"),
+                perm("CAN_VIEW_ACTIVE_PRS", "View Active Purchase Requests", "Purchase Requests"),
+                perm("CAN_VIEW_ALL_EMPLOYEE_PR", "View All Employee Purchase Requests", "Purchase Requests"),
+                perm("CAN_VIEW_PR_TIMELINE", "View PR Timeline", "Approval"),
+
+                // --- Approval ---
+                perm("CAN_VIEW_ASSIGNED_APPROVAL", "View Assigned Approvals", "Approval"),
+                perm("CAN_APPROVE_PR", "Approve Purchase Request", "Approval"),
+                perm("CAN_REJECT_PR", "Reject Purchase Request", "Approval"),
+                perm("CAN_RETURN_PR", "Return Purchase Request", "Approval"),
+                perm("CAN_VIEW_APPROVAL_HISTORY", "View Approval History", "Approval"),
+
+                // --- Procurement ---
+                perm("CAN_CREATE_RFQ", "Create RFQ", "Procurement"),
+                perm("CAN_VIEW_RFQ", "View RFQs", "Procurement"),
+                perm("CAN_INVITE_VENDOR", "Invite Vendors", "Procurement"),
+                perm("CAN_VIEW_QUOTATIONS", "View Quotations", "Procurement"),
+                perm("CAN_COMPARE_QUOTATIONS", "Compare Quotations", "Procurement"),
+                perm("CAN_SELECT_VENDOR", "Select Vendor", "Procurement"),
+                perm("CAN_CREATE_PO", "Create Purchase Order", "Procurement"),
+                perm("CAN_VIEW_PO", "View Purchase Orders", "Procurement"),
+                perm("CAN_APPROVE_PO", "Approve Purchase Order", "Procurement"),
+                perm("CAN_SHIP_PO", "Dispatch Purchase Order", "Procurement"),
+
+                // --- Fulfilment ---
+                perm("CAN_CREATE_GRN", "Create GRN", "Fulfilment"),
+                perm("CAN_VERIFY_GRN", "Verify GRN", "Fulfilment"),
+                perm("CAN_VIEW_INVENTORY", "View Inventory", "Fulfilment"),
+                perm("CAN_UPDATE_INVENTORY", "Update Inventory", "Fulfilment"),
+                perm("CAN_CREATE_ASSET", "Create Asset", "Fulfilment"),
+                perm("CAN_ASSIGN_ASSET", "Assign Asset", "Fulfilment"),
+                perm("CAN_MANAGE_SOFTWARE_LICENSE", "Manage Software Licenses", "Fulfilment"),
+                perm("CAN_ASSIGN_SOFTWARE", "Assign Software", "Fulfilment"),
+                perm("CAN_MANAGE_FACILITY_REQUEST", "Manage Facility Requests", "Fulfilment"),
+
+                // --- Finance ---
+                perm("CAN_UPLOAD_INVOICE", "Upload Invoice", "Finance"),
+                perm("CAN_VIEW_INVOICE", "View Invoices", "Finance"),
+                perm("CAN_VERIFY_INVOICE", "Verify Invoice", "Finance"),
+                perm("CAN_THREE_WAY_MATCH", "Three-Way Match", "Finance"),
+                perm("CAN_PROCESS_PAYMENT", "Process Payment", "Finance"),
+                perm("CAN_VIEW_PAYMENT", "View Payments", "Finance"),
+
+                // --- Reports & Governance ---
+                perm("CAN_VIEW_REPORTS", "View Reports", "Reports & Governance"),
+                perm("CAN_EXPORT_REPORT", "Export Reports", "Reports & Governance"),
+                perm("CAN_VIEW_AUDIT_LOGS", "View Audit Logs", "Reports & Governance"),
+                perm("CAN_VIEW_SYSTEM_MONITORING", "View System Monitoring", "Reports & Governance"),
+
+                // --- Audit (independent review) ---
+                perm("CAN_VIEW_AUDIT_CASES", "View Audit Cases", "Audit"),
+                perm("CAN_VIEW_AUDIT_TEAM_QUEUE", "View Team Audit Queue", "Audit"),
+                perm("CAN_CREATE_AUDIT_CASE", "Create Audit Case", "Audit"),
+                perm("CAN_CREATE_AUDIT_FINDING", "Create Audit Finding", "Audit"),
+                perm("CAN_CLOSE_FINDING", "Close/Resolve Finding", "Audit"),
+                perm("CAN_CONCLUDE_AUDIT", "Conclude Audit", "Audit"),
                 perm("CAN_VIEW_NOTIFICATIONS", "View Notifications", "Notifications"),
-                perm("CAN_MANAGE_SETTINGS", "Manage System Settings", "System")
+                perm("CAN_MARK_NOTIFICATION_READ", "Mark Notifications Read", "Notifications"),
+
+                // --- Account & Security ---
+                perm("CHANGE_PASSWORD", "Change Own Password", "Account & Security"),
+
+                // --- Documents ---
+                perm("CAN_PRINT_DOCUMENT", "Print Documents", "Documents"),
+                perm("CAN_DOWNLOAD_DOCUMENT", "Download Documents", "Documents")
         );
         permissions.forEach(p -> createPermission(repository, p));
+
+        // Cleanup pass: any permission in the database that is no longer part of the
+        // procurement-focused catalog (e.g. legacy "Reset Password", "Deactivate User",
+        // "Manage System Settings") is deactivated so it disappears from role permission
+        // checklists without deleting rows that may be referenced by audit history.
+        List<String> validCodes = permissions.stream().map(Permission::getPermissionCode).toList();
+        repository.findAll().forEach(existing -> {
+            if (!validCodes.contains(existing.getPermissionCode()) && Boolean.TRUE.equals(existing.getActive())) {
+                existing.setActive(false);
+                repository.save(existing);
+                log.info("Deactivated legacy permission {}", existing.getPermissionCode());
+            }
+        });
     }
 
     private Permission perm(String code, String name, String module) {
@@ -334,10 +496,37 @@ public class AdminSeedDataInitializer {
         }
     }
 
+    private void scopeOfficer(OfficerCategoryScopeRepository repository,
+                              EmployeeRepository employeeRepository,
+                              CategoryRepository categoryRepository,
+                              String employeeCode, String categoryCode, String logMessage) {
+        try {
+            Employee officer = employeeRepository.findByEmployeeCode(employeeCode).orElse(null);
+            Category category = categoryRepository.findByCategoryCode(categoryCode).orElse(null);
+            if (officer == null || category == null) return;
+            if (repository.existsByEmployeeIdAndCategoryId(officer.getId(), category.getId())) return;
+            repository.save(OfficerCategoryScope.builder()
+                    .employee(officer)
+                    .category(category)
+                    .active(true)
+                    .build());
+            log.info(logMessage);
+        } catch (Exception ex) {
+            log.warn("Could not seed officer category scope for {}: {}", employeeCode, ex.getMessage());
+        }
+    }
+
     private Category createCategory(CategoryRepository repository, String code, String name,
-                                    String description, Category parent) {
+                                    String description, Category parent, String teamRoleCode) {
         if (repository.existsByCategoryCode(code)) {
-            return repository.findByCategoryCode(code).orElseThrow();
+            Category existing = repository.findByCategoryCode(code).orElseThrow();
+            // Backfill the routing mapping on existing installations so the
+            // category routing engine always has a team to route to.
+            if (existing.getTeamRoleCode() == null || existing.getTeamRoleCode().isBlank()) {
+                existing.setTeamRoleCode(teamRoleCode);
+                return repository.save(existing);
+            }
+            return existing;
         }
         Category category = new Category();
         category.setCategoryCode(code);
@@ -345,6 +534,7 @@ public class AdminSeedDataInitializer {
         category.setDescription(description);
         category.setParentCategory(parent);
         category.setActive(true);
+        category.setTeamRoleCode(teamRoleCode);
         return repository.save(category);
     }
 

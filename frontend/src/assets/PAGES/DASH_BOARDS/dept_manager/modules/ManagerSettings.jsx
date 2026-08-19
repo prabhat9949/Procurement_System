@@ -194,7 +194,7 @@ const ManagerSettings = () => {
             </div>
 
             <div className="dm-form-group">
-              <label className="dm-form-label">Maximum Auto-Approve Limit ($USD)</label>
+              <label className="dm-form-label">Maximum Auto-Approve Limit (INR)</label>
               <input
                 type="number"
                 value={autoApprove.maxLimit}

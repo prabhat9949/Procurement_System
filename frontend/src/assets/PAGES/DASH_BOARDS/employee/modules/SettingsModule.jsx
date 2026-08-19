@@ -97,8 +97,8 @@ const SettingsModule = () => {
 
             <div className="emp-form-group">
               <label className="emp-form-label">Default Currency Format</label>
-              <select className="emp-form-select" defaultValue="USD">
-                <option value="USD">USD ($ - United States Dollar)</option>
+              <select className="emp-form-select" defaultValue="INR">
+                <option value="INR">INR (₹ - Indian Rupee)</option>
                 <option value="EUR">EUR (€ - Euro)</option>
                 <option value="GBP">GBP (£ - British Pound)</option>
                 <option value="INR">INR (₹ - Indian Rupee)</option>

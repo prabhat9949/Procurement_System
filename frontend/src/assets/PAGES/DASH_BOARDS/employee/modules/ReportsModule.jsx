@@ -4,7 +4,7 @@ import {
   Download,
   TrendingUp,
   Clock,
-  DollarSign,
+  IndianRupee,
   Award,
 } from "lucide-react";
 import {
@@ -76,14 +76,14 @@ const ReportsModule = () => {
           <div className="emp-kpi-info">
             <span className="emp-kpi-label">YTD Department Spend</span>
             <span className="emp-kpi-value" style={{ color: "#d97706" }}>
-              $155,700
+              ₹1,55,700
             </span>
             <span className="emp-kpi-change positive">
               <TrendingUp size={14} /> 6.2% under budget ceiling
             </span>
           </div>
           <div className="emp-kpi-icon-wrapper" style={{ color: "#f8b400" }}>
-            <DollarSign size={24} />
+            <IndianRupee size={24} />
           </div>
         </div>
 
@@ -104,7 +104,7 @@ const ReportsModule = () => {
           <div className="emp-kpi-info">
             <span className="emp-kpi-label">Vendor Discount Savings</span>
             <span className="emp-kpi-value" style={{ color: "#10b981" }}>
-              $14,250
+              ₹14,250
             </span>
             <span className="emp-kpi-change positive">
               <Award size={14} /> Enterprise preferred pricing

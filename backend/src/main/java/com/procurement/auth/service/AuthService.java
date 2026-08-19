@@ -24,6 +24,8 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 import org.springframework.transaction.annotation.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -137,11 +139,20 @@ public class AuthService {
         String displayName = user.getEmployee() == null
                 ? user.getUsername()
                 : user.getEmployee().getFirstName() + " " + user.getEmployee().getLastName();
+        // Permission codes from the authenticated principal's authorities. The JWT
+        // filter reloads these from the database on every request, so role/permission
+        // changes made by Admin take effect on the next call without re-login.
+        List<String> permissions = authentication.getAuthorities().stream()
+                .map(org.springframework.security.core.GrantedAuthority::getAuthority)
+                .filter(a -> !a.startsWith("ROLE_"))
+                .sorted()
+                .toList();
         return new LoginResponse(token, "Bearer", tokenProvider.getExpirationMs(),
                 authentication.getName(),
                 user.getRole().getRoleCode(),
                 user.getRole().getRoleName(),
-                displayName);
+                displayName,
+                permissions);
     }
 
     @Transactional(readOnly = true)
@@ -172,20 +183,29 @@ public class AuthService {
 
     @Transactional
     public void changePassword(String username, ChangePasswordRequest request) {
-        // Only SUPER_ADMIN / ADMIN may change passwords. All other roles
-        // (employee, HR, manager, vendor, ...) must request it from an admin.
+        // The CHANGE_PASSWORD permission is enforced at the controller level.
+        // Here we only verify the current password and update the hash.
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-        Role role = user.getRole();
-        if (role == null || !("SUPER_ADMIN".equals(role.getRoleCode()) || "ADMIN".equals(role.getRoleCode()))) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Only an administrator can change passwords");
-        }
         if (!passwordEncoder.matches(request.currentPassword(), user.getPassword())) {
             throw new UnauthorizedException("Current password is incorrect");
         }
         user.setPassword(passwordEncoder.encode(request.newPassword()));
         user.setPlainPassword(request.newPassword());
         userRepository.save(user);
+        try {
+            eventPublisher.publish(
+                    BusinessEventType.LOGIN,
+                    "Auth",
+                    "User",
+                    user.getId(),
+                    user.getUsername(),
+                    "User changed their own password",
+                    user.getUsername(),
+                    NotificationType.SYSTEM
+            );
+        } catch (Exception exception) {
+            log.warn("Password-change event could not be published for user '{}'", user.getUsername(), exception);
+        }
     }
 }

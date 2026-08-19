@@ -10,7 +10,7 @@ import {
   Lock,
   Activity,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   Boxes,
   Truck,
   FileText,
@@ -23,7 +23,6 @@ import {
   ChevronRight,
   AlertTriangle,
   Server,
-  FlaskConical,
 } from "lucide-react";
 
 import SuperSystemOverview from "./modules/SuperSystemOverview";
@@ -44,7 +43,6 @@ import OrgMasterDataPanel from "../org_admin/modules/OrgMasterDataPanel";
 import OrgSystemHealth from "../org_admin/modules/OrgSystemHealth";
 
 import SuperSettings from "./modules/SuperSettings";
-import SuperDemoBriefing from "./modules/SuperDemoBriefing";
 
 const SuperAdminDashboard = () => {
   const navigate = useNavigate();
@@ -63,7 +61,7 @@ const SuperAdminDashboard = () => {
     { id: "permission-management", label: "Permission Management", icon: Lock },
     { id: "system-analytics", label: "System Analytics", icon: Activity },
     { id: "procurement-monitoring", label: "Procurement Monitoring", icon: ShoppingBag },
-    { id: "financial-monitoring", label: "Financial Monitoring", icon: DollarSign },
+    { id: "financial-monitoring", label: "Financial Monitoring", icon: IndianRupee },
     { id: "inventory-monitoring", label: "Inventory Monitoring", icon: Boxes },
     { id: "vendor-monitoring", label: "Vendor Monitoring", icon: Truck },
     { id: "security-center", label: "Security Center", icon: ShieldCheck },
@@ -71,7 +69,6 @@ const SuperAdminDashboard = () => {
     { id: "master-data", label: "Master Data Management", icon: Globe },
     { id: "global-reports", label: "Global Reports", icon: FolderKanban },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "demo-briefing", label: "Demo / Briefing", icon: FlaskConical },
     { id: "settings", label: "Account & Security", icon: Settings },
     ];
 
@@ -118,8 +115,6 @@ const SuperAdminDashboard = () => {
         return <SuperGlobalReports />;
       case "notifications":
         return <SuperNotificationsCenter />;
-      case "demo-briefing":
-        return <SuperDemoBriefing />;
       case "master-data":
         return <OrgMasterDataPanel />;
       case "profile":

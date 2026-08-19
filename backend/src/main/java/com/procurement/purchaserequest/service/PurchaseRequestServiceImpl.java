@@ -22,6 +22,7 @@ import com.procurement.purchaserequest.entity.PurchaseRequestStatus;
 import com.procurement.purchaserequest.exception.PurchaseRequestNotFoundException;
 import com.procurement.purchaserequest.mapper.PurchaseRequestMapper;
 import com.procurement.purchaserequest.repository.PurchaseRequestRepository;
+import com.procurement.purchaserequestline.repository.PurchaseRequestLineRepository;
 import com.procurement.purchaserequest.specification.PurchaseRequestSpecification;
 import com.procurement.purchaserequest.validator.PurchaseRequestValidator;
 import com.procurement.approvaltask.service.ApprovalTaskService;
@@ -37,11 +38,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.List;
 
 @Service
 public class PurchaseRequestServiceImpl implements PurchaseRequestService {
 
     private final PurchaseRequestRepository purchaseRequestRepository;
+    private final PurchaseRequestLineRepository purchaseRequestLineRepository;
+    private final com.procurement.category.repository.CategoryRepository categoryRepository;
     private final EmployeeRepository employeeRepository;
     private final DepartmentRepository departmentRepository;
     private final CostCenterRepository costCenterRepository;
@@ -50,8 +54,11 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     private final PurchaseRequestValidator purchaseRequestValidator;
     private final ApprovalTaskService approvalTaskService;
     private final BusinessEventPublisher eventPublisher;
+    private final com.procurement.procurement.scope.service.ProcurementScopeService procurementScopeService;
 
     public PurchaseRequestServiceImpl(PurchaseRequestRepository purchaseRequestRepository,
+                                      PurchaseRequestLineRepository purchaseRequestLineRepository,
+                                      com.procurement.category.repository.CategoryRepository categoryRepository,
                                       EmployeeRepository employeeRepository,
                                       DepartmentRepository departmentRepository,
                                       CostCenterRepository costCenterRepository,
@@ -59,8 +66,11 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
                                       PurchaseRequestMapper purchaseRequestMapper,
                                       PurchaseRequestValidator purchaseRequestValidator,
                                       ApprovalTaskService approvalTaskService,
-                                      BusinessEventPublisher eventPublisher) {
+                                      BusinessEventPublisher eventPublisher,
+                                      com.procurement.procurement.scope.service.ProcurementScopeService procurementScopeService) {
         this.purchaseRequestRepository = purchaseRequestRepository;
+        this.purchaseRequestLineRepository = purchaseRequestLineRepository;
+        this.categoryRepository = categoryRepository;
         this.employeeRepository = employeeRepository;
         this.departmentRepository = departmentRepository;
         this.costCenterRepository = costCenterRepository;
@@ -69,8 +79,8 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
         this.purchaseRequestValidator = purchaseRequestValidator;
         this.approvalTaskService = approvalTaskService;
         this.eventPublisher = eventPublisher;
+        this.procurementScopeService = procurementScopeService;
     }
-
     @Override
     @Transactional
     public PurchaseRequestResponse create(PurchaseRequestRequest request) {
@@ -113,15 +123,56 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
                                                         LocalDate createdDateFrom,
                                                         LocalDate createdDateTo,
                                                         Pageable pageable) {
-        // Plain requesters only ever see their own requests; the employee id is
-        // derived from the authenticated user and never trusted from the client.
         if (isEmployeeOnly()) {
             requesterId = currentEmployee().getId();
         }
-        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(
-                        PurchaseRequestSpecification.search(keyword, requesterId, departmentId,
-                                costCenterId, priority, status, approvalStatus, requiredDateFrom,
-                                requiredDateTo, createdDateFrom, createdDateTo), pageable)
+        org.springframework.data.jpa.domain.Specification<PurchaseRequest> spec =
+                PurchaseRequestSpecification.search(keyword, requesterId, departmentId,
+                        costCenterId, priority, status, approvalStatus, requiredDateFrom,
+                        requiredDateTo, createdDateFrom, createdDateTo);
+
+        String role = currentRoleCode();
+        List<Long> teamCatIds = getSpecializedTeamCategoryIds(role);
+        if (!teamCatIds.isEmpty()) {
+            var teamCatSpec = PurchaseRequestSpecification.categoryIn(teamCatIds);
+            if (teamCatSpec != null) spec = spec.and(teamCatSpec);
+        } else {
+            var categorySpec = PurchaseRequestSpecification.categoryIn(procurementScopeService.myCategoryIds());
+            if (categorySpec != null) spec = spec.and(categorySpec);
+        }
+
+        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(spec, pageable)
+                .map(purchaseRequestMapper::toResponse);
+        return new PageResponse<>(page.getContent(), page.getNumber(), page.getSize(),
+                page.getTotalElements(), page.getTotalPages(), page.isLast());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<PurchaseRequestResponse> procurementQueue(Pageable pageable) {
+        var statuses = java.util.List.of(
+                PurchaseRequestStatus.APPROVED,
+                PurchaseRequestStatus.INTERNAL_AVAILABILITY_CHECK,
+                PurchaseRequestStatus.INTERNALLY_FULFILLABLE,
+                PurchaseRequestStatus.INTERNAL_FULFILMENT_IN_PROGRESS,
+                PurchaseRequestStatus.PARTIAL_FULFILMENT_PENDING,
+                PurchaseRequestStatus.EXTERNAL_PROCUREMENT_REQUIRED,
+                PurchaseRequestStatus.RFQ_CREATED
+        );
+        org.springframework.data.jpa.domain.Specification<PurchaseRequest> spec =
+                (root, query, cb) -> root.get("status").in(statuses);
+
+        String role = currentRoleCode();
+        List<Long> teamCatIds = getSpecializedTeamCategoryIds(role);
+        if (!teamCatIds.isEmpty()) {
+            var teamCatSpec = PurchaseRequestSpecification.categoryIn(teamCatIds);
+            if (teamCatSpec != null) spec = spec.and(teamCatSpec);
+        } else {
+            var categorySpec = PurchaseRequestSpecification.categoryIn(procurementScopeService.myCategoryIds());
+            if (categorySpec != null) spec = spec.and(categorySpec);
+        }
+
+        Page<PurchaseRequestResponse> page = purchaseRequestRepository.findAll(spec, pageable)
                 .map(purchaseRequestMapper::toResponse);
         return new PageResponse<>(page.getContent(), page.getNumber(), page.getSize(),
                 page.getTotalElements(), page.getTotalPages(), page.isLast());
@@ -131,9 +182,7 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
     @Transactional(readOnly = true)
     public PurchaseRequestResponse getById(Long id) {
         PurchaseRequest entity = findRequest(id);
-        if (isEmployeeOnly() && !entity.getRequester().getId().equals(currentEmployee().getId())) {
-            throw new ForbiddenException("You can only view your own purchase requests");
-        }
+        checkSpecializedDomainAccess(entity);
         return purchaseRequestMapper.toResponse(entity);
     }
 
@@ -315,6 +364,59 @@ public class PurchaseRequestServiceImpl implements PurchaseRequestService {
             throw new ForbiddenException("Authenticated user is not linked to an employee");
         }
         return employee;
+    }
+
+    private String currentRoleCode() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated()) return "";
+        return userRepository.findByUsername(authentication.getName())
+                .map(user -> user.getRole() != null ? user.getRole().getRoleCode() : "")
+                .orElse("");
+    }
+
+    private java.util.List<Long> getSpecializedTeamCategoryIds(String roleCode) {
+        if ("EQUIPMENT_ASSET_TEAM".equals(roleCode)) {
+            return categoryRepository.findAll().stream()
+                    .filter(c -> "EQUIPMENT_ASSET_TEAM".equalsIgnoreCase(c.getTeamRoleCode())
+                            || (c.getCategoryCode() != null && c.getCategoryCode().toUpperCase().startsWith("HW")))
+                    .map(com.procurement.category.entity.Category::getId).toList();
+        } else if ("IT_SOFTWARE_TEAM".equals(roleCode)) {
+            return categoryRepository.findAll().stream()
+                    .filter(c -> "IT_SOFTWARE_TEAM".equalsIgnoreCase(c.getTeamRoleCode())
+                            || (c.getCategoryCode() != null && c.getCategoryCode().toUpperCase().startsWith("SW")))
+                    .map(com.procurement.category.entity.Category::getId).toList();
+        } else if ("FACILITIES_TEAM".equals(roleCode)) {
+            return categoryRepository.findAll().stream()
+                    .filter(c -> "FACILITIES_TEAM".equalsIgnoreCase(c.getTeamRoleCode())
+                            || (c.getCategoryCode() != null && c.getCategoryCode().toUpperCase().startsWith("FAC")))
+                    .map(com.procurement.category.entity.Category::getId).toList();
+        }
+        return java.util.List.of();
+    }
+
+    private void checkSpecializedDomainAccess(PurchaseRequest entity) {
+        String role = currentRoleCode();
+        if ("SUPER_ADMIN".equals(role) || "ADMIN".equals(role) || "PROCUREMENT_MANAGER".equals(role)
+                || "FINANCE_MANAGER".equals(role) || "AUDITOR".equals(role) || "DEPARTMENT_MANAGER".equals(role)
+                || "SENIOR_MANAGER".equals(role) || "HEAD".equals(role)) {
+            return;
+        }
+        if (isEmployeeOnly()) {
+            if (!entity.getRequester().getId().equals(currentEmployee().getId())) {
+                throw new ForbiddenException("You can only view your own purchase requests");
+            }
+            return;
+        }
+        java.util.List<Long> allowedCategoryIds = getSpecializedTeamCategoryIds(role);
+        if (!allowedCategoryIds.isEmpty()) {
+            java.util.List<com.procurement.purchaserequestline.entity.PurchaseRequestLine> lines =
+                    purchaseRequestLineRepository.findByPurchaseRequestId(entity.getId());
+            boolean hasAccess = lines.stream().anyMatch(l -> l.getProduct() != null && l.getProduct().getCategory() != null
+                    && allowedCategoryIds.contains(l.getProduct().getCategory().getId()));
+            if (!hasAccess && !lines.isEmpty()) {
+                throw new ForbiddenException("Access denied: You do not have permission to view requests from other domains");
+            }
+        }
     }
 
     /** True when the authenticated user holds only the plain EMPLOYEE role. */

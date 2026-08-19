@@ -10,16 +10,25 @@ import {
   Save,
   Loader2,
   IndianRupee,
+  Search,
+  Sparkles,
 } from "lucide-react";
 import { apiGet, apiPost } from "../../../../../services/apiClient";
 import { formatINR } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
 
 const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"];
 
 const CreateRequest = ({ onNavigate }) => {
+  // Read effective permissions at render time so admin grants/revocations
+  // take effect after a session refresh without a stale module-level value.
+  const canCreate = hasPermission("CAN_CREATE_PR");
+  const canSubmit = hasPermission("CAN_SUBMIT_PR");
   const [me, setMe] = useState(null);
   const [products, setProducts] = useState([]);
   const [costCenters, setCostCenters] = useState([]);
+  const [productSearch, setProductSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -34,7 +43,14 @@ const CreateRequest = ({ onNavigate }) => {
     priority: "MEDIUM",
     purpose: "",
     remarks: "",
+    newItem: false,
+    newItemName: "",
+    newItemCategoryId: "",
+    newItemBrand: "",
+    newItemDescription: "",
+    newItemPrice: "",
   });
+  const [allCategories, setAllCategories] = useState([]);
 
   useEffect(() => {
     const load = async () => {
@@ -43,8 +59,9 @@ const CreateRequest = ({ onNavigate }) => {
       try {
         const employee = await apiGet("/api/employees/me");
         setMe(employee);
-        const productPage = await apiGet("/api/products?active=true&size=500");
-        setProducts(productPage?.content || []);
+        const productList = await apiGet("/api/products/active");
+        setProducts(productList || []);
+        apiGet("/api/categories/all").then((list) => setAllCategories(list || [])).catch(() => setAllCategories([]));
         if (employee?.departmentId) {
           const cc = await apiGet(`/api/cost-centers/by-department/${employee.departmentId}`);
           setCostCenters(cc || []);
@@ -66,6 +83,16 @@ const CreateRequest = ({ onNavigate }) => {
   }, []);
 
   const selectedProduct = products.find((p) => p.id === Number(form.productId));
+  const categories = ["ALL", ...Array.from(new Set(products.map((p) => p.categoryName).filter(Boolean)))];
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory = categoryFilter === "ALL" || product.categoryName === categoryFilter;
+    const q = productSearch.trim().toLowerCase();
+    const matchesSearch = !q
+      || (product.productName || "").toLowerCase().includes(q)
+      || (product.sku || "").toLowerCase().includes(q)
+      || (product.brand || "").toLowerCase().includes(q);
+    return matchesCategory && matchesSearch;
+  });
 
   const update = (key, value) => setForm((f) => ({ ...f, [key]: value }));
 
@@ -78,12 +105,20 @@ const CreateRequest = ({ onNavigate }) => {
     }));
   };
 
-  const total = Number(form.quantity || 0) * Number(form.unitPrice || 0);
+  const effectiveUnitPrice = form.newItem ? Number(form.newItemPrice || 0) : Number(form.unitPrice || 0);
+  const total = Number(form.quantity || 0) * effectiveUnitPrice;
 
   const validate = () => {
-    if (!form.productId) return "Please select a product or service from the catalogue.";
+    if (form.newItem) {
+      if (!form.newItemName.trim()) return "Please provide a name for the new item.";
+      if (!form.newItemCategoryId) return "Please select a category for the new item.";
+      if (form.newItemPrice === "" || Number(form.newItemPrice) < 0) return "Unit price is required for the new item.";
+    } else if (!form.productId) {
+      return "Please select a product or service from the catalogue, or request a new item below.";
+    }
     if (!form.quantity || Number(form.quantity) <= 0) return "Quantity must be a positive number.";
-    if (form.unitPrice === "" || Number(form.unitPrice) < 0) return "Unit price is required.";
+    const price = form.newItem ? form.newItemPrice : form.unitPrice;
+    if (price === "" || Number(price) < 0) return "Unit price is required.";
     if (!form.costCenterId) return "Please select a cost center.";
     if (!form.requiredDate) return "Required delivery/access date is required.";
     if (new Date(form.requiredDate) <= new Date(new Date().toDateString()))
@@ -93,7 +128,7 @@ const CreateRequest = ({ onNavigate }) => {
   };
 
   const buildHeaderPayload = () => ({
-    requesterId: me.id,
+    requesterId: me.employeeId || me.id,
     departmentId: me.departmentId,
     costCenterId: Number(form.costCenterId),
     requiredDate: form.requiredDate,
@@ -114,12 +149,26 @@ const CreateRequest = ({ onNavigate }) => {
     setError("");
     setSuccess("");
     try {
+      let productId = Number(form.productId);
+      if (form.newItem) {
+        // Create the new item in the database catalogue first so it becomes
+        // visible across procurement, inventory and the employee catalogue.
+        const created = await apiPost("/api/products/request-new", {
+          productName: form.newItemName.trim(),
+          description: form.newItemDescription.trim() || null,
+          brand: form.newItemBrand.trim() || null,
+          categoryId: Number(form.newItemCategoryId),
+          unitPrice: Number(form.newItemPrice),
+          currency: "INR",
+        });
+        productId = created.id;
+      }
       const pr = await apiPost("/api/purchase-requests", buildHeaderPayload());
       await apiPost("/api/purchase-request-lines", {
         purchaseRequestId: pr.id,
-        productId: Number(form.productId),
+        productId,
         quantity: Number(form.quantity),
-        unitPrice: Number(form.unitPrice),
+        unitPrice: effectiveUnitPrice,
         remarks: form.remarks.trim() || null,
       });
       if (submitAfter) {
@@ -195,18 +244,84 @@ const CreateRequest = ({ onNavigate }) => {
         </h3>
         <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr", gap: 14 }}>
           <div>
-            <label style={fieldLabel}>Product / Service *</label>
-            <select style={inputStyle} value={form.productId} onChange={(e) => handleProductChange(e.target.value)}>
-              <option value="">Select from catalogue…</option>
-              {products.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.productName} {p.sku ? `(${p.sku})` : ""} — {p.categoryName || "Uncategorised"}
-                </option>
-              ))}
-            </select>
-            {selectedProduct && (
-              <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
-                {selectedProduct.description || "No description on file"} · Reference price {formatINR(selectedProduct.unitPrice)}
+            <label style={fieldLabel}>Product / Service {form.newItem ? "(New item)" : "*"}</label>
+            {form.newItem ? (
+              <div style={{ padding: "14px", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, fontSize: 12.5, color: "#92400e" }}>
+                You are requesting a new item. It will be added to the catalogue in the database so the whole procurement system and the inventory team can see it.
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: 10, marginBottom: 10 }}>
+                  <div style={{ position: "relative" }}>
+                    <Search size={15} style={{ position: "absolute", left: 12, top: 12, color: "#94a3b8" }} />
+                    <input
+                      type="text"
+                      style={{ ...inputStyle, paddingLeft: 34 }}
+                      value={productSearch}
+                      onChange={(e) => setProductSearch(e.target.value)}
+                      placeholder="Search by product, SKU, or brand"
+                    />
+                  </div>
+                  <select style={inputStyle} value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                    {categories.map((category) => (
+                      <option key={category} value={category}>
+                        {category === "ALL" ? "All categories" : category}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <select style={inputStyle} value={form.productId} onChange={(e) => handleProductChange(e.target.value)}>
+                  <option value="">Select from catalogue…</option>
+                  {filteredProducts.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.productName} {p.sku ? `(${p.sku})` : ""} — {p.categoryName || "Uncategorised"}
+                    </option>
+                  ))}
+                </select>
+                {selectedProduct && (
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                    {selectedProduct.description || "No description on file"} · SKU {selectedProduct.sku || "—"} · Brand {selectedProduct.brand || "—"} · Reference price {formatINR(selectedProduct.unitPrice)}
+                  </div>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setForm((f) => ({ ...f, newItem: !f.newItem, productId: f.newItem ? f.productId : "" }))}
+              style={{ marginTop: 10, display: "inline-flex", alignItems: "center", gap: 7, background: "none", border: "1px dashed #d97706", color: "#b45309", padding: "8px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 700, cursor: "pointer" }}
+            >
+              <Sparkles size={14} />
+              {form.newItem ? "← Pick from catalogue instead" : "Item not in catalogue? Request a new item"}
+            </button>
+            {form.newItem && (
+              <div style={{ display: "grid", gap: 10, marginTop: 12, padding: "14px", background: "#f8fafc", border: "1px solid #eef1f5", borderRadius: 10 }}>
+                <div>
+                  <label style={fieldLabel}>New Item Name *</label>
+                  <input type="text" style={inputStyle} value={form.newItemName} onChange={(e) => setForm((f) => ({ ...f, newItemName: e.target.value }))} placeholder="e.g. 4K Conference Camera" />
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <label style={fieldLabel}>Category *</label>
+                    <select style={inputStyle} value={form.newItemCategoryId} onChange={(e) => setForm((f) => ({ ...f, newItemCategoryId: e.target.value }))}>
+                      <option value="">Select category…</option>
+                      {allCategories.filter((c) => c.active !== false).map((c) => (
+                        <option key={c.id} value={c.id}>{c.categoryName}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={fieldLabel}>Unit Price (₹) *</label>
+                    <input type="number" min="0" step="any" style={inputStyle} value={form.newItemPrice} onChange={(e) => setForm((f) => ({ ...f, newItemPrice: e.target.value }))} />
+                  </div>
+                </div>
+                <div>
+                  <label style={fieldLabel}>Brand</label>
+                  <input type="text" style={inputStyle} value={form.newItemBrand} onChange={(e) => setForm((f) => ({ ...f, newItemBrand: e.target.value }))} placeholder="e.g. Logitech" />
+                </div>
+                <div>
+                  <label style={fieldLabel}>Description / Specification</label>
+                  <textarea rows={2} style={{ ...inputStyle, resize: "vertical" }} value={form.newItemDescription} onChange={(e) => setForm((f) => ({ ...f, newItemDescription: e.target.value }))} placeholder="What is this item and what is it for?" />
+                </div>
               </div>
             )}
           </div>
@@ -292,22 +407,31 @@ const CreateRequest = ({ onNavigate }) => {
 
       {/* ============ Actions ============ */}
       <div style={{ display: "flex", gap: 12, marginTop: 28, paddingTop: 20, borderTop: "1px solid #eef1f5" }}>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
-          disabled={saving}
-          onClick={() => saveRequest(false)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
-        </button>
-        <button
-          className="emp-btn-primary-sm"
-          style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
-          disabled={saving}
-          onClick={() => saveRequest(true)}
-        >
-          {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
-        </button>
+        {canCreate && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#059669" }}
+            disabled={saving}
+            onClick={() => saveRequest(false)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Save size={15} />} Save Draft
+          </button>
+        )}
+        {canSubmit && (
+          <button
+            className="emp-btn-primary-sm"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7 }}
+            disabled={saving}
+            onClick={() => saveRequest(true)}
+          >
+            {saving ? <Loader2 size={15} className="lro-spin" /> : <Send size={15} />} Submit for Approval
+          </button>
+        )}
+        {!canCreate && !canSubmit && (
+          <div style={{ fontSize: 13, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10, padding: "12px 14px", display: "flex", alignItems: "center", gap: 8 }}>
+            <AlertCircle size={16} /> You do not have permission to create or submit purchase requests. Contact your administrator.
+          </div>
+        )}
         <button
           className="emp-btn-primary-sm"
           style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }}

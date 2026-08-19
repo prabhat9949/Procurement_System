@@ -55,7 +55,7 @@ public class AuthController {
     }
 
     @PostMapping("/change-password")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN')")
+    @PreAuthorize("hasAuthority('CHANGE_PASSWORD')")
     public ResponseEntity<Void> changePassword(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody ChangePasswordRequest request) {

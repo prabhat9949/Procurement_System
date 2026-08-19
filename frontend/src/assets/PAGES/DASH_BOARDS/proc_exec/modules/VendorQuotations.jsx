@@ -1,448 +1,190 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   FileCheck2,
   Search,
-  Download,
   Eye,
-  FileText,
-  DollarSign,
-  Award,
   X,
-  CheckCircle2,
-  Building,
-  ShieldCheck,
-  Clock
+  Loader2,
+  AlertTriangle,
+  Clock,
 } from "lucide-react";
-import { epsEventBus, fetchActiveRfqs, awardVendorContract, revokeVendorContract } from "../../../../../services/epsApiService";
+import { apiGet } from "../../../../../services/apiClient";
+import { formatINR, formatDateIN } from "../../../../../utils/format";
 
-const defaultApprovedQuotations = [
-  {
-    id: "QUOTE-2026-001",
-    rfqId: "RFQ-2026-901",
-    vendor: "Apple Business Direct",
-    rating: "4.9 ⭐",
-    item: "MacBook Pro M3 Max 64GB (x10)",
-    unitPrice: "$3,699.00",
-    totalPrice: "$36,990.00",
-    leadTime: "3 Business Days",
-    warranty: "3 Years AppleCare+ Enterprise",
-    quoteFile: "Apple_Direct_Official_Quote_2026.pdf",
-    discount: "5% Volume Tier",
-    validUntil: "2026-08-15",
-    paymentTerms: "Net 30 Days",
-    technicalCompliance: "100% Meets Specifications",
-    status: "Approved"
-  }
-];
+const STATUS_STYLE = {
+  DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
+  SUBMITTED: { bg: "rgba(37,99,235,.12)", color: "#2563eb" },
+  UNDER_REVIEW: { bg: "rgba(217,119,6,.12)", color: "#d97706" },
+  ACCEPTED: { bg: "rgba(5,150,105,.12)", color: "#059669" },
+  REJECTED: { bg: "rgba(220,38,38,.12)", color: "#dc2626" },
+  WITHDRAWN: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
+};
 
 const VendorQuotations = () => {
-  const [quotationsList, setQuotationsList] = useState(defaultApprovedQuotations);
+  const [quotations, setQuotations] = useState([]);
+  const [rfqs, setRfqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRfqFilter, setSelectedRfqFilter] = useState("all");
-  const [statusTabFilter, setStatusTabFilter] = useState("all"); // 'all' | 'Approved' | 'Pending Review' | 'Rejected'
-  const [previewQuote, setPreviewQuote] = useState(null);
-  const [toastMsg, setToastMsg] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [rfqFilter, setRfqFilter] = useState("");
+  const [preview, setPreview] = useState(null);
 
-  const handleUpdateQuoteStatus = async (quoteObj, newStatus) => {
-    const quoteId = typeof quoteObj === "string" ? quoteObj : quoteObj.id;
-    const targetQuote = quotationsList.find(q => q.id === quoteId) || (typeof quoteObj === "object" ? quoteObj : null);
-
-    setQuotationsList((prev) =>
-      prev.map((q) => (q.id === quoteId ? { ...q, status: newStatus } : q))
-    );
-
-    if (newStatus === "Approved" && targetQuote) {
-      await awardVendorContract(targetQuote.rfqId, targetQuote.vendor, targetQuote.totalPrice);
-    } else if (newStatus === "Rejected" && targetQuote) {
-      await revokeVendorContract(targetQuote.rfqId);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [quoteRes, rfqRes] = await Promise.all([
+        apiGet("/api/vendor-quotations?page=0&size=100&sort=createdAt&direction=desc").catch(() => null),
+        apiGet("/api/rfqs?page=0&size=100").catch(() => null),
+      ]);
+      setQuotations(quoteRes?.content || []);
+      setRfqs(rfqRes?.content || []);
+    } catch (err) {
+      setError(err.message || "Unable to load quotations.");
+    } finally {
+      setLoading(false);
     }
-
-    setToastMsg(`✓ Quotation ${quoteId} status updated to: [ ${newStatus} ] & PO synced`);
-    setTimeout(() => setToastMsg(""), 4000);
-  };
-
-  const loadLiveQuotations = async () => {
-    const rfqs = await fetchActiveRfqs();
-    const vendorMap = new Map();
-
-    // 1. Add default approved quotations
-    defaultApprovedQuotations.forEach((q) => {
-      const compositeKey = `${q.rfqId}_${q.vendor.toLowerCase().trim()}`;
-      vendorMap.set(compositeKey, q);
-    });
-
-    // 2. Add/override with live extracted bids from RFQs
-    (rfqs || []).forEach((rfq) => {
-      if (rfq.bids && rfq.bids.length > 0) {
-        rfq.bids.forEach((bid) => {
-          const vName = bid.vendor || "Approved Supplier";
-          const compositeKey = `${rfq.id}_${vName.toLowerCase().trim()}`;
-          vendorMap.set(compositeKey, {
-            id: `QUOTE-${rfq.id}-${vName.replace(/\s+/g, "")}`,
-            rfqId: rfq.id,
-            vendor: vName,
-            rating: "4.8 ⭐",
-            item: rfq.item || "Equipment Sourcing",
-            unitPrice: bid.amount || "$3,699.00",
-            totalPrice: bid.amount || "$36,990.00",
-            leadTime: bid.leadTime || "3 Business Days",
-            warranty: "Standard OEM Warranty",
-            quoteFile: `${rfq.id}_Received_Proposal.pdf`,
-            discount: "Commercial Bidding Rate",
-            validUntil: rfq.deadline || "2026-08-15",
-            paymentTerms: "Net 30 Days",
-            technicalCompliance: "Verified Compliant",
-            status: bid.status || (rfq.status === "Awarded" && rfq.winnerVendor === vName ? "Approved" : "Pending Review")
-          });
-        });
-      }
-    });
-
-    setQuotationsList(Array.from(vendorMap.values()));
-  };
-
-  useEffect(() => {
-    loadLiveQuotations();
-    const unsub = epsEventBus.subscribe(() => {
-      loadLiveQuotations();
-    });
-    return unsub;
   }, []);
 
-  const filtered = quotationsList.filter((q) => {
-    const matchesSearch =
-      q.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.vendor.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.item.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRfq =
-      selectedRfqFilter === "all" || q.rfqId === selectedRfqFilter;
-    const qStatus = q.status || "Approved";
-    const matchesStatus =
-      statusTabFilter === "all" || qStatus.toLowerCase().includes(statusTabFilter.toLowerCase());
-    return matchesSearch && matchesRfq && matchesStatus;
-  });
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const handleDownloadQuote = (quoteObj) => {
-    setToastMsg(`Downloading official bid proposal PDF (${quoteObj.quoteFile})...`);
-    setTimeout(() => setToastMsg(""), 4000);
-  };
+  const filtered = quotations.filter((q) => {
+    const text = searchTerm.toLowerCase();
+    if (text && !(
+      (q.quotationNumber || "").toLowerCase().includes(text) ||
+      (q.vendorName || "").toLowerCase().includes(text) ||
+      (q.rfqNumber || "").toLowerCase().includes(text)
+    )) return false;
+    if (statusFilter && q.status !== statusFilter) return false;
+    if (rfqFilter && String(q.rfqId) !== rfqFilter) return false;
+    return true;
+  });
 
   return (
     <div className="pe-quotations-container">
-      {/* Header */}
       <div className="pe-page-header">
         <div>
           <h1 className="pe-page-title">
-            <FileCheck2 color="#f8b400" /> Vendor Quotations Repository
+            <FileCheck2 color="#f8b400" /> Vendor Quotations Review
           </h1>
           <p className="pe-page-subtitle">
-            View submitted commercial bids, inspect proposal documents, and download supplier quotes.
+            Quotations submitted by invited vendors against your RFQs — live from the database.
           </p>
         </div>
       </div>
 
-      {toastMsg && (
-        <div
-          style={{
-            background: "rgba(5, 150, 105, 0.12)",
-            border: "1px solid #059669",
-            color: "#059669",
-            padding: "14px 20px",
-            borderRadius: "12px",
-            marginBottom: "20px",
-            fontWeight: "700",
-            fontSize: "14px",
-            display: "flex",
-            alignItems: "center",
-            gap: "10px",
-          }}
-        >
-          <CheckCircle2 size={18} /> {toastMsg}
+      {error && (
+        <div style={{ display: "flex", alignItems: "center", gap: 10, background: "#fef2f2", border: "1px solid #fecaca", color: "#991b1b", borderRadius: 10, padding: "12px 14px", marginBottom: 16, fontSize: 13 }}>
+          <AlertTriangle size={17} /> {error}
         </div>
       )}
 
-      {/* Status Filter Tabs Bar */}
-      <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap" }}>
-        <button
-          className={`pe-btn-primary-sm ${statusTabFilter === "all" ? "active" : ""}`}
-          style={{
-            background: statusTabFilter === "all" ? "#111111" : "#ffffff",
-            color: statusTabFilter === "all" ? "#ffffff" : "#111111",
-            border: "1px solid #d9d9d9",
-            fontWeight: "700"
-          }}
-          onClick={() => setStatusTabFilter("all")}
-        >
-          All Quotations ({quotationsList.length})
-        </button>
-
-        <button
-          className={`pe-btn-primary-sm ${statusTabFilter === "Approved" ? "active" : ""}`}
-          style={{
-            background: statusTabFilter === "Approved" ? "#059669" : "#ffffff",
-            color: statusTabFilter === "Approved" ? "#ffffff" : "#059669",
-            border: "1px solid #059669",
-            fontWeight: "700"
-          }}
-          onClick={() => setStatusTabFilter("Approved")}
-        >
-          <CheckCircle2 size={14} /> Approved Quotations ({quotationsList.filter(q => (q.status || "Approved").includes("Approved")).length})
-        </button>
-
-        <button
-          className={`pe-btn-primary-sm ${statusTabFilter === "Pending Review" ? "active" : ""}`}
-          style={{
-            background: statusTabFilter === "Pending Review" ? "#d97706" : "#ffffff",
-            color: statusTabFilter === "Pending Review" ? "#ffffff" : "#d97706",
-            border: "1px solid #d97706",
-            fontWeight: "700"
-          }}
-          onClick={() => setStatusTabFilter("Pending Review")}
-        >
-          <Clock size={14} /> Pending Quotations ({quotationsList.filter(q => (q.status || "").includes("Pending")).length})
-        </button>
-
-        <button
-          className={`pe-btn-primary-sm ${statusTabFilter === "Rejected" ? "active" : ""}`}
-          style={{
-            background: statusTabFilter === "Rejected" ? "#dc2626" : "#ffffff",
-            color: statusTabFilter === "Rejected" ? "#ffffff" : "#dc2626",
-            border: "1px solid #dc2626",
-            fontWeight: "700"
-          }}
-          onClick={() => setStatusTabFilter("Rejected")}
-        >
-          <X size={14} /> Rejected Quotations ({quotationsList.filter(q => (q.status || "").includes("Rejected")).length})
-        </button>
-      </div>
-
-      {/* Search & RFQ Filter Bar */}
-      <div className="pe-card" style={{ marginBottom: "24px", padding: "18px 24px" }}>
-        <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ position: "relative", width: "340px" }}>
-            <Search
-              size={16}
-              color="#666666"
-              style={{ position: "absolute", left: "14px", top: "50%", transform: "translateY(-50%)" }}
-            />
+      <div className="pe-card" style={{ marginBottom: 24, padding: "18px 24px" }}>
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", alignItems: "center" }}>
+          <div style={{ position: "relative", flex: 1, minWidth: 260 }}>
+            <Search size={16} color="#666" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }} />
             <input
               type="text"
-              placeholder="Search by Quote ID, Vendor, or Item..."
+              placeholder="Search by quotation number, vendor or RFQ..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pe-form-input"
-              style={{ paddingLeft: "42px", height: "42px" }}
+              style={{ paddingLeft: 42, height: 42 }}
             />
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <label style={{ fontSize: "12px", color: "#666", fontWeight: "700" }}>FILTER BY RFQ:</label>
-            <select
-              value={selectedRfqFilter}
-              onChange={(e) => setSelectedRfqFilter(e.target.value)}
-              className="pe-form-select"
-              style={{ width: "180px", height: "42px" }}
-            >
-              <option value="all">All Open RFQs</option>
-              <option value="RFQ-2026-901">RFQ-2026-901 (MacBook Pro)</option>
-              <option value="RFQ-2026-898">RFQ-2026-898 (Datadog APM)</option>
-            </select>
-          </div>
+          <select className="pe-form-select" style={{ width: 200, height: 42 }} value={rfqFilter} onChange={(e) => setRfqFilter(e.target.value)}>
+            <option value="">All RFQs</option>
+            {rfqs.map((r) => <option key={r.id} value={r.id}>{r.rfqNumber}</option>)}
+          </select>
+          <select className="pe-form-select" style={{ width: 180, height: 42 }} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="">All Statuses</option>
+            {["DRAFT", "SUBMITTED", "UNDER_REVIEW", "ACCEPTED", "REJECTED", "WITHDRAWN"].map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Grid of Quotations */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))",
-          gap: "20px",
-        }}
-      >
-        {filtered.map((q) => {
-          const isApproved = (q.status || "Approved").includes("Approved");
-          const isRejected = (q.status || "").includes("Rejected");
-          const isPending = (q.status || "").includes("Pending");
-
-          return (
-            <div key={q.id} className="pe-card pe-card-gold-glow">
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                <span style={{ fontWeight: "800", color: "#d97706", fontSize: "13px" }}>
-                  {q.id} • {q.rfqId}
-                </span>
-
-                {isApproved && (
-                  <span style={{ background: "rgba(5, 150, 105, 0.12)", color: "#059669", border: "1px solid rgba(5, 150, 105, 0.3)", padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                    <CheckCircle2 size={12} /> Approved
-                  </span>
-                )}
-                {isPending && (
-                  <span style={{ background: "rgba(217, 119, 6, 0.12)", color: "#d97706", border: "1px solid rgba(217, 119, 6, 0.3)", padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                    <Clock size={12} /> Pending Review
-                  </span>
-                )}
-                {isRejected && (
-                  <span style={{ background: "rgba(220, 38, 38, 0.12)", color: "#dc2626", border: "1px solid rgba(220, 38, 38, 0.3)", padding: "3px 10px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-                    <X size={12} /> Rejected
-                  </span>
-                )}
-              </div>
-
-              <h3 style={{ fontSize: "17px", color: "#111111", fontWeight: "700" }}>{q.vendor}</h3>
-              <p style={{ fontSize: "13px", color: "#555555", marginTop: "2px" }}>{q.item}</p>
-
-            <div
-              style={{
-                marginTop: "16px",
-                padding: "12px",
-                background: "#f8f9fb",
-                borderRadius: "10px",
-                border: "1px solid #ececec",
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-                fontSize: "12px",
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>Total Bid Price:</span>
-                <strong style={{ color: "#059669", fontSize: "15px" }}>{q.totalPrice}</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>SLA Lead Time:</span>
-                <span style={{ fontWeight: "600" }}>{q.leadTime}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>Commercial Incentive:</span>
-                <span style={{ fontWeight: "700", color: "#d97706" }}>{q.discount}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span style={{ color: "#666" }}>Proposal Validity:</span>
-                <span style={{ fontWeight: "600", color: "#111" }}>Until {q.validUntil}</span>
-              </div>
-            </div>
-
-            {/* Action buttons: View Submitted Quotation & Download Quotations */}
-            <div
-              style={{
-                marginTop: "18px",
-                display: "flex",
-                justify: "flex-end",
-                gap: "10px",
-              }}
-            >
-              <button
-                className="pe-btn-primary-sm"
-                style={{ background: "#ffffff", color: "#111", border: "1px solid #d9d9d9" }}
-                onClick={() => setPreviewQuote(q)}
-              >
-                <Eye size={15} /> View Quotation Details
-              </button>
-
-              <button
-                className="pe-btn-primary-sm"
-                onClick={() => handleDownloadQuote(q)}
-              >
-                <Download size={15} /> Download PDF
-              </button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-
-      {/* VIEW SUBMITTED QUOTATION MODAL */}
-      {previewQuote && (
-        <div className="pe-modal-overlay">
-          <div className="pe-modal" style={{ maxWidth: "600px" }}>
-            <div
-              style={{
-                display: "flex",
-                justify: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-              }}
-            >
-              <div>
-                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>SUBMITTED VENDOR COMMERCIAL BID</span>
-                <h3 style={{ fontSize: "18px", color: "#111111", fontWeight: "800" }}>
-                  {previewQuote.id} ({previewQuote.vendor})
-                </h3>
-              </div>
-              <button
-                onClick={() => setPreviewQuote(null)}
-                style={{ background: "none", border: "none", color: "#666666", cursor: "pointer" }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-              <div
-                style={{
-                  padding: "16px",
-                  background: "#f8f9fb",
-                  borderRadius: "12px",
-                  border: "1px solid #ececec",
-                  display: "grid",
-                  gridTemplateColumns: "1fr 1fr",
-                  gap: "14px",
-                  fontSize: "13.5px",
-                }}
-              >
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Offered Total Price</span>
-                  <p style={{ fontSize: "20px", color: "#059669", fontWeight: "800" }}>{previewQuote.totalPrice}</p>
-                  <span style={{ fontSize: "11px", color: "#666" }}>Unit Rate: {previewQuote.unitPrice}</span>
+      {loading ? (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, padding: "80px 0", color: "#888", fontWeight: 600 }}>
+          <Loader2 size={22} className="login-spin" /> Loading quotations...
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="pe-card" style={{ padding: 60, textAlign: "center", color: "#9aa8b8" }}>
+          <Clock size={30} style={{ opacity: 0.5, marginBottom: 8 }} />
+          <div style={{ fontWeight: 700, fontSize: 15, color: "#475569" }}>No vendor quotations received yet</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>Quotations appear here once invited vendors submit their commercial bids.</div>
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 20 }}>
+          {filtered.map((q) => {
+            const s = STATUS_STYLE[q.status] || STATUS_STYLE.DRAFT;
+            return (
+              <div key={q.id} className="pe-card pe-card-gold-glow">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                  <span style={{ fontWeight: 800, color: "#d97706", fontSize: 13 }}>{q.quotationNumber} · {q.rfqNumber}</span>
+                  <span style={{ background: s.bg, color: s.color, padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 800 }}>{q.status}</span>
                 </div>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Vendor Rating & Tier</span>
-                  <p style={{ fontWeight: "700", color: "#111" }}>{previewQuote.rating}</p>
-                  <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "700" }}>{previewQuote.discount}</span>
-                </div>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Guaranteed Delivery SLA</span>
-                  <p style={{ fontWeight: "700", color: "#111" }}>{previewQuote.leadTime}</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Payment Terms</span>
-                  <p style={{ fontWeight: "700", color: "#111" }}>{previewQuote.paymentTerms}</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Warranty & Support</span>
-                  <p style={{ fontWeight: "700", color: "#111" }}>{previewQuote.warranty}</p>
-                </div>
-                <div>
-                  <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Specs Compliance</span>
-                  <p style={{ fontWeight: "700", color: "#059669" }}>{previewQuote.technicalCompliance}</p>
-                </div>
-              </div>
-
-              <div style={{ background: "#ffffff", border: "1px solid #d9d9d9", padding: "14px", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <FileText color="#f8b400" size={20} />
-                  <div>
-                    <strong style={{ fontSize: "14px", color: "#111" }}>{previewQuote.quoteFile}</strong>
-                    <p style={{ fontSize: "11px", color: "#666" }}>Official signed proposal PDF document</p>
+                <h3 style={{ fontSize: 17, color: "#111", fontWeight: 700 }}>{q.vendorName}</h3>
+                <p style={{ fontSize: 13, color: "#555", marginTop: 2 }}>{q.vendorCode} · Valid until {formatDateIN(q.validUntil, { withTime: false })}</p>
+                <div style={{ marginTop: 16, padding: 12, background: "#f8f9fb", borderRadius: 10, border: "1px solid #ececec", display: "flex", flexDirection: "column", gap: 6, fontSize: 12.5 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#666" }}>Total Bid Price:</span>
+                    <strong style={{ color: "#059669", fontSize: 15 }}>{formatINR(q.grandTotal)}</strong>
                   </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#666" }}>Delivery:</span>
+                    <span style={{ fontWeight: 600 }}>{q.deliveryDays ? `${q.deliveryDays} day(s)` : "—"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#666" }}>Payment Terms:</span>
+                    <span style={{ fontWeight: 600 }}>{q.paymentTerms || "—"}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span style={{ color: "#666" }}>Warranty:</span>
+                    <span style={{ fontWeight: 600 }}>{q.warrantyMonths ? `${q.warrantyMonths} months` : "—"}</span>
+                  </div>
+                  {q.remarks && <div style={{ color: "#555", fontStyle: "italic", marginTop: 4 }}>"{q.remarks}"</div>}
                 </div>
-
-                <button
-                  className="pe-btn-primary-sm"
-                  onClick={() => handleDownloadQuote(previewQuote)}
-                >
-                  <Download size={15} /> Download PDF
-                </button>
+                <div style={{ marginTop: 16, display: "flex", justifyContent: "flex-end" }}>
+                  <button className="pe-btn-primary-sm" style={{ background: "#fff", color: "#111", border: "1px solid #d9d9d9" }} onClick={() => setPreview(q)}>
+                    <Eye size={15} /> View Quotation Details
+                  </button>
+                </div>
               </div>
-            </div>
+            );
+          })}
+        </div>
+      )}
 
-            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "20px" }}>
-              <button
-                className="pe-btn-primary-sm"
-                onClick={() => setPreviewQuote(null)}
-              >
-                Close Quotation
-              </button>
+      {preview && (
+        <div className="pe-modal-overlay">
+          <div className="pe-modal" style={{ maxWidth: 600 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <div>
+                <span style={{ fontSize: 11, color: "#d97706", fontWeight: 800 }}>VENDOR COMMERCIAL BID</span>
+                <h3 style={{ fontSize: 18, color: "#111", fontWeight: 800, margin: "2px 0 0" }}>{preview.quotationNumber} ({preview.vendorName})</h3>
+              </div>
+              <button onClick={() => setPreview(null)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div style={{ padding: 16, background: "#f8f9fb", borderRadius: 12, border: "1px solid #ececec", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, fontSize: 13 }}>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Total Bid Price</span><p style={{ fontSize: 20, color: "#059669", fontWeight: 800, margin: "2px 0 0" }}>{formatINR(preview.grandTotal)}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>RFQ</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{preview.rfqNumber}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Submitted</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{formatDateIN(preview.submissionDate, { withTime: false })}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Valid Until</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{formatDateIN(preview.validUntil, { withTime: false })}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Subtotal</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{formatINR(preview.subtotal)}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Tax</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{formatINR(preview.taxAmount)}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Delivery (days)</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{preview.deliveryDays ?? "—"}</p></div>
+                <div><span style={{ fontSize: 11, color: "#666", textTransform: "uppercase" }}>Warranty (months)</span><p style={{ fontWeight: 700, color: "#111", margin: "2px 0 0" }}>{preview.warrantyMonths ?? "—"}</p></div>
+              </div>
+              {preview.remarks && <p style={{ background: "#f8f9fb", padding: 12, borderRadius: 8, border: "1px solid #ececec", fontSize: 13, fontStyle: "italic" }}>"{preview.remarks}"</p>}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20 }}>
+              <button className="pe-btn-primary-sm" onClick={() => setPreview(null)}>Close</button>
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ import {
   ShieldCheck,
   FileText,
   Building,
-  DollarSign,
+  IndianRupee,
   ArrowRight,
   ChevronRight,
   PackageCheck,
@@ -22,7 +22,7 @@ export const mockApprovedWorkflows = {
     requester: "Hannah Lee",
     role: "UI/UX Designer",
     dept: "Engineering & IT",
-    cost: "$4,500.00",
+    cost: "₹4,500.00",
     vendor: "Figma Inc.",
     approvedDate: "2026-07-20",
     priority: "High",
@@ -92,7 +92,7 @@ export const mockApprovedWorkflows = {
     requester: "Alex Morgan",
     role: "Senior Architect",
     dept: "Engineering & IT",
-    cost: "$3,899.00",
+    cost: "₹3,899.00",
     vendor: "Apple Business Direct",
     approvedDate: "2026-07-24",
     priority: "Urgent",
@@ -162,7 +162,7 @@ export const mockApprovedWorkflows = {
     requester: "Alex Morgan",
     role: "Senior Architect",
     dept: "Engineering & IT",
-    cost: "$12,000.00",
+    cost: "₹12,000.00",
     vendor: "Amazon Web Services",
     approvedDate: "2026-07-10",
     priority: "High",
@@ -232,7 +232,7 @@ export const mockApprovedWorkflows = {
     requester: "James Kim",
     role: "QA Engineer",
     dept: "Engineering & IT",
-    cost: "$1,250.00",
+    cost: "₹1,250.00",
     vendor: "Herman Miller Direct",
     approvedDate: "2026-07-15",
     priority: "Medium",
@@ -302,7 +302,7 @@ export const mockApprovedWorkflows = {
     requester: "Priya Sharma",
     role: "Lead QA Engineer",
     dept: "Engineering & IT",
-    cost: "$2,400.00",
+    cost: "₹2,400.00",
     vendor: "Dell Commercial Direct",
     approvedDate: "2026-06-28",
     priority: "Medium",
@@ -371,8 +371,8 @@ export const mockApprovedWorkflows = {
 import { epsEventBus, fetchTrackForms } from "../../../../../services/epsApiService";
 
 const TrackForms = ({ initialReqId }) => {
-  const [workflows, setWorkflows] = useState(() => mockApprovedWorkflows);
-  const [selectedReqId, setSelectedReqId] = useState(initialReqId || "REQ-2026-8894");
+  const [workflows, setWorkflows] = useState({});
+  const [selectedReqId, setSelectedReqId] = useState(initialReqId || null);
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
@@ -391,24 +391,40 @@ const TrackForms = ({ initialReqId }) => {
       setWorkflows(liveData);
     });
     return unsub;
-  }, [selectedReqId]);
+  }, []);
 
   const approvedList = Object.values(workflows);
 
   const filteredList = approvedList.filter((req) => {
     const term = searchTerm.toLowerCase();
     return (
-      req.id.toLowerCase().includes(term) ||
-      req.requester.toLowerCase().includes(term) ||
-      req.product.toLowerCase().includes(term) ||
-      req.vendor.toLowerCase().includes(term)
+      String(req.id || "").toLowerCase().includes(term) ||
+      String(req.requester || "").toLowerCase().includes(term) ||
+      String(req.product || "").toLowerCase().includes(term) ||
+      String(req.vendor || "").toLowerCase().includes(term)
     );
   });
 
   const activeWorkflow =
     workflows[selectedReqId] ||
     Object.values(workflows)[0] ||
-    mockApprovedWorkflows["REQ-2026-8894"];
+    null;
+
+  if (!activeWorkflow) {
+    return (
+      <div className="dm-track-forms-container">
+        <div className="dm-page-header">
+          <div>
+            <h1 className="dm-page-title"><Clock color="#f8b400" /> Approved Requisitions Workflow Tracker</h1>
+            <p className="dm-page-subtitle">Live tracking from the database for approved requisitions.</p>
+          </div>
+        </div>
+        <div className="dm-card" style={{ padding: 32, textAlign: "center", color: "#64748b" }}>
+          No approved requisitions are currently available for tracking.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dm-track-forms-container">
@@ -568,9 +584,9 @@ const TrackForms = ({ initialReqId }) => {
                   textTransform: "uppercase",
                 }}
               >
-                {activeWorkflow.status === "rejected"
+                {String(activeWorkflow.status).toUpperCase() === "REJECTED"
                   ? "Manager Rejected"
-                  : activeWorkflow.status === "pending"
+                  : ["PENDING", "UNDER_REVIEW", "SUBMITTED"].includes(String(activeWorkflow.status).toUpperCase())
                   ? "Pending Approval"
                   : "Manager Approved"}
               </span>
@@ -595,6 +611,10 @@ const TrackForms = ({ initialReqId }) => {
               </div>
               <div>
                 Manager Approval Date: <strong style={{ color: "#111111" }}>{activeWorkflow.approvedDate}</strong>
+              </div>
+              <div>
+                Next Action: <strong style={{ color: "#7c3aed" }}>{activeWorkflow.nextApprover}</strong>
+                {activeWorkflow.nextApproverRole ? ` (${activeWorkflow.nextApproverRole})` : ""}
               </div>
             </div>
           </div>
@@ -623,7 +643,7 @@ const TrackForms = ({ initialReqId }) => {
                 marginTop: "2px",
               }}
             >
-              {activeWorkflow.currentStep === 8 ? "Fulfillment Completed" : "In Sourcing & Delivery Pipeline"}
+              {activeWorkflow.currentStep === 8 ? "Fulfillment Completed" : `Next: ${activeWorkflow.nextApprover || "Assigned workflow owner"}`}
             </span>
           </div>
         </div>

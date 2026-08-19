@@ -55,6 +55,7 @@ import com.procurement.vendorquotation.repository.VendorQuotationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -84,6 +85,7 @@ public class DemoWorkflowSeeder {
     @org.springframework.core.annotation.Order(4)
     @Transactional
     public CommandLineRunner seedDemoWorkflow(
+            @Value("${app.seed.demo-transactions-enabled:false}") boolean demoTransactionsEnabled,
             DepartmentRepository departmentRepository,
             RoleRepository roleRepository,
             ApprovalRuleRepository ruleRepository,
@@ -107,6 +109,11 @@ public class DemoWorkflowSeeder {
             PurchaseOrderLineRepository poLineRepository
     ) {
         return args -> {
+            if (!demoTransactionsEnabled) {
+                log.info("Demo transaction workflow seeding disabled.");
+                return;
+            }
+
             Department it = departmentRepository.findByDepartmentCode("IT").orElse(null);
             Role managerRole = roleRepository.findByRoleCode("DEPARTMENT_MANAGER").orElse(null);
             Role seniorRole = roleRepository.findByRoleCode("SENIOR_MANAGER").orElse(null);

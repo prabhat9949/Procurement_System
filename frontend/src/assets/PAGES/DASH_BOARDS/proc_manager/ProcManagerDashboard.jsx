@@ -18,11 +18,17 @@ import {
   ChevronLeft,
   ChevronRight,
   AlertTriangle,
+  Bell,
+  HelpCircle,
+  Inbox,
+  PackageCheck,
+  Send,
 } from "lucide-react";
 
 import ManagerOverview from "./modules/ManagerOverview";
 import ProcurementOverview from "./modules/ProcurementOverview";
-import ProcurementRequests from "./modules/ProcurementRequests";
+import InternalFulfilment from "./modules/InternalFulfilment";
+import ExternalProcurement from "./modules/ExternalProcurement";
 import PoApprovals from "./modules/PoApprovals";
 import VendorManagement from "./modules/VendorManagement";
 import ProcurementOperations from "./modules/ProcurementOperations";
@@ -31,6 +37,12 @@ import ProcurementTracking from "./modules/ProcurementTracking";
 import ManagerReports from "./modules/ManagerReports";
 import ManagerProfile from "./modules/ManagerProfile";
 import ManagerInvoices from "./modules/ManagerInvoices";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
+import RfqManagement from "../proc_exec/modules/RfqManagement";
+import VendorQuotations from "../proc_exec/modules/VendorQuotations";
+import PurchaseOrders from "../proc_exec/modules/PurchaseOrders";
+import MyApprovals from "../shared_ui/MyApprovals";
 
 const ProcManagerDashboard = () => {
   const navigate = useNavigate();
@@ -43,7 +55,12 @@ const ProcManagerDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "procurement-overview", label: "Procurement Overview", icon: Layers },
-    { id: "procurement-requests", label: "Procurement Requests", icon: FileText },
+    { id: "internal-fulfilment", label: "Internal Fulfilment", icon: PackageCheck },
+    { id: "external-procurement", label: "External Procurement", icon: Send },
+    { id: "my-approvals", label: "My Approvals & Tasks", icon: Inbox },
+    { id: "rfq-management", label: "RFQ Management", icon: FileText },
+    { id: "vendor-quotations", label: "Vendor Quotations", icon: FileText },
+    { id: "purchase-orders", label: "Purchase Orders", icon: FileText },
     { id: "po-approvals", label: "PO Approvals", icon: ShieldCheck },
     { id: "vendor-invoices", label: "Vendor Invoices", icon: AlertTriangle },
     { id: "vendor-management", label: "Vendor Management", icon: Users },
@@ -51,6 +68,8 @@ const ProcManagerDashboard = () => {
     { id: "procurement-analytics", label: "Procurement Analytics", icon: BarChart3 },
     { id: "procurement-tracking", label: "Procurement Tracking", icon: Clock },
     { id: "reports", label: "Procurement Reports", icon: FolderKanban },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
     ];
 
   const handleLogout = () => {
@@ -65,8 +84,18 @@ const ProcManagerDashboard = () => {
         return <ManagerOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "procurement-overview":
         return <ProcurementOverview />;
-      case "procurement-requests":
-        return <ProcurementRequests />;
+      case "internal-fulfilment":
+        return <InternalFulfilment />;
+      case "external-procurement":
+        return <ExternalProcurement onNavigate={(tab) => setActiveTab(tab)} />;
+      case "my-approvals":
+        return <MyApprovals />;
+      case "rfq-management":
+        return <RfqManagement />;
+      case "vendor-quotations":
+        return <VendorQuotations />;
+      case "purchase-orders":
+        return <PurchaseOrders />;
       case "po-approvals":
         return <PoApprovals />;
       case "vendor-invoices":
@@ -81,6 +110,10 @@ const ProcManagerDashboard = () => {
         return <ProcurementTracking />;
       case "reports":
         return <ManagerReports />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <ManagerProfile />;
       default:

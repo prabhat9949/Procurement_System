@@ -18,7 +18,7 @@ import { formatINR, formatDateIN } from "../../../../../utils/format";
 const PAYMENT_TERMS = ["Net 15 Days", "Net 30 Days", "Net 45 Days", "Net 60 Days", "Advance 50% + Net 30", "Immediate"];
 const DELIVERY_DAYS = [3, 5, 7, 10, 14, 21, 30, 45];
 const WARRANTY_MONTHS = [0, 6, 12, 24, 36];
-const CURRENCIES = ["INR", "USD"];
+const CURRENCIES = ["INR", "INR"];
 const DISCOUNTS = [0, 2, 5, 10, 15, 20];
 const TAX_RATES = [0, 5, 9, 12, 18];
 

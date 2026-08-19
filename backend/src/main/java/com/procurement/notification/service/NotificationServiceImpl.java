@@ -31,19 +31,22 @@ public class NotificationServiceImpl implements NotificationService {
 
     /**
      * Generates a unique notification number. Uses the row count as a starting
-     * point but walks forward past any number that already exists, so concurrent
-     * event-driven notifications (BusinessEvent listener) never collide.
+     * point but walks forward past any number that already exists. The method is
+     * synchronized and ends in a millisecond+random fallback so concurrent
+     * event-driven notifications (BusinessEvent listener, e.g. one per login)
+     * can never pick the same candidate.
      */
-    private String nextNumber(){
+    private synchronized String nextNumber(){
         long base = repo.count() + 1;
         for (long i = 0; i < 1000; i++) {
             String candidate = "NTF-" + Year.now().getValue() + "-" + String.format("%06d", base + i);
             if (!repo.existsByNotificationNumber(candidate)) return candidate;
         }
-        return "NTF-" + Year.now().getValue() + "-" + System.currentTimeMillis();
+        return "NTF-" + Year.now().getValue() + "-" + System.currentTimeMillis()
+                + "-" + java.util.concurrent.ThreadLocalRandom.current().nextInt(1000, 9999);
     }
 
-    @Transactional public NotificationResponse create(NotificationRequest request){var sender=request.senderId()==null?null:userRepo.findById(request.senderId()).orElseThrow(()->new ResourceNotFoundException("Sender not found"));var n=Notification.builder().notificationNumber(nextNumber()).title(request.title()).message(request.message()).type(request.type()).priority(request.priority()).status(NotificationStatus.PENDING).referenceType(request.referenceType()).referenceId(request.referenceId()).sender(sender).scheduledAt(request.scheduledAt()).expiresAt(request.expiresAt()).createdBy(user()).updatedBy(user()).build();var saved=repo.save(n);return mapper.toResponse(saved);}
+    @Transactional public NotificationResponse create(NotificationRequest request){var sender=request.senderId()==null?null:userRepo.findById(request.senderId()).orElseThrow(()->new ResourceNotFoundException("Sender not found"));var n=Notification.builder().notificationNumber(nextNumber()).title(request.title()).message(request.message()).type(request.type()).priority(request.priority()).status(NotificationStatus.PENDING).referenceType(request.referenceType()).referenceId(request.referenceId()).sender(sender).scheduledAt(request.scheduledAt()).expiresAt(request.expiresAt()).createdBy(user()).updatedBy(user()).build();return mapper.toResponse(repo.saveAndFlush(n));}
     @Transactional(readOnly=true) public PageResponse<NotificationResponse> search(String keyword, Long userId, NotificationStatus status, NotificationPriority priority, NotificationType type, Pageable pageable){var page=repo.findAll(NotificationSpecification.search(keyword,userId,status,priority,type),pageable).map(mapper::toResponse);return new PageResponse<>(page.getContent(),page.getNumber(),page.getSize(),page.getTotalElements(),page.getTotalPages(),page.isLast());}
     @Transactional(readOnly=true) public NotificationResponse get(Long id){return mapper.toResponse(find(id));}
     @Transactional public NotificationResponse send(Long id, NotificationSendRequest request){var n=find(id);if(n.getStatus()==NotificationStatus.EXPIRED)throw new ConflictException("Expired notification is read-only");recipientRepo.deleteAll(recipientRepo.findByNotificationId(id));for(var uid:request.recipientUserIds()){var u=userRepo.findById(uid).orElseThrow(()->new ResourceNotFoundException("User not found: "+uid));for(var channel:request.deliveryChannels()){recipientRepo.save(NotificationRecipient.builder().notification(n).user(u).deliveryChannel(channel).deliveryStatus(DeliveryStatus.SENT).build());}}var old=n.getStatus();n.setStatus(NotificationStatus.SENT);n.setSentAt(LocalDateTime.now());n.setUpdatedBy(user());var saved=repo.save(n);return mapper.toResponse(saved);}

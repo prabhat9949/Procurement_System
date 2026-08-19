@@ -61,6 +61,9 @@ public class VendorPortalController {
     private final PurchaseOrderRepository pos;
     private final PurchaseOrderService poService;
     private final PurchaseOrderMapper poMapper;
+    private final com.procurement.invoice.repository.InvoiceRepository invoices;
+    private final com.procurement.payment.repository.PaymentRepository payments;
+    private final com.procurement.goodsreceipt.repository.GoodsReceiptNoteRepository grnRepo;
 
     public VendorPortalController(UserRepository users,
                                   VendorMapper vendorMapper,
@@ -70,7 +73,10 @@ public class VendorPortalController {
                                   VendorQuotationService quotationService,
                                   PurchaseOrderRepository pos,
                                   PurchaseOrderService poService,
-                                  PurchaseOrderMapper poMapper) {
+                                  PurchaseOrderMapper poMapper,
+                                  com.procurement.invoice.repository.InvoiceRepository invoices,
+                                  com.procurement.payment.repository.PaymentRepository payments,
+                                  com.procurement.goodsreceipt.repository.GoodsReceiptNoteRepository grnRepo) {
         this.users = users;
         this.vendorMapper = vendorMapper;
         this.rfqVendors = rfqVendors;
@@ -80,6 +86,9 @@ public class VendorPortalController {
         this.pos = pos;
         this.poService = poService;
         this.poMapper = poMapper;
+        this.invoices = invoices;
+        this.payments = payments;
+        this.grnRepo = grnRepo;
     }
 
     private String username() {
@@ -212,6 +221,93 @@ public class VendorPortalController {
     }
 
     /** Vendor accepts the PO — only their own PO can be acknowledged. */
+    /** Invoices belonging to the authenticated vendor (financial visibility). */
+    @GetMapping("/invoices")
+    public ApiResponse<PageResponse<Map<String, Object>>> invoices(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Vendor vendor = myVendor();
+        var list = invoices.findByVendorId(vendor.getId());
+        list.sort((a, b) -> (b.getInvoiceDate() == null ? java.time.LocalDate.MIN : b.getInvoiceDate())
+                .compareTo(a.getInvoiceDate() == null ? java.time.LocalDate.MIN : a.getInvoiceDate()));
+        List<Map<String, Object>> rows = list.stream().skip((long) page * size).limit(size).map(inv -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", inv.getId());
+            row.put("invoiceNumber", inv.getInvoiceNumber());
+            row.put("vendorInvoiceNumber", inv.getVendorInvoiceNumber());
+            row.put("purchaseOrderId", inv.getPurchaseOrder().getId());
+            row.put("poNumber", inv.getPurchaseOrder().getPoNumber());
+            row.put("invoiceDate", inv.getInvoiceDate());
+            row.put("dueDate", inv.getDueDate());
+            row.put("currency", inv.getCurrency());
+            row.put("subtotal", inv.getSubtotal());
+            row.put("discountAmount", inv.getDiscountAmount());
+            row.put("taxAmount", inv.getTaxAmount());
+            row.put("shippingCharges", inv.getShippingCharges());
+            row.put("otherCharges", inv.getOtherCharges());
+            row.put("grandTotal", inv.getGrandTotal());
+            row.put("status", inv.getStatus());
+            return row;
+        }).toList();
+        PageResponse<Map<String, Object>> result = new PageResponse<>(
+                rows, page, size, list.size(),
+                (int) Math.ceil(list.size() / (double) size), rows.size() < size);
+        return ApiResponse.success(result);
+    }
+
+    /** Payments belonging to the authenticated vendor (payment status visibility). */
+    @GetMapping("/payments")
+    public ApiResponse<PageResponse<Map<String, Object>>> payments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Vendor vendor = myVendor();
+        var list = payments.findByVendorId(vendor.getId());
+        list.sort((a, b) -> (b.getPaymentDate() == null ? java.time.LocalDate.MIN : b.getPaymentDate())
+                .compareTo(a.getPaymentDate() == null ? java.time.LocalDate.MIN : a.getPaymentDate()));
+        List<Map<String, Object>> rows = list.stream().skip((long) page * size).limit(size).map(p -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", p.getId());
+            row.put("paymentNumber", p.getPaymentNumber());
+            row.put("invoiceId", p.getInvoice() == null ? null : p.getInvoice().getId());
+            row.put("invoiceNumber", p.getInvoice() == null ? null : p.getInvoice().getInvoiceNumber());
+            row.put("purchaseOrderId", p.getPurchaseOrder() == null ? null : p.getPurchaseOrder().getId());
+            row.put("purchaseOrderNumber", p.getPurchaseOrder() == null ? null : p.getPurchaseOrder().getPoNumber());
+            row.put("paymentDate", p.getPaymentDate());
+            row.put("paymentMethod", p.getPaymentMethod());
+            row.put("paymentReference", p.getPaymentReference());
+            row.put("bankReference", p.getBankReference());
+            row.put("currency", p.getCurrency());
+            row.put("grossAmount", p.getGrossAmount());
+            row.put("netAmount", p.getNetAmount());
+            row.put("paidAmount", p.getPaidAmount());
+            row.put("status", p.getStatus());
+            return row;
+        }).toList();
+        PageResponse<Map<String, Object>> result = new PageResponse<>(
+                rows, page, size, list.size(),
+                (int) Math.ceil(list.size() / (double) size), rows.size() < size);
+        return ApiResponse.success(result);
+    }
+
+    /** Goods receipt notes (delivery status) for the authenticated vendor's purchase orders. */
+    @GetMapping("/deliveries")
+    public ApiResponse<List<Map<String, Object>>> deliveries() {
+        Vendor vendor = myVendor();
+        var grns = grnRepo.findByVendorId(vendor.getId());
+        List<Map<String, Object>> rows = grns.stream().map(g -> {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", g.getId());
+            row.put("grnNumber", g.getGrnNumber());
+            row.put("purchaseOrderId", g.getPurchaseOrder().getId());
+            row.put("poNumber", g.getPurchaseOrder().getPoNumber());
+            row.put("receiptDate", g.getReceiptDate());
+            row.put("status", g.getStatus());
+            row.put("remarks", g.getRemarks());
+            return row;
+        }).toList();
+        return ApiResponse.success(rows);
+    }
+
     @PostMapping("/purchase-orders/{id}/acknowledge")
     @Transactional
     public ApiResponse<PurchaseOrderResponse> acknowledge(@PathVariable Long id) {

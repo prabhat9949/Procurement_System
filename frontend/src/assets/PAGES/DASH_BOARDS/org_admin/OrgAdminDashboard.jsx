@@ -5,9 +5,8 @@ import "./OrgAdminDashboard.css";
 import {
   Building2,
   ShoppingBag,
-  DollarSign,
+  IndianRupee,
   Boxes,
-  Database,
   Truck,
   Activity,
   Users,
@@ -16,7 +15,6 @@ import {
   AlertTriangle,
   FolderKanban,
   Bell,
-  Lock,
   FileText,
   Settings,
   LogOut,
@@ -37,13 +35,10 @@ import BusinessIntelligence from "./modules/BusinessIntelligence";
 import OrgComplianceMonitoring from "./modules/OrgComplianceMonitoring";
 import OrgRiskAnalysis from "./modules/OrgRiskAnalysis";
 import OrgReports from "./modules/OrgReports";
-import OrgMasterDataPanel from "./modules/OrgMasterDataPanel";
 import OrgSystemHealth from "./modules/OrgSystemHealth";
 
 // Real admin control modules (shared with the Super Admin portal)
 import SuperUserManagement from "../super_admin/modules/SuperUserManagement";
-import SuperRoleManagement from "../super_admin/modules/SuperRoleManagement";
-import SuperPermissionManagement from "../super_admin/modules/SuperPermissionManagement";
 import SuperVendorMonitoring from "../super_admin/modules/SuperVendorMonitoring";
 import SuperAuditLogs from "../super_admin/modules/SuperAuditLogs";
 import SuperNotificationsCenter from "../super_admin/modules/SuperNotificationsCenter";
@@ -61,14 +56,11 @@ const OrgAdminDashboard = () => {
     { id: "org-overview", label: "Admin Dashboard", icon: Building2 },
     { id: "system-health", label: "System Health", icon: Server },
     { id: "user-management", label: "User Management", icon: Users },
-    { id: "role-management", label: "Role Management", icon: ShieldCheck },
-    { id: "permission-management", label: "Permission Management", icon: Lock },
-    { id: "master-data", label: "Master Data Management", icon: Database },
     { id: "vendor-monitoring", label: "Vendors & KYC", icon: Truck },
     { id: "audit-logs", label: "Audit Logs", icon: FileText },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "procurement-analytics", label: "Procurement Analytics", icon: ShoppingBag },
-    { id: "financial-analytics", label: "Financial Analytics", icon: DollarSign },
+    { id: "financial-analytics", label: "Financial Analytics", icon: IndianRupee },
     { id: "inventory-analytics", label: "Inventory Analytics", icon: Boxes },
     { id: "vendor-analytics", label: "Vendor Analytics", icon: Activity },
     { id: "department-analytics", label: "Department Analytics", icon: BarChart2 },
@@ -98,12 +90,6 @@ const OrgAdminDashboard = () => {
         return <OrgSystemHealth />;
       case "user-management":
         return <SuperUserManagement />;
-      case "role-management":
-        return <SuperRoleManagement />;
-      case "permission-management":
-        return <SuperPermissionManagement />;
-      case "master-data":
-        return <OrgMasterDataPanel />;
       case "vendor-monitoring":
         return <SuperVendorMonitoring />;
       case "audit-logs":

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { apiGet, apiPost, apiPut, apiDelete } from "../../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../../utils/format";
+import { hasPermission } from "../../../../../utils/permissions";
 
 const STATUS_STYLE = {
   DRAFT: { bg: "rgba(100,116,139,.12)", color: "#64748b" },
@@ -30,6 +31,9 @@ const displayStatus = (r) => (r.approvalStatus === "RETURNED" ? "RETURNED" : r.s
 const statusLabel = (s) => (s === "UNDER_REVIEW" ? "Pending" : s === "RETURNED" ? "Returned for Correction" : s.replace("_", " "));
 
 const MyRequests = ({ onNavigate, onSelectTracking }) => {
+  const canEdit = hasPermission("CAN_EDIT_PR");
+  const canSubmit = hasPermission("CAN_SUBMIT_PR");
+  const canCancel = hasPermission("CAN_CANCEL_PR");
   const [requests, setRequests] = useState([]);
   const [linesByRequest, setLinesByRequest] = useState({});
   const [loading, setLoading] = useState(true);
@@ -218,16 +222,16 @@ const MyRequests = ({ onNavigate, onSelectTracking }) => {
                       <td style={{ padding: "12px 14px" }}>{statusBadge(status)}</td>
                       <td style={{ padding: "12px 14px", textAlign: "right", whiteSpace: "nowrap" }} onClick={(e) => e.stopPropagation()}>
                         <button title="View / Track" style={iconBtn("#2563eb")} onClick={() => onSelectTracking(r.id)}><Eye size={15} /></button>
-                        {editable && (
+                        {editable && canEdit && (
                           <button title="Edit" style={iconBtn("#7c3aed")} onClick={() => setEditTarget(r)}><Pencil size={14} /></button>
                         )}
-                        {editable && (
+                        {editable && canSubmit && (
                           <button title="Submit" style={iconBtn("#059669")} disabled={busy} onClick={() => setConfirmAction({ action: "submit", request: r })}><Send size={14} /></button>
                         )}
-                        {cancellable && (
+                        {cancellable && canCancel && (
                           <button title="Cancel" style={iconBtn("#d97706")} disabled={busy} onClick={() => setConfirmAction({ action: "cancel", request: r })}><XCircle size={14} /></button>
                         )}
-                        {editable && (
+                        {editable && (canEdit || canCancel) && (
                           <button title="Delete" style={iconBtn("#dc2626")} disabled={busy} onClick={() => setConfirmAction({ action: "delete", request: r })}><Trash2 size={14} /></button>
                         )}
                       </td>
