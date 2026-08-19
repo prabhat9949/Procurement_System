@@ -6,19 +6,13 @@ import {
   LayoutDashboard,
   CreditCard,
   FileCheck2,
-  PieChart,
-  TrendingUp,
-  BarChart3,
   IndianRupee,
-  FolderKanban,
-  Bell,
-  UserCheck,
-  Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 
 import FinanceOverview from "./modules/FinanceOverview";
@@ -28,10 +22,8 @@ import FinanceBudgetMgmt from "./modules/FinanceBudgetMgmt";
 import FinanceExpenseMgmt from "./modules/FinanceExpenseMgmt";
 import FinancialAnalytics from "./modules/FinancialAnalytics";
 import ProcurementPaymentTracking from "./modules/ProcurementPaymentTracking";
-import FinancialReports from "./modules/FinancialReports";
-import FinanceNotifications from "./modules/FinanceNotifications";
-import FinanceSettings from "./modules/FinanceSettings";
-import ProfileDrawer from "../shared_ui/ProfileDrawer";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const FinanceDashboard = () => {
   const navigate = useNavigate();
@@ -46,9 +38,10 @@ const FinanceDashboard = () => {
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "payment-approvals", label: "Payment Approvals", icon: CreditCard },
     { id: "invoice-management", label: "Invoice Management", icon: FileCheck2 },
-    { id: "expense-management", label: "Expense Management", icon: TrendingUp },
+    { id: "expense-management", label: "Expense Management", icon: FileCheck2 },
     { id: "procurement-payments", label: "Procurement Payments", icon: IndianRupee },
-    { id: "reports", label: "Financial Reports", icon: FolderKanban },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
   const handleLogout = () => {
@@ -69,8 +62,10 @@ const FinanceDashboard = () => {
         return <FinanceExpenseMgmt />;
       case "procurement-payments":
         return <ProcurementPaymentTracking />;
-      case "reports":
-        return <FinancialReports />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       default:
         return <FinanceOverview onNavigate={(tab) => setActiveTab(tab)} />;
     }

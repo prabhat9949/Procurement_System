@@ -5,34 +5,20 @@ import "./AuditorDashboard.css";
 import {
   LayoutDashboard,
   ShieldCheck,
-  IndianRupee,
   FileText,
-  Star,
-  Boxes,
-  AlertTriangle,
-  FolderKanban,
-  Bell,
-  UserCheck,
-  Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 
 import AuditorOverview from "./modules/AuditorOverview";
 import ProcurementAudits from "./modules/ProcurementAudits";
-import FinancialAudits from "./modules/FinancialAudits";
 import PoAudits from "./modules/PoAudits";
-import VendorAudits from "./modules/VendorAudits";
-import InventoryAudits from "./modules/InventoryAudits";
-import ComplianceMonitoring from "./modules/ComplianceMonitoring";
-import RiskAnalysis from "./modules/RiskAnalysis";
-import AuditReports from "./modules/AuditReports";
-import AuditorNotifications from "./modules/AuditorNotifications";
-import AuditorProfile from "./modules/AuditorProfile";
-import AuditorSettings from "./modules/AuditorSettings";
-import AuditorBudgetAllocation from "./modules/AuditorBudgetAllocation";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const AuditorDashboard = () => {
   const navigate = useNavigate();
@@ -44,16 +30,11 @@ const AuditorDashboard = () => {
 
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "procurement-audits", label: "Procurement Audits", icon: ShieldCheck },
-    { id: "financial-audits", label: "Financial Audits", icon: IndianRupee },
+    { id: "procurement-audits", label: "Audit Queue", icon: ShieldCheck },
     { id: "po-audits", label: "PO Audits", icon: FileText },
-    { id: "vendor-audits", label: "Vendor Audits", icon: Star },
-    { id: "inventory-audits", label: "Inventory Audits", icon: Boxes },
-    { id: "compliance-monitoring", label: "Compliance Monitoring", icon: ShieldCheck },
-    { id: "risk-analysis", label: "Risk Analysis", icon: AlertTriangle },
-    { id: "budget-allocations", label: "Budget Allocations", icon: IndianRupee },
-    { id: "reports", label: "Audit Reports", icon: FolderKanban },
-    ];
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("eps_active_role");
@@ -67,22 +48,12 @@ const AuditorDashboard = () => {
         return <AuditorOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "procurement-audits":
         return <ProcurementAudits />;
-      case "financial-audits":
-        return <FinancialAudits />;
       case "po-audits":
         return <PoAudits />;
-      case "vendor-audits":
-        return <VendorAudits />;
-      case "inventory-audits":
-        return <InventoryAudits />;
-      case "compliance-monitoring":
-        return <ComplianceMonitoring />;
-      case "risk-analysis":
-        return <RiskAnalysis />;
-      case "budget-allocations":
-        return <AuditorBudgetAllocation />;
-      case "reports":
-        return <AuditReports />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <AuditorProfile />;
       default:
