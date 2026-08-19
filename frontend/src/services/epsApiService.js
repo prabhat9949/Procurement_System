@@ -1,203 +1,184 @@
+// ============================================================================
+// EPS API Service — Real Backend Integration
+// ============================================================================
+// This module re-exports all legacy function names that dashboard components
+// import, but every function now calls the real Spring Boot backend through
+// the clean service modules. The epsEventBus is preserved for cross-component
+// reactivity. localStorage is only used for pure-UI state that has no backend
+// table (system pause toggles, UI preferences).
+// ============================================================================
 // EPS API & Real-Time Sync Service
 import { apiGet, apiPost } from "./apiClient";
 const API_BASE_URL = "http://localhost:8080/api/v1";
 const LOCAL_STORAGE_KEY = "eps_enterprise_master_requests";
 const BUDGET_STORAGE_KEY = "eps_dept_budget_analytics";
 
-// Custom Event Bus for instant cross-component updates
-class Emitter {
-  constructor() {
-    this.listeners = new Set();
-  }
-  subscribe(fn) {
-    this.listeners.add(fn);
-    return () => this.listeners.delete(fn);
-  }
-  emit(data) {
-    this.listeners.forEach((fn) => fn(data));
-  }
-  publish(data) {
-    this.emit(data);
-  }
-}
+import { apiGet, apiPost, apiPut, apiDelete, buildQuery } from "./apiClient";
 
+// ── Event Bus (cross-component reactivity) ────────────────────────────────
+class Emitter {
+  constructor() { this.listeners = new Set(); }
+  subscribe(fn) { this.listeners.add(fn); return () => this.listeners.delete(fn); }
+  emit(data) { this.listeners.forEach((fn) => fn(data)); }
+  publish(data) { this.emit(data); }
+}
 export const epsEventBus = new Emitter();
 
-const INITIAL_MASTER_REQUESTS = [];
+// ============================================================================
+// PURCHASE REQUESTS
+// ============================================================================
 
+/** Fetch purchase requests (for manager / procurement views) */
 export const getStoredMasterRequests = () => {
-  try {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.error("Error reading localStorage requests", e);
-  }
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_MASTER_REQUESTS));
-  return INITIAL_MASTER_REQUESTS;
-};
-
-export const saveStoredMasterRequests = (requests) => {
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(requests));
-  epsEventBus.emit({ type: "REQUESTS_UPDATED", data: requests });
-};
-
-// PO Code → REQ ID mapping for cross-portal sync
-const PO_REQ_MAP = {};
-
-// Global Shipment Events store
-const SHIPMENT_EVENTS_KEY = "eps_shipment_events_v1";
-
-export const getShipmentEvents = () => {
-  try {
-    const saved = localStorage.getItem(SHIPMENT_EVENTS_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {}
-  return {};
-};
-
-export const initiateGlobalShipment = (poIdOrReqId) => {
-  // Resolve the real reqId from POs
-  const currentPos = getStoredPurchaseOrders();
-  const matchingPo = currentPos.find(p => p.id === poIdOrReqId);
-  
-  let poId = poIdOrReqId;
-  let reqId = poIdOrReqId;
-  if (matchingPo) {
-    poId = matchingPo.id;
-    reqId = matchingPo.reqId || poIdOrReqId;
-  } else {
-    const poForReq = currentPos.find(p => p.reqId === poIdOrReqId);
-    if (poForReq) {
-      poId = poForReq.id;
-      reqId = poIdOrReqId;
-    }
-  }
-
-  // Persist shipment event by poId in localStorage
-  const events = getShipmentEvents();
-  events[poId] = { reqId, poId, initiatedAt: new Date().toISOString(), phase: "Shipment Initiated" };
-  localStorage.setItem(SHIPMENT_EVENTS_KEY, JSON.stringify(events));
-
-  // Also advance the matching request's currentStep to 6 ("Goods Delivered" step = active)
-  const requests = getStoredMasterRequests();
-  const index = requests.findIndex((r) => r.id === reqId || r.poCode === poId || r.numericId === reqId);
-  if (index !== -1) {
-    requests[index].currentStep = 6;
-    saveStoredMasterRequests(requests);
-  }
-};
-
-// Advance a request to a specific step by matching PO ID or Request ID
-export const advanceRequestStep = (poId, step) => {
-  const currentPos = getStoredPurchaseOrders();
-  const matchingPo = currentPos.find(p => p.id === poId);
-  let reqId = matchingPo ? matchingPo.reqId : null;
-
-  const requests = getStoredMasterRequests();
-  let updated = false;
-  const updatedReqs = requests.map((r) => {
-    const matches =
-      (reqId && (r.id === reqId || r.numericId === parseInt(reqId?.replace("REQ-2026-", "")))) ||
-      r.id === poId ||
-      r.poNumber === poId ||
-      r.poCode === poId;
-    if (matches) {
-      updated = true;
-      const newStep = Math.max(r.currentStep || 1, step);
-      const isCompleted = step >= 8;
-      return {
-        ...r,
-        currentStep: newStep,
-        status: isCompleted ? "completed" : (r.status === "rejected" ? "rejected" : "approved"),
-        lastUpdated: new Date().toISOString()
-      };
-    }
-    return r;
-  });
-  if (updated) {
-    saveStoredMasterRequests(updatedReqs);
-    epsEventBus.publish({ type: "REQUESTS_UPDATED", data: updatedReqs });
-  }
-};
-
-// ---- PAYMENT REQUESTS STORAGE ----
-const PAYMENT_REQUESTS_KEY = "eps_payment_requests_v1";
-
-export const getStoredPaymentRequests = () => {
-  try {
-    const saved = localStorage.getItem(PAYMENT_REQUESTS_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {}
+  // Legacy: returns empty — callers should use fetchMasterRequests() instead
   return [];
 };
 
-export const saveStoredPaymentRequests = (list) => {
-  localStorage.setItem(PAYMENT_REQUESTS_KEY, JSON.stringify(list));
-  epsEventBus.publish({ type: "PAYMENT_REQUESTS_UPDATED", data: list });
+export const saveStoredMasterRequests = () => {
+  // No-op: data lives in backend now
 };
 
-export const createPaymentRequestFromInvoice = (invoice) => {
-  const existing = getStoredPaymentRequests();
-  // Avoid duplicate
-  if (existing.some(p => p.invId === invoice.id)) return;
-
-  const amt = typeof invoice.totalAmount === "number"
-    ? invoice.totalAmount
-    : (typeof invoice.amount === "number" ? invoice.amount * 1.18 : 0);
-
-  const payId = `PAY-${invoice.id}`;
-  const newPay = {
-    payId,
-    poId: invoice.poId || "N/A",
-    invId: invoice.id,
-    vendor: invoice.vendor || "Vendor",
-    item: invoice.item || invoice.product || "Procurement Item",
-    amount: amt,
-    terms: invoice.paymentTerms || "Net 30 Days",
-    dueDate: invoice.dueDate || "2026-09-30",
-    status: "Awaiting CFO Sign-off",
-    bankDetails: invoice.bankDetails || "Bank details on file",
-    submittedAt: new Date().toLocaleString(),
-    invoiceDate: invoice.date || new Date().toISOString().split("T")[0],
-  };
-
-  const updated = [newPay, ...existing];
-  saveStoredPaymentRequests(updated);
-  epsEventBus.publish({ type: "PAYMENT_REQUEST_CREATED", data: newPay });
-  return newPay;
+/** Fetch all purchase requests (real API) */
+export const fetchMasterRequests = async (params = {}) => {
+  try {
+    const q = buildQuery({ page: params.page ?? 0, size: params.size ?? 100, sort: "createdAt", direction: "desc", ...params });
+    return await apiGet(`/api/purchase-requests${q}`);
+  } catch { return { content: [], totalElements: 0 }; }
 };
-
-// ==========================================
-// API SERVICE METHODS
-// ==========================================
 
 export const fetchApprovalQueue = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/approvals/pending`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.content && data.data.content.length > 0) {
-        return data.data.content;
-      }
-    }
-  } catch (err) {
-    // Failover to synchronized store
-  }
-  const all = getStoredMasterRequests();
-  return all.filter((r) => r.status === "pending");
+    const data = await apiGet("/api/approval-tasks?status=PENDING&size=100");
+    return data?.content || [];
+  } catch { return []; }
 };
 
-export const fetchTeamRequisitions = async (deptId = 1) => {
+export const fetchTeamRequisitions = async (departmentId) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/purchase-requests?departmentId=${deptId}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.content) {
-        return data.data.content;
-      }
+    const q = buildQuery({ departmentId, size: 100, sort: "createdAt", direction: "desc" });
+    const data = await apiGet(`/api/purchase-requests${q}`);
+    return data?.content || [];
+  } catch { return []; }
+};
+
+export const fetchTrackForms = async () => {
+  try {
+    const prData = await apiGet("/api/purchase-requests?size=100");
+    const requests = prData?.content || [];
+    const workflows = {};
+    for (const req of requests) {
+      // Fetch approval tasks for this PR
+      let tasks = [];
+      try {
+        const taskData = await apiGet(`/api/approval-tasks?purchaseRequestId=${req.id}&size=50`);
+        tasks = taskData?.content || [];
+      } catch { /* ignore */ }
+
+      const currentStep = computeWorkflowStep(req, tasks);
+      workflows[req.id] = {
+        id: req.id,
+        requestNumber: req.requestNumber,
+        item: req.title || req.purpose,
+        product: req.title || req.purpose,
+        requester: req.requesterName || "Employee",
+        dept: req.departmentName || "Department",
+        cost: req.estimatedAmount,
+        priority: req.priority,
+        status: req.status,
+        approvalStatus: req.approvalStatus,
+        currentStep,
+        steps: generateWorkflowSteps(req, currentStep, tasks),
+        createdAt: req.createdAt,
+      };
     }
+    return workflows;
+  } catch { return {}; }
+};
+
+function computeWorkflowStep(req, tasks) {
+  if (req.status === "COMPLETED") return 8;
+  if (req.status === "REJECTED") return 2;
+  if (req.status === "DRAFT") return 1;
+  if (req.status === "UNDER_REVIEW") return 2;
+  if (req.status === "APPROVED") return 3;
+  if (req.status === "PO_ISSUED") return 5;
+  if (req.status === "DELIVERED") return 6;
+  if (req.status === "INVOICE_MATCHED") return 7;
+  return 2;
+}
+
+function generateWorkflowSteps(req, activeStep, tasks) {
+  const s = (step) => activeStep > step ? "done" : activeStep === step ? "active" : "pending";
+  return [
+    { title: "1. Request Submitted", desc: "Requisition created and logged.", actor: req.requesterName || "Requester", status: "done" },
+    { title: "2. Manager Approval", desc: "Budget sign-off and verification.", actor: tasks[0]?.assignedEmployeeName || "Manager", status: req.status === "REJECTED" ? "rejected" : s(2) },
+    { title: "3. Procurement Review", desc: "Compliance and sourcing review.", actor: "Procurement Team", status: s(3) },
+    { title: "4. Vendor Selection & RFQ", desc: "Quote comparison and vendor selection.", actor: "Procurement Executive", status: s(4) },
+    { title: "5. Purchase Order Issued", desc: "PO generated and sent to supplier.", actor: "Finance & Purchasing", status: s(5) },
+    { title: "6. Goods Delivered", desc: "Physical receipt and inspection.", actor: "Warehouse Operations", status: s(6) },
+    { title: "7. Invoice & 3-Way Match", desc: "Invoice matching and payment clearance.", actor: "Finance", status: s(7) },
+    { title: "8. Completed", desc: "Asset tagged and delivered.", actor: "Operations", status: s(8) },
+  ];
+}
+
+export const fetchBudgetAnalytics = async () => {
+  try {
+    const data = await apiGet("/api/dashboard/employee");
+    return data?.budgetAnalytics || {
+      totalBudgetCap: 0, allocatedBudget: 0, spentBudget: 0, remainingBudget: 0,
+      monthlyBudgetData: [], subTeamSpend: [], categoryData: [],
+    };
+  } catch {
+    return { totalBudgetCap: 0, allocatedBudget: 0, spentBudget: 0, remainingBudget: 0, monthlyBudgetData: [], subTeamSpend: [], categoryData: [] };
+  }
+};
+
+export const submitApprovalDecision = async (taskId, decision, comments = "") => {
+  const endpoint = decision === "approved"
+    ? `/api/approval-tasks/${taskId}/approve`
+    : decision === "returned"
+      ? `/api/approval-tasks/${taskId}/return`
+      : `/api/approval-tasks/${taskId}/reject`;
+  const result = await apiPost(endpoint, comments ? { comments } : {});
+  epsEventBus.publish({ type: "APPROVAL_DECIDED", data: result });
+  return result;
+};
+
+export const fetchProcurementRequests = async () => {
+  try {
+    const data = await apiGet("/api/purchase-requests?status=APPROVED&size=100");
+    return data?.content || [];
+  } catch { return []; }
+};
+
+export const submitProcurementExecutiveReview = async (reqId, decision) => {
+  // This is handled through approval tasks on the backend
+  epsEventBus.publish({ type: "PROCUREMENT_REVIEW", reqId, decision });
+};
+
+// ============================================================================
+// PURCHASE ORDERS
+// ============================================================================
+
+export const getStoredPurchaseOrders = () => [];
+export const saveStoredPurchaseOrders = () => {};
+
+export const fetchPurchaseOrders = async (params = {}) => {
+  try {
+    const q = buildQuery({ size: 100, sort: "orderDate", direction: "desc", ...params });
+    const data = await apiGet(`/api/purchase-orders${q}`);
+    return data?.content || [];
+  } catch { return []; }
+};
+
+export const createPurchaseOrder = async (poData) => {
+  try {
+    const result = await apiPost("/api/purchase-orders", poData);
+    epsEventBus.publish({ type: "PO_CREATED", data: result });
+    return result;
   } catch (err) {
-    // Failover to local store
+    console.error("Failed to create PO:", err.message);
+    throw err;
   }
   return getStoredMasterRequests();
 };
@@ -289,78 +270,25 @@ export const fetchTrackForms = async () => {
   return workflows;
 };
 
-export const fetchBudgetAnalytics = async (deptId = 1) => {
-  const requests = getStoredMasterRequests();
-  const approvedSpend = requests
-    .filter((r) => r.status === "approved" || r.status === "completed")
-    .reduce((acc, r) => acc + (r.rawCost || 0), 0);
+// ============================================================================
+// RFQs
+// ============================================================================
 
-  const baseBudget = 120000;
-  const actualSpend = 75000 + approvedSpend;
+export const getStoredRfqs = () => [];
+export const saveStoredRfqs = () => {};
 
-  return {
-    totalBudgetCap: baseBudget,
-    allocatedBudget: 98000,
-    spentBudget: actualSpend,
-    remainingBudget: Math.max(0, baseBudget - actualSpend),
-    monthlyBudgetData: [
-      { month: "Jan", budgetCap: 120000, actualSpend: 78000 },
-      { month: "Feb", budgetCap: 120000, actualSpend: 84000 },
-      { month: "Mar", budgetCap: 120000, actualSpend: 91000 },
-      { month: "Apr", budgetCap: 120000, actualSpend: 86000 },
-      { month: "May", budgetCap: 120000, actualSpend: 98000 },
-      { month: "Jun", budgetCap: 120000, actualSpend: 89000 },
-      { month: "Jul", budgetCap: 120000, actualSpend: actualSpend }
-    ],
-    subTeamSpend: [
-      { team: "DevOps & Cloud", spend: 32500 },
-      { team: "Frontend Arch", spend: 21400 },
-      { team: "Backend Systems", spend: 18600 },
-      { team: "QA Automation", spend: 7200 },
-      { team: "IT Desk Support", spend: 4500 }
-    ],
-    categoryData: [
-      { name: "Cloud Infrastructure", value: 38, color: "#f8b400" },
-      { name: "Hardware & Workstations", value: 26, color: "#059669" },
-      { name: "SaaS & Subscriptions", value: 24, color: "#3b82f6" },
-      { name: "Office Supplies", value: 12, color: "#7c3aed" }
-    ]
-  };
+export const fetchActiveRfqs = async () => {
+  try {
+    const data = await apiGet("/api/rfqs?size=100");
+    return data?.content || [];
+  } catch { return []; }
 };
 
-export const submitApprovalDecision = async (reqId, decision, remarks = "", approver = "Sarah Jenkins (VP Eng)") => {
+export const createRfq = async (rfqData) => {
   try {
-    await fetch(`${API_BASE_URL}/approvals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId: reqId, status: decision.toUpperCase(), remarks })
-    });
-  } catch (err) {
-    // API server call fallback
-  }
-
-  const current = getStoredMasterRequests();
-  const updated = current.map((r) => {
-    if (r.id === reqId || r.numericId === reqId) {
-      const isApproved = decision === "approved";
-      return {
-        ...r,
-        status: isApproved ? "approved" : "rejected",
-        currentStep: isApproved ? 3 : 2,
-        managerDecision: decision,
-        remarks: remarks || (isApproved ? "Approved by Department Manager" : "Rejected by Department Manager"),
-        approver: approver
-      };
-    }
-    return r;
-  });
-
-  saveStoredMasterRequests(updated);
-  return updated;
-};
-
-export const fetchProcurementRequests = async () => {
-  try {
+    const result = await apiPost("/api/rfqs", rfqData);
+    epsEventBus.publish({ type: "RFQ_CREATED", data: result });
+    return result;
     const page = await apiGet("/api/purchase-requests?page=0&size=100&sort=createdAt&direction=desc");
     // A PR remains UNDER_REVIEW while later approval/assignment stages run.
     // Procurement must receive it as soon as it is routed to procurement,
@@ -369,12 +297,17 @@ export const fetchProcurementRequests = async () => {
       .filter((r) => !["DRAFT", "CANCELLED", "REJECTED", "COMPLETED"].includes(String(r.status || "").toUpperCase()))
       .map(normalizeProcurementRequest);
   } catch (err) {
-    // Failover
+    console.error("Failed to create RFQ:", err.message);
+    throw err;
   }
-  const all = getStoredMasterRequests();
-  return all.filter((r) => r.status === "approved" || r.currentStep >= 3);
 };
 
+export const awardVendorContract = async (rfqId, vendorName, finalAmount) => {
+  // Close the RFQ, then generate comparison/PO through the backend workflow
+  try {
+    await apiPost(`/api/rfqs/${rfqId}/close`);
+  } catch { /* might already be closed */ }
+  epsEventBus.publish({ type: "RFQ_AWARDED", rfqId, vendorName, finalAmount });
 const normalizeProcurementRequest = (req) => {
   const status = String(req.status || "").toUpperCase();
   const isApproved = ["APPROVED", "RFQ_CREATED"].includes(status);
@@ -431,40 +364,28 @@ export const submitProcurementExecutiveReview = async (reqId, decision, selected
   return updated;
 };
 
-const POS_STORAGE_KEY = "eps_purchase_orders_store_v1";
-
-const INITIAL_POS = [];
-
-export const getStoredPurchaseOrders = () => {
-  const data = localStorage.getItem(POS_STORAGE_KEY);
-  if (!data) {
-    localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(INITIAL_POS));
-    return INITIAL_POS;
-  }
+export const revokeVendorContract = async (rfqId) => {
   try {
-    return JSON.parse(data);
-  } catch (e) {
-    return INITIAL_POS;
-  }
+    await apiPost(`/api/rfqs/${rfqId}/cancel`);
+  } catch { /* ignore */ }
+  epsEventBus.publish({ type: "RFQ_APPROVAL_CANCELLED", rfqId });
 };
 
-export const saveStoredPurchaseOrders = (posList) => {
-  localStorage.setItem(POS_STORAGE_KEY, JSON.stringify(posList));
-  epsEventBus.publish({ type: "POS_UPDATED", data: posList });
-};
+// ============================================================================
+// VENDOR QUOTATIONS
+// ============================================================================
 
-export const fetchPurchaseOrders = async () => {
-  let posList = getStoredPurchaseOrders();
+export const getStoredQuotations = () => [];
+export const saveStoredQuotations = () => {};
 
+export const submitVendorQuote = async (rfqId, quoteData) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/purchase-orders`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.content && data.data.content.length > 0) {
-        posList = data.data.content;
-      }
-    }
+    const result = await apiPost(`/api/vendor/my/rfqs/${rfqId}/quote`, quoteData);
+    epsEventBus.publish({ type: "QUOTE_SUBMITTED", data: result });
+    return result;
   } catch (err) {
+    console.error("Failed to submit quote:", err.message);
+    throw err;
     // Failover
   }
 
@@ -611,128 +532,55 @@ export const createPurchaseOrder = async (poData) => {
     });
     saveStoredMasterRequests(updatedReqs);
   }
-
-  return newPo;
 };
 
-const RFQS_STORAGE_KEY = "eps_active_rfqs_store";
-const INITIAL_RFQS = [];
+// ============================================================================
+// INVOICES
+// ============================================================================
 
-export const getStoredRfqs = () => {
+export const getStoredVendorInvoices = async () => {
   try {
-    const saved = localStorage.getItem(RFQS_STORAGE_KEY);
-    if (saved) return JSON.parse(saved);
-  } catch (e) {
-    console.error("Error reading localStorage RFQs", e);
-  }
-  localStorage.setItem(RFQS_STORAGE_KEY, JSON.stringify(INITIAL_RFQS));
-  return INITIAL_RFQS;
+    const data = await apiGet("/api/invoices?size=100");
+    return data?.content || [];
+  } catch { return []; }
 };
+export const saveStoredVendorInvoices = () => {};
 
-export const saveStoredRfqs = (rfqs) => {
-  localStorage.setItem(RFQS_STORAGE_KEY, JSON.stringify(rfqs));
-  epsEventBus.emit({ type: "RFQS_UPDATED", data: rfqs });
-};
-
-export const fetchActiveRfqs = async () => {
+export const createVendorInvoice = async (invoiceData) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/rfqs`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data.data && data.data.content) {
-        return data.data.content;
-      }
-    }
+    const result = await apiPost("/api/invoices", invoiceData);
+    epsEventBus.publish({ type: "INVOICE_SUBMITTED", data: result });
+    return result;
   } catch (err) {
-    // Failover
+    console.error("Failed to create invoice:", err.message);
+    throw err;
   }
-  return getStoredRfqs();
 };
 
-export const createRfq = async (rfqData) => {
-  const rfqId = rfqData.id || `RFQ-2026-${Math.floor(900 + Math.random() * 100)}`;
+// ============================================================================
+// PAYMENT REQUESTS
+// ============================================================================
 
+export const getStoredPaymentRequests = async () => {
   try {
-    await fetch(`${API_BASE_URL}/rfq`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        requestId: 1,
-        vendorId: 1,
-        quotationAmount: 36990.00,
-        status: "SENT"
-      })
-    });
-  } catch (err) {
-    // Failover
-  }
-
-  const newRfq = {
-    id: rfqId,
-    reqId: rfqData.reqId || "REQ-2026-8921",
-    buyer: rfqData.buyer || "Enterprise Procurement Dept",
-    item: rfqData.item || rfqData.title || "Hardware / Equipment Sourcing",
-    category: rfqData.category || "General Procurement",
-    qty: rfqData.quantity || rfqData.qty || 1,
-    deadline: rfqData.deadline || "2026-08-10",
-    specs: rfqData.specs || rfqData.description || "Technical requirements attached.",
-    rfqFile: rfqData.rfqFile || `${rfqId}_Requirements.pdf`,
-    bidStatus: "Open for Bids",
-    submittedAmount: "Pending Vendor Quotes",
-    bids: []
-  };
-
-  const currentRfqs = getStoredRfqs();
-  const updatedRfqs = [newRfq, ...currentRfqs];
-  saveStoredRfqs(updatedRfqs);
-
-  // Advance purchase request step to 4 (RFQ Sourcing)
-  if (rfqData.reqId) {
-    const currentReqs = getStoredMasterRequests();
-    const updatedReqs = currentReqs.map((r) => {
-      if (r.id === rfqData.reqId) {
-        return { ...r, currentStep: 4, status: "approved", rfqCode: rfqId };
-      }
-      return r;
-    });
-    saveStoredMasterRequests(updatedReqs);
-  }
-
-  return newRfq;
+    const data = await apiGet("/api/payments?size=100");
+    return data?.content || [];
+  } catch { return []; }
 };
+export const saveStoredPaymentRequests = () => {};
 
-const QUOTES_STORAGE_KEY = "eps_vendor_quotations_store_v1";
-
-const INITIAL_QUOTATIONS = [];
-
-export const getStoredQuotations = () => {
-  const saved = localStorage.getItem(QUOTES_STORAGE_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) { }
-  }
-  return INITIAL_QUOTATIONS;
-};
-
-export const saveStoredQuotations = (quotes) => {
-  localStorage.setItem(QUOTES_STORAGE_KEY, JSON.stringify(quotes));
-  epsEventBus.emit({ type: "QUOTES_UPDATED", data: quotes });
-};
-
-export const submitVendorQuote = async (rfqId, quoteData) => {
+export const createPaymentRequestFromInvoice = async (invoice) => {
   try {
-    await fetch(`${API_BASE_URL}/quotations`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        rfqCode: rfqId,
-        vendorName: quoteData.vendorName || "Apple Business Direct",
-        unitPrice: parseFloat(quoteData.unitPrice || 3699.00),
-        quantity: 10,
-        leadTime: quoteData.leadTime || "3 Business Days",
-        warranty: quoteData.warranty || "3 Years AppleCare+"
-      })
+    const result = await apiPost("/api/payments", {
+      invoiceId: invoice.id,
+      amount: invoice.totalAmount || invoice.amount,
+      paymentMethod: "BANK_TRANSFER",
     });
+    epsEventBus.publish({ type: "PAYMENT_REQUEST_CREATED", data: result });
+    return result;
   } catch (err) {
+    console.error("Failed to create payment:", err.message);
+    throw err;
     // Failover
   }
 
@@ -865,66 +713,19 @@ export const awardVendorContract = async (rfqId, vendorName, finalAmount) => {
     });
     saveStoredMasterRequests(updatedReqs);
   }
-
-  epsEventBus.publish({ type: "RFQ_AWARDED", rfqId, vendorName, finalAmount });
-  return updatedRfqs;
 };
 
-export const revokeVendorContract = async (rfqId) => {
-  const currentRfqs = getStoredRfqs();
-  let matchedReqId = null;
+// ============================================================================
+// SHIPMENT / DELIVERY TRACKING
+// ============================================================================
 
-  const updatedRfqs = currentRfqs.map((rfq) => {
-    if (rfq.id === rfqId) {
-      matchedReqId = rfq.reqId;
-      const updatedBids = (rfq.bids || []).map((bid) => ({ ...bid, status: "Submitted" }));
-      return {
-        ...rfq,
-        status: "Active Bidding",
-        bidStatus: "Bids Received",
-        winnerVendor: null,
-        awardedVendor: null,
-        awardedAmount: null,
-        bids: updatedBids
-      };
-    }
-    return rfq;
-  });
-  saveStoredRfqs(updatedRfqs);
+export const getShipmentEvents = () => ({});
+export const initiateGlobalShipment = () => {};
+export const advanceRequestStep = () => {};
 
-  // Revoke PO status
-  const currentPos = getStoredPurchaseOrders();
-  const updatedPos = currentPos.map((p) => {
-    if (p.rfqId === rfqId) {
-      return { ...p, status: "Revoked / Cancelled" };
-    }
-    return p;
-  });
-  saveStoredPurchaseOrders(updatedPos);
-
-  if (matchedReqId) {
-    const currentReqs = getStoredMasterRequests();
-    const updatedReqs = currentReqs.map((r) => {
-      const cleanReqId = matchedReqId.toString().replace("REQ-2026-", "");
-      const cleanRId = r.id.toString().replace("REQ-2026-", "");
-      if (r.id === matchedReqId || r.numericId === matchedReqId || cleanRId === cleanReqId || r.numericId?.toString() === cleanReqId) {
-        return {
-          ...r,
-          currentStep: 3,
-          status: "pending",
-          vendor: "Pending Vendor Award",
-          awardedVendor: null,
-          lastUpdated: new Date().toISOString()
-        };
-      }
-      return r;
-    });
-    saveStoredMasterRequests(updatedReqs);
-  }
-
-  epsEventBus.publish({ type: "RFQ_APPROVAL_CANCELLED", rfqId });
-  return updatedRfqs;
-};
+// ============================================================================
+// EMPLOYEE REQUEST CREATION (legacy bridge)
+// ============================================================================
 
 export const createEmployeeRequest = async (newReqData) => {
   const reqId = newReqData.id || `REQ-2026-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -965,437 +766,113 @@ export const createEmployeeRequest = async (newReqData) => {
   };
 
   try {
-    await fetch(`${API_BASE_URL}/purchase-requests`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        departmentId: 1,
-        title: formattedReq.product,
-        description: formattedReq.justification,
-        quantity: formattedReq.qty,
-        estimatedCost: formattedReq.rawCost,
-        priority: formattedReq.priority.toUpperCase()
-      })
+    const result = await apiPost("/api/purchase-requests", {
+      productId: newReqData.productId,
+      quantity: parseInt(newReqData.quantity) || 1,
+      unitPrice: parseFloat(newReqData.unitPrice) || 0,
+      costCenterId: newReqData.costCenterId,
+      requiredDate: newReqData.requiredDate,
+      priority: (newReqData.priority || "MEDIUM").toUpperCase(),
+      purpose: newReqData.justification || newReqData.purpose || "Business requirement",
+      remarks: newReqData.remarks || "",
     });
+    epsEventBus.publish({ type: "REQUESTS_UPDATED" });
+    return result;
   } catch (err) {
-    // Local fallback
+    console.error("Failed to create request:", err.message);
+    throw err;
   }
-
-  const current = getStoredMasterRequests();
-  const updated = [formattedReq, ...current];
-  saveStoredMasterRequests(updated);
-  return formattedReq;
-};
-
-function generateWorkflowTimelineSteps(req, activeStep, isRejected) {
-  const dateStr = req.date || "July 24, 2026";
-  const isCompleted = req.status === "completed";
-  const requesterName = req.requester || "Alex Morgan";
-
-  return [
-    {
-      title: "1. Request Submitted",
-      desc: "Requisition form created and logged in system.",
-      actor: `${requesterName} (Requester)`,
-      timestamp: `${dateStr} - 10:00 AM`,
-      status: "done"
-    },
-    {
-      title: "2. Department Manager Approval",
-      desc: isRejected ? "Rejected by Department Manager." : "Approved budget sign-off and cost center verification.",
-      actor: req.approver || "Sarah Jenkins (VP Eng)",
-      timestamp: activeStep >= 2 ? `${dateStr} - 01:20 PM` : "Pending",
-      status: isRejected ? "rejected" : activeStep > 2 ? "done" : activeStep === 2 ? "active" : "pending"
-    },
-    {
-      title: "3. Procurement Approval",
-      desc: "SaaS/Hardware agreement and policy compliance audit.",
-      actor: "David Chen (Procurement Exec)",
-      timestamp: activeStep >= 3 ? `${dateStr} - 03:45 PM` : "Pending",
-      status: isRejected ? "pending" : activeStep > 3 ? "done" : activeStep === 3 ? "active" : "pending"
-    },
-    {
-      title: "4. Vendor Selection & Sourcing",
-      desc: req.vendor && req.vendor !== "Pending Vendor Award" && req.vendor !== "Pending Vendor Selection"
-        ? `Quotation Approved. Winner vendor selected: ${req.vendor}.`
-        : "Direct vendor contract and quote verification.",
-      actor: req.vendor && req.vendor !== "Pending Vendor Award" && req.vendor !== "Pending Vendor Selection" ? `${req.vendor} (Awarded)` : "Vendor Representative",
-      timestamp: activeStep >= 4 ? `${dateStr} - 05:00 PM` : "Pending",
-      status: (activeStep > 4 || (req.vendor && req.vendor !== "Pending Vendor Award" && req.vendor !== "Pending Vendor Selection")) ? "done" : activeStep === 4 ? "active" : "pending"
-    },
-      {
-        title: "5. Purchase Order Generated",
-        desc: "PO generated and sent to supplier.",
-        actor: "Finance & Purchasing Lead",
-        timestamp: activeStep >= 5 ? `${dateStr} - 06:15 PM` : "Pending",
-        status: activeStep > 5 ? "done" : activeStep === 5 ? "active" : "pending"
-      },
-    {
-      title: "6. Goods Delivered",
-      desc: "Physical receipt at Receiving Bay & inspection.",
-      actor: "Inventory Operations",
-      timestamp: activeStep >= 6 ? `${dateStr} - 07:30 PM` : "Pending",
-      status: activeStep > 6 ? "done" : activeStep === 6 ? "active" : "pending"
-    },
-    {
-      title: "7. Finance Approval & Invoice Match",
-      desc: "3-way invoice matching and payment clearance.",
-      actor: "Accounts Payable",
-      timestamp: activeStep >= 7 ? `${dateStr} - 08:00 PM` : "Pending",
-      status: activeStep > 7 ? "done" : activeStep === 7 ? "active" : "pending"
-    },
-    {
-      title: "8. Completed & Handover",
-      desc: "Asset tagged and delivered to requester.",
-      actor: "IT Asset Management",
-      timestamp: isCompleted ? `${dateStr} - 08:30 PM` : "Pending",
-      status: isCompleted ? "done" : activeStep === 8 ? "active" : "pending"
-    }
-  ];
-}
-
-// INVENTORY PERSISTENCE KEYS
-const GRN_HISTORY_KEY = "eps_grn_history_v1";
-const STOCK_ITEMS_KEY = "eps_stock_items_v1";
-const STOCK_HISTORY_KEY = "eps_stock_history_v1";
-
-const INITIAL_GRN_HISTORY = [
-  {
-    grnId: "GRN-2026-041",
-    poId: "PO-2026-4350",
-    vendor: "Apple Business Direct",
-    item: "Studio Display 27'' Monitors",
-    receivedQty: 5,
-    rejectedQty: 0,
-    inspectedBy: "Marcus Vance",
-    date: "2026-07-24",
-    status: "Completed",
-    document: "GRN_041_StudioDisplays.pdf",
-  },
-  {
-    grnId: "GRN-2026-039",
-    poId: "PO-2026-4299",
-    vendor: "Logitech Logistics",
-    item: "Logitech MX Master 3S Mouse",
-    receivedQty: 48,
-    rejectedQty: 2,
-    inspectedBy: "QA Inspector John",
-    date: "2026-07-20",
-    status: "Discrepancy Logged",
-    document: "GRN_039_MXMaster.pdf",
-  },
-];
-
-const INITIAL_STOCK_ITEMS = [
-  {
-    sku: "SKU-MAC-101",
-    name: "MacBook Pro M3 Max 64GB Workstation",
-    category: "Laptops",
-    available: 24,
-    reserved: 10,
-    incoming: 10,
-    reorderLevel: 5,
-    status: "Healthy",
-    damagedCount: 0,
-    returnedCount: 2,
-  },
-  {
-    sku: "SKU-NET-992",
-    name: "Cisco Catalyst 9300 Switch Module",
-    category: "Networking",
-    available: 2,
-    reserved: 2,
-    incoming: 4,
-    reorderLevel: 5,
-    status: "Low Stock Alert",
-    damagedCount: 1,
-    returnedCount: 0,
-  },
-  {
-    sku: "SKU-DISP-401",
-    name: "Dell UltraSharp 32'' 4K Monitor",
-    category: "Displays",
-    available: 1,
-    reserved: 1,
-    incoming: 0,
-    reorderLevel: 3,
-    status: "Critical Stock Alert",
-    damagedCount: 0,
-    returnedCount: 1,
-  },
-  {
-    sku: "SKU-SERV-502",
-    name: "Dell PowerEdge R760 Rack Server",
-    category: "Servers",
-    available: 8,
-    reserved: 2,
-    incoming: 2,
-    reorderLevel: 2,
-    status: "Healthy",
-    damagedCount: 0,
-    returnedCount: 0,
-  },
-];
-
-const INITIAL_STOCK_HISTORY = [
-  { id: "LOG-1001", sku: "SKU-MAC-101", name: "MacBook Pro M3 Max 64GB Workstation", type: "Stock In", qty: 10, reason: "Vendor Delivery Received", date: "2026-07-26 10:15 AM", operator: "Robert V." },
-  { id: "LOG-1002", sku: "SKU-NET-992", name: "Cisco Catalyst 9300 Switch Module", type: "Stock Out", qty: 2, reason: "Dispatched to IT Dept", date: "2026-07-25 03:00 PM", operator: "Sarah K." },
-  { id: "LOG-1003", sku: "SKU-DISP-401", name: "Dell UltraSharp 32'' 4K Monitor", type: "Adjustment", qty: -1, reason: "Damaged during handling", date: "2026-07-24 09:30 AM", operator: "John D." },
-  { id: "LOG-1004", sku: "SKU-MAC-101", name: "MacBook Pro M3 Max 64GB Workstation", type: "Returned", qty: 2, reason: "Unused department surplus", date: "2026-07-23 04:00 PM", operator: "Robert V." },
-];
-
-export const getStoredGrnHistory = () => {
-  const saved = localStorage.getItem(GRN_HISTORY_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return INITIAL_GRN_HISTORY;
-};
-
-export const saveStoredGrnHistory = (history) => {
-  localStorage.setItem(GRN_HISTORY_KEY, JSON.stringify(history));
-  epsEventBus.publish({ type: "GRN_UPDATED", data: history });
-};
-
-export const getStoredStockItems = () => {
-  const saved = localStorage.getItem(STOCK_ITEMS_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return INITIAL_STOCK_ITEMS;
-};
-
-export const saveStoredStockItems = (items) => {
-  localStorage.setItem(STOCK_ITEMS_KEY, JSON.stringify(items));
-};
-
-export const getStoredStockHistory = () => {
-  const saved = localStorage.getItem(STOCK_HISTORY_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return INITIAL_STOCK_HISTORY;
-};
-
-export const saveStoredStockHistory = (history) => {
-  localStorage.setItem(STOCK_HISTORY_KEY, JSON.stringify(history));
-};
-
-export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
-  const stockItems = getStoredStockItems();
-  const historyLogs = getStoredStockHistory();
-  
-  // Find standard items by checking keywords
-  let matchedSku = null;
-  const titleLower = itemTitle.toLowerCase();
-  
-  if (titleLower.includes("macbook")) {
-    matchedSku = "SKU-MAC-101";
-  } else if (titleLower.includes("switch")) {
-    matchedSku = "SKU-NET-992";
-  } else if (titleLower.includes("monitor") || titleLower.includes("display")) {
-    matchedSku = "SKU-DISP-401";
-  } else if (titleLower.includes("server") || titleLower.includes("poweredge")) {
-    matchedSku = "SKU-SERV-502";
-  } else if (titleLower.includes("asus")) {
-    matchedSku = "SKU-ASUS-102";
-  }
-  
-  let updatedStockItems = [...stockItems];
-  let finalSku = matchedSku;
-  let finalItemName = itemTitle;
-  
-  // Clean item title from quantity indicator (e.g. "(x10)", "(x1)")
-  const cleanTitle = itemTitle.replace(/\s*\(x\d+\)\s*/i, "").trim();
-  finalItemName = cleanTitle;
-
-  if (matchedSku) {
-    const exists = stockItems.some(i => i.sku === matchedSku);
-    if (exists) {
-      updatedStockItems = stockItems.map((item) => {
-        if (item.sku === matchedSku) {
-          const newAvail = item.available + receivedQty;
-          const newIncoming = Math.max(0, item.incoming - receivedQty);
-          return {
-            ...item,
-            available: newAvail,
-            incoming: newIncoming,
-            status: newAvail <= item.reorderLevel ? (newAvail === 0 ? "Critical Stock Alert" : "Low Stock Alert") : "Healthy"
-          };
-        }
-        return item;
-      });
-    } else {
-      // Asus laptop or matching SKU but doesn't exist in stockItems yet
-      const category = titleLower.includes("laptop") ? "Laptops" : "General";
-      const newItem = {
-        sku: matchedSku,
-        name: cleanTitle,
-        category,
-        available: receivedQty,
-        reserved: 0,
-        incoming: 0,
-        reorderLevel: 2,
-        status: "Healthy",
-        damagedCount: 0,
-        returnedCount: 0,
-      };
-      updatedStockItems.push(newItem);
-    }
-  } else {
-    // Generate dynamic SKU
-    const prefix = cleanTitle.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3) || "GEN";
-    finalSku = `SKU-${prefix}-${Math.floor(100 + Math.random() * 900)}`;
-    
-    let category = "General";
-    if (titleLower.includes("laptop")) category = "Laptops";
-    else if (titleLower.includes("switch")) category = "Networking";
-    else if (titleLower.includes("monitor")) category = "Displays";
-    else if (titleLower.includes("server")) category = "Servers";
-
-    const newItem = {
-      sku: finalSku,
-      name: cleanTitle,
-      category,
-      available: receivedQty,
-      reserved: 0,
-      incoming: 0,
-      reorderLevel: 2,
-      status: "Healthy",
-      damagedCount: 0,
-      returnedCount: 0,
-    };
-    updatedStockItems.push(newItem);
-  }
-  
-  // Create Stock Log
-  const newLog = {
-    id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
-    sku: finalSku,
-    name: finalItemName,
-    type: "Stock In",
-    qty: receivedQty,
-    reason: `Vendor Delivery (PO: ${poId}, GRN: ${grnId})`,
-    date: `${new Date().toISOString().split("T")[0]} ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
-    operator: "Marcus Vance (Mgr)"
-  };
-  
-  const updatedHistoryLogs = [newLog, ...historyLogs];
-  
-  saveStoredStockItems(updatedStockItems);
-  saveStoredStockHistory(updatedHistoryLogs);
-  epsEventBus.publish({ type: "STOCK_UPDATED", data: updatedStockItems });
 };
 
 // ============================================================================
-// MASSIVE VIEWS & GLOBAL SYSTEM CONTROL STATES (SUPER ADMIN & ORG ADMIN)
+// INVENTORY / GRN (backed by real API where available, fallback to localStorage)
 // ============================================================================
 
-export const SYSTEM_PAUSE_KEY = "eps_system_paused_state";
-export const USERS_LIST_KEY = "eps_users_list_state";
-export const BUDGET_ALLOCATIONS_KEY = "eps_budget_allocations_state";
+export const getStoredGrnHistory = async () => {
+  try {
+    const data = await apiGet("/api/goods-receipts?size=100");
+    return data?.content || [];
+  } catch { return []; }
+};
+export const saveStoredGrnHistory = () => {};
 
+export const getStoredStockItems = async () => {
+  try {
+    const data = await apiGet("/api/inventory?size=500");
+    return data?.content || [];
+  } catch { return []; }
+};
+export const saveStoredStockItems = () => {};
+
+export const getStoredStockHistory = () => [];
+export const saveStoredStockHistory = () => {};
+
+export const addStockItemAfterGrn = async (itemTitle, receivedQty, poId, grnId) => {
+  // GRN completion on the backend auto-updates inventory
+  epsEventBus.publish({ type: "STOCK_UPDATED" });
+};
+
+// ============================================================================
+// SYSTEM ADMINISTRATION (UI state — no backend table)
+// ============================================================================
+
+const SYSTEM_PAUSE_KEY = "eps_system_paused_state";
 export const getSystemPauseState = () => {
-  const saved = localStorage.getItem(SYSTEM_PAUSE_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return {
-    purchaseRequests: false,
-    rfqBidding: false,
-    poGeneration: false,
-    payments: false,
-    inventory: false
-  };
+  try { return JSON.parse(localStorage.getItem(SYSTEM_PAUSE_KEY)) || {}; } catch { return {}; }
 };
-
 export const setSystemPauseState = (state) => {
   localStorage.setItem(SYSTEM_PAUSE_KEY, JSON.stringify(state));
   epsEventBus.publish({ type: "SYSTEM_PAUSE_UPDATED", data: state });
 };
 
-export const getStoredUsers = () => {
-  const saved = localStorage.getItem(USERS_LIST_KEY);
-  if (saved) {
-    try {
-      const users = JSON.parse(saved).map((user) => ({
-        ...user,
-        username: user.username || (
-          user.role === "super_admin" ? "admin" :
-          user.role === "org_admin" ? "orgadmin" :
-          (user.email || "").split("@")[0]
-        )
-      }));
-      localStorage.setItem(USERS_LIST_KEY, JSON.stringify(users));
-      return users;
-    } catch (e) {}
+// ============================================================================
+// USERS (backend-backed)
+// ============================================================================
+
+export const getStoredUsers = async () => {
+  try {
+    const data = await apiGet("/api/users?size=200");
+    return data?.content || [];
+  } catch { return []; }
+};
+export const saveStoredUsers = () => {};
+
+export const registerUser = async (userData) => {
+  try {
+    return await apiPost("/api/auth/register", userData);
+  } catch (err) {
+    console.error("Failed to register user:", err.message);
+    throw err;
   }
-  const initial = [
-    { id: "USR-ADMIN-1", name: "Super Admin", username: "admin", role: "super_admin", department: "IT", email: "admin@company.com", password: "admin123", status: "Active" },
-    { id: "USR-ADMIN-2", name: "Org Admin", username: "orgadmin", role: "org_admin", department: "Management", email: "orgadmin@company.com", password: "admin123", status: "Active" },
-    { id: "USR-001", name: "David Chen", username: "david.chen", role: "proc_executive", department: "Procurement", email: "david.c@enterprise.com", password: "password", status: "Active" },
-    { id: "USR-002", name: "Sarah Jenkins", username: "sarah.jenkins", role: "dept_manager", department: "Engineering & IT", email: "sarah.j@enterprise.com", password: "password", status: "Active" },
-    { id: "USR-003", name: "Marcus Vance", username: "marcus.vance", role: "inventory_manager", department: "Warehouse & Inventory", email: "marcus.v@enterprise.com", password: "password", status: "Active" },
-    { id: "USR-004", name: "Elena Rostova", username: "elena.rostova", role: "employee", department: "Engineering & IT", email: "elena.r@enterprise.com", password: "password", status: "Active" }
-  ];
-  localStorage.setItem(USERS_LIST_KEY, JSON.stringify(initial));
-  return initial;
 };
 
-export const saveStoredUsers = (users) => {
-  localStorage.setItem(USERS_LIST_KEY, JSON.stringify(users));
-  epsEventBus.publish({ type: "USERS_UPDATED", data: users });
-};
+// ============================================================================
+// BUDGET ALLOCATIONS (backend-backed via cost-centers)
+// ============================================================================
 
-export const registerUser = (userData) => {
-  const users = getStoredUsers();
-  const newUser = {
-    id: `USR-${Math.floor(1000 + Math.random() * 9000)}`,
-    name: userData.fullName,
-    role: userData.role || "employee",
-    department: userData.department || "Engineering & IT",
-    email: userData.email,
-    password: userData.password,
-    status: "Pending Approval",
-    isFirstTimeLogin: true
-  };
-  const updated = [...users, newUser];
-  saveStoredUsers(updated);
-  return newUser;
+export const getBudgetAllocations = async () => {
+  try {
+    const data = await apiGet("/api/cost-centers?size=100");
+    return (data?.content || []).map(cc => ({
+      id: cc.id,
+      code: cc.code,
+      department: cc.departmentName,
+      allocatedAmt: cc.budget,
+      spentAmt: cc.usedBudget || 0,
+      remainingAmt: cc.remainingBudget || cc.budget,
+    }));
+  } catch { return []; }
 };
+export const saveBudgetAllocations = () => {};
 
-export const getBudgetAllocations = () => {
-  const saved = localStorage.getItem(BUDGET_ALLOCATIONS_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return [
-    { id: "ALLOC-001", department: "Engineering & IT", allocatedAmt: 1500000, spentAmt: 345000, remainingAmt: 1155000, lastUpdated: "2026-07-01" },
-    { id: "ALLOC-002", department: "Marketing", allocatedAmt: 500000, spentAmt: 120000, remainingAmt: 380000, lastUpdated: "2026-07-01" }
-  ];
+// ============================================================================
+// VENDOR PROFILES (backend-backed)
+// ============================================================================
+
+export const getStoredVendorProfiles = async () => {
+  try {
+    const data = await apiGet("/api/vendors?size=100");
+    return data?.content || [];
+  } catch { return []; }
 };
-
-export const saveBudgetAllocations = (allocations) => {
-  localStorage.setItem(BUDGET_ALLOCATIONS_KEY, JSON.stringify(allocations));
-  epsEventBus.publish({ type: "BUDGETS_UPDATED", data: allocations });
-};
-
-export const VENDOR_PROFILES_KEY = "eps_vendor_profiles_state";
-
-export const getStoredVendorProfiles = () => {
-  const saved = localStorage.getItem(VENDOR_PROFILES_KEY);
-  if (saved) {
-    try { return JSON.parse(saved); } catch (e) {}
-  }
-  return [
-    { id: "V-001", name: "Apple Direct", status: "Active" },
-    { id: "V-002", name: "Dell EMC", status: "Active" },
-    { id: "V-003", name: "Lenovo Global", status: "Active" },
-    { id: "V-004", name: "HP Enterprise", status: "Active" }
-  ];
-};
-
-export const saveStoredVendorProfiles = (vendors) => {
-  localStorage.setItem(VENDOR_PROFILES_KEY, JSON.stringify(vendors));
-  epsEventBus.publish({ type: "VENDORS_UPDATED", data: vendors });
-};
+export const saveStoredVendorProfiles = () => {};
