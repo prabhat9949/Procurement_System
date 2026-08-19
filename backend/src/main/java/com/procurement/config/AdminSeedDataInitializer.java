@@ -34,6 +34,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,17 +67,17 @@ public class AdminSeedDataInitializer {
             OfficerCategoryScopeRepository officerCategoryScopeRepository) {
         return args -> {
 
-            // ============ 1. PERMISSIONS ============
+// ============ 1. PERMISSIONS ============
             seedPermissions(permissionRepository);
 
             // ============ 2. ROLE → PERMISSION MAPPINGS ============
-            // Only SUPER_ADMIN and ADMIN carry the complete permission set.
+            // Only ADMIN carries the complete permission set.
             // Every other role receives exactly the permissions required for its
             // responsibilities — and anything previously granted beyond that is
             // revoked, so a fresh clone or an upgraded database stays least-privilege.
             List<Permission> allPermissions = permissionRepository.findAll();
+            // SUPER_ADMIN carries the full permission set
             assignAllPermissions(roleRepository, rolePermissionRepository, "SUPER_ADMIN", allPermissions);
-            assignAllPermissions(roleRepository, rolePermissionRepository, "ADMIN", allPermissions);
 
             // HR: employee lifecycle, access administration and employee
             // procurement monitoring (read-only; HR never holds approval/procurement
@@ -90,7 +91,7 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_APPROVAL_HISTORY", "CAN_VIEW_PR_TIMELINE",
                     "CAN_VIEW_NOTIFICATIONS", "CAN_MARK_NOTIFICATION_READ", "CAN_VIEW_REPORTS");
 
-            // Procurement: sourcing, quotations, vendor selection and PO operations.
+            // Procurement Manager/Executive: sourcing, quotations, vendor selection and PO operations.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER"),
                     "CAN_VIEW_DEPARTMENT_PR", "CAN_CREATE_RFQ", "CAN_VIEW_RFQ", "CAN_INVITE_VENDOR",
@@ -111,17 +112,16 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_VENDORS", "CAN_VIEW_PO", "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT",
                     "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
-            // Warehouse: GRN, inventory, stock operations and catalogue management
-            // (the consolidated inventory dashboard adds products to the catalogue
-            // that employees can then request).
+            // Warehouse / Inventory: GRN, inventory, stock operations and catalogue management
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
-                    List.of("WAREHOUSE_MANAGER"),
+                    List.of("EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER"),
                     "CAN_CREATE_GRN", "CAN_VERIFY_GRN", "CAN_VIEW_INVENTORY", "CAN_UPDATE_INVENTORY",
                     "CAN_VIEW_PO", "CAN_VIEW_WAREHOUSES", "CAN_MANAGE_WAREHOUSES",
                     "CAN_VIEW_PRODUCTS", "CAN_MANAGE_PRODUCTS", "CAN_VIEW_CATEGORIES",
                     "CAN_MANAGE_CATEGORIES", "CAN_VIEW_REPORTS", "CAN_VIEW_NOTIFICATIONS");
 
-            // Department Manager / Senior Manager / Head: PR approval workflow.
+            // Department Manager / Senior Manager: PR approval workflow.
+            // Senior Manager is required for requests above amount thresholds.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
                     List.of("DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD"),
                     "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_ASSIGNED_APPROVAL", "CAN_APPROVE_PR",
@@ -139,22 +139,23 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_COST_CENTERS", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             // Fulfilment teams: equipment, software and facilities operations.
+            // Consolidated into Warehouse/Inventory role where possible.
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
-                    List.of("EQUIPMENT_ASSET_TEAM"),
+                    List.of("EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER"),
                     "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_CREATE_GRN", "CAN_VIEW_INVENTORY",
                     "CAN_UPDATE_INVENTORY", "CAN_CREATE_ASSET", "CAN_ASSIGN_ASSET",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
                     "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
-                    List.of("IT_SOFTWARE_TEAM"),
+                    List.of("EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER"),
                     "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_VIEW_INVENTORY", "CAN_UPDATE_INVENTORY",
                     "CAN_MANAGE_SOFTWARE_LICENSE", "CAN_ASSIGN_SOFTWARE",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
                     "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             assignRolePermissions(roleRepository, rolePermissionRepository, permissionRepository,
-                    List.of("FACILITIES_TEAM"),
+                    List.of("EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER"),
                     "CAN_VIEW_DEPARTMENT_PR", "CAN_VIEW_PO", "CAN_MANAGE_FACILITY_REQUEST",
                     "CAN_VIEW_PRODUCTS", "CAN_VIEW_CATEGORIES", "CAN_VIEW_VENDORS",
                     "CAN_VIEW_WAREHOUSES", "CAN_PRINT_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
@@ -168,7 +169,7 @@ public class AdminSeedDataInitializer {
                     "CAN_VIEW_APPROVAL_HISTORY", "CAN_VIEW_REPORTS", "CAN_EXPORT_REPORT",
                     "CAN_VIEW_AUDIT_LOGS", "CAN_VIEW_SYSTEM_MONITORING",
                     "CAN_VIEW_AUDIT_CASES", "CAN_VIEW_AUDIT_TEAM_QUEUE", "CAN_CREATE_AUDIT_CASE",
-                    "CAN_CREATE_AUDIT_FINDING", "CAN_CLOSE_FINDING", "CAN_CONCLUDE_AUDIT",
+                    "CAN_CREATE_AUDIT_Finding", "CAN_CLOSE_FINDING", "CAN_CONCLUDE_AUDIT",
                     "CAN_PRINT_DOCUMENT", "CAN_DOWNLOAD_DOCUMENT", "CAN_VIEW_NOTIFICATIONS");
 
             // Support Team: user assistance, system/workflow issue reporting and
@@ -441,7 +442,8 @@ public class AdminSeedDataInitializer {
             boolean exists = rolePermissionRepository.findWithPermissionsByRoleId(role.getId())
                     .stream().anyMatch(rp -> rp.getPermission().getId().equals(permission.getId()));
             if (!exists) {
-                rolePermissionRepository.save(RolePermission.builder().role(role).permission(permission).build());
+                rolePermissionRepository.save(
+                        RolePermission.builder().role(role).permission(permission).build());
             }
         }
         log.info("Assigned {} permissions to role {}", permissions.size(), roleCode);
@@ -462,7 +464,12 @@ public class AdminSeedDataInitializer {
                                        List<String> roleCodes,
                                        String... permissionCodes) {
         long totalPermissions = permissionRepository.count();
-        List<String> required = List.of(permissionCodes);
+        List<String> required = new ArrayList<>();
+        for (String permissionCode : permissionCodes) {
+            if (!required.contains(permissionCode)) {
+                required.add(permissionCode);
+            }
+        }
         for (String roleCode : roleCodes) {
             Optional<Role> roleOpt = roleRepository.findByRoleCode(roleCode);
             if (roleOpt.isEmpty()) {
@@ -481,16 +488,18 @@ public class AdminSeedDataInitializer {
                 existing = rolePermissionRepository.findWithPermissionsByRoleId(role.getId());
             }
             for (String code : required) {
-                boolean exists = existing.stream()
-                        .anyMatch(rp -> rp.getPermission().getPermissionCode().equals(code));
-                if (exists) {
+                Optional<Permission> permissionOpt = permissionRepository.findByPermissionCode(code);
+                if (permissionOpt.isEmpty()) {
                     continue;
                 }
-                Optional<Permission> permissionOpt = permissionRepository.findByPermissionCode(code);
-                if (permissionOpt.isPresent()) {
-                    rolePermissionRepository.save(
-                            RolePermission.builder().role(role).permission(permissionOpt.get()).build());
+                Permission permission = permissionOpt.get();
+                if (rolePermissionRepository.existsByRole_IdAndPermission_Id(role.getId(), permission.getId())) {
+                    continue;
                 }
+                RolePermission mapping = rolePermissionRepository.save(
+                        RolePermission.builder().role(role).permission(permission).build());
+                // Keep the in-memory snapshot current for subsequent checks in this run.
+                existing.add(mapping);
             }
             log.info("Configured role {} with {} required permissions", roleCode, required.size());
         }

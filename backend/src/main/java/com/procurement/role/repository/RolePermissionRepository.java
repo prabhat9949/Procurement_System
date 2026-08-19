@@ -12,6 +12,8 @@ import java.util.List;
 @Repository
 public interface RolePermissionRepository extends JpaRepository<RolePermission, Long> {
 
+    boolean existsByRole_IdAndPermission_Id(Long roleId, Long permissionId);
+
     @Query("select rolePermission from RolePermission rolePermission "
             + "join fetch rolePermission.permission "
             + "where rolePermission.role.id = :roleId")

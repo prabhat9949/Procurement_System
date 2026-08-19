@@ -80,7 +80,7 @@ public class NonCatalogRequestController {
     }
 
     @PostMapping("/{id}/procurement-process")
-    @PreAuthorize("hasAnyAuthority('CAN_MANAGE_PRODUCTS','SUPER_ADMIN','ADMIN','PROCUREMENT_MANAGER','PROCUREMENT_OFFICER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','PROCUREMENT_MANAGER','PROCUREMENT_OFFICER') or hasAuthority('CAN_MANAGE_PRODUCTS')")
     public ApiResponse<NonCatalogResponse> processByProcurement(
             @PathVariable Long id,
             @Valid @RequestBody NonCatalogReviewRequest request) {

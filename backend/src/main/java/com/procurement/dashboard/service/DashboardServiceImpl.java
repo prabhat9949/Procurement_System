@@ -85,9 +85,17 @@ public class DashboardServiceImpl implements DashboardService {
     }
 
     @Override
-    public DashboardResponse vendor(DashboardFilter filter) {
-        if (filter == null || filter.vendorId() == null) throw new IllegalArgumentException("vendorId is required for the vendor dashboard");
-        Map<String, Object> vendor = Map.of("vendorId", filter.vendorId());
+    public DashboardResponse vendor(DashboardFilter filter, String username) {
+        // Auto-resolve vendorId from authenticated user if not provided in filter
+        Long vendorId = (filter != null) ? filter.vendorId() : null;
+        if (vendorId == null && username != null) {
+            var user = userRepository.findByUsername(username).orElse(null);
+            if (user != null && user.getVendor() != null) {
+                vendorId = user.getVendor().getId();
+            }
+        }
+        if (vendorId == null) throw new IllegalArgumentException("vendorId is required for the vendor dashboard");
+        Map<String, Object> vendor = Map.of("vendorId", vendorId);
         List<KpiResponse> kpis = new ArrayList<>();
         addCount(kpis, "OPEN_RFQS", "Open RFQs", "select count(*) from rfq_vendors rv join rfqs r on r.rfq_id = rv.rfq_id where rv.vendor_id = :vendorId and r.status in ('DRAFT','OPEN')", vendor);
         addCount(kpis, "SUBMITTED_QUOTATIONS", "Submitted Quotations", "select count(*) from vendor_quotations where vendor_id = :vendorId and status = 'SUBMITTED'", vendor);
@@ -114,8 +122,6 @@ public class DashboardServiceImpl implements DashboardService {
         return response("hr", kpis, List.of(
                 hrChart("EMPLOYEES_BY_DEPARTMENT", "Employees by Department", "select d.department_name, count(*) from employees e join departments d on d.department_id = e.department_id group by d.department_name order by 2 desc"),
                 hrChart("EMPLOYEES_BY_DESIGNATION", "Employees by Designation", "select r.role_name, count(*) from employees e join roles r on r.role_id = e.role_id group by r.role_name order by 2 desc"),
-                hrChart("EMPLOYEES_BY_STATUS", "Active vs Inactive", "select case when e.active_flag = true then 'Active' else 'Inactive' end, count(*) from employees e group by case when e.active_flag = true then 'Active' else 'Inactive' end order by 2 desc"),
-                hrChart("EMPLOYEES_BY_MANAGER", "Employees by Manager", "select coalesce(concat(m.first_name, ' ', m.last_name), 'No Manager'), count(*) from employees e left join employees m on m.employee_id = e.manager_id group by coalesce(concat(m.first_name, ' ', m.last_name), 'No Manager') order by 2 desc"),
                 hrChart("EMPLOYEE_ACCOUNT_STATUS", "Employee Account Status", "select case when u.user_id is null then 'No Account' when u.enabled = false then 'Disabled' when u.account_locked = true then 'Locked' else 'Active' end, count(*) from employees e left join users u on u.employee_id = e.employee_id group by case when u.user_id is null then 'No Account' when u.enabled = false then 'Disabled' when u.account_locked = true then 'Locked' else 'Active' end order by 2 desc")
         ), filter);
     }

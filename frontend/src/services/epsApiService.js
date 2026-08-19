@@ -1,8 +1,9 @@
 // EPS API & Real-Time Sync Service
 import { apiGet, apiPost } from "./apiClient";
-const API_BASE_URL = "http://localhost:8080/api/v1";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 const LOCAL_STORAGE_KEY = "eps_enterprise_master_requests";
 const BUDGET_STORAGE_KEY = "eps_dept_budget_analytics";
+const backendOnlyError = () => { throw new Error("This operation requires the live backend and cannot use local demo data."); };
 
 // Custom Event Bus for instant cross-component updates
 class Emitter {
@@ -32,7 +33,6 @@ export const getStoredMasterRequests = () => {
   } catch (e) {
     console.error("Error reading localStorage requests", e);
   }
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(INITIAL_MASTER_REQUESTS));
   return INITIAL_MASTER_REQUESTS;
 };
 
@@ -59,7 +59,7 @@ export const initiateGlobalShipment = (poIdOrReqId) => {
   // Resolve the real reqId from POs
   const currentPos = getStoredPurchaseOrders();
   const matchingPo = currentPos.find(p => p.id === poIdOrReqId);
-  
+
   let poId = poIdOrReqId;
   let reqId = poIdOrReqId;
   if (matchingPo) {
@@ -181,10 +181,8 @@ export const fetchApprovalQueue = async () => {
       }
     }
   } catch (err) {
-    // Failover to synchronized store
+    throw new Error("Unable to load approval queue from the backend.");
   }
-  const all = getStoredMasterRequests();
-  return all.filter((r) => r.status === "pending");
 };
 
 export const fetchTeamRequisitions = async (deptId = 1) => {
@@ -197,9 +195,8 @@ export const fetchTeamRequisitions = async (deptId = 1) => {
       }
     }
   } catch (err) {
-    // Failover to local store
+    throw new Error("Unable to load requisitions from the backend.");
   }
-  return getStoredMasterRequests();
 };
 
 export const fetchTrackForms = async () => {
@@ -328,17 +325,10 @@ export const fetchBudgetAnalytics = async (deptId = 1) => {
   };
 };
 
-export const submitApprovalDecision = async (reqId, decision, remarks = "", approver = "Sarah Jenkins (VP Eng)") => {
-  try {
-    await fetch(`${API_BASE_URL}/approvals`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId: reqId, status: decision.toUpperCase(), remarks })
-    });
-  } catch (err) {
-    // API server call fallback
-  }
-
+export const submitApprovalDecision = async (reqId, decision, remarks = "", approver = "") => {
+  const response = await apiPost(`/api/approval-tasks/${reqId}/decision`, { decision: decision.toUpperCase(), remarks });
+  return response;
+  /* legacy local implementation intentionally unreachable */
   const current = getStoredMasterRequests();
   const updated = current.map((r) => {
     if (r.id === reqId || r.numericId === reqId) {
@@ -535,6 +525,7 @@ export const saveStoredVendorInvoices = (invoices) => {
 };
 
 export const createVendorInvoice = async (invoiceData) => {
+  return backendOnlyError();
   const existing = getStoredVendorInvoices();
   const invId = invoiceData.id || `INV-2026-${Math.floor(9900 + Math.random() * 90)}`;
   const rawAmt = typeof invoiceData.amount === "number"
@@ -571,6 +562,7 @@ export const createVendorInvoice = async (invoiceData) => {
 };
 
 export const createPurchaseOrder = async (poData) => {
+  return backendOnlyError();
   const currentPos = getStoredPurchaseOrders();
   const poId = poData.id || poData.poNumber || `PO-2026-${Math.floor(4400 + Math.random() * 500)}`;
   const newPo = {
@@ -650,6 +642,7 @@ export const fetchActiveRfqs = async () => {
 };
 
 export const createRfq = async (rfqData) => {
+  return backendOnlyError();
   const rfqId = rfqData.id || `RFQ-2026-${Math.floor(900 + Math.random() * 100)}`;
 
   try {
@@ -1184,11 +1177,11 @@ export const saveStoredStockHistory = (history) => {
 export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
   const stockItems = getStoredStockItems();
   const historyLogs = getStoredStockHistory();
-  
+
   // Find standard items by checking keywords
   let matchedSku = null;
   const titleLower = itemTitle.toLowerCase();
-  
+
   if (titleLower.includes("macbook")) {
     matchedSku = "SKU-MAC-101";
   } else if (titleLower.includes("switch")) {
@@ -1200,11 +1193,11 @@ export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
   } else if (titleLower.includes("asus")) {
     matchedSku = "SKU-ASUS-102";
   }
-  
+
   let updatedStockItems = [...stockItems];
   let finalSku = matchedSku;
   let finalItemName = itemTitle;
-  
+
   // Clean item title from quantity indicator (e.g. "(x10)", "(x1)")
   const cleanTitle = itemTitle.replace(/\s*\(x\d+\)\s*/i, "").trim();
   finalItemName = cleanTitle;
@@ -1246,7 +1239,7 @@ export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
     // Generate dynamic SKU
     const prefix = cleanTitle.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3) || "GEN";
     finalSku = `SKU-${prefix}-${Math.floor(100 + Math.random() * 900)}`;
-    
+
     let category = "General";
     if (titleLower.includes("laptop")) category = "Laptops";
     else if (titleLower.includes("switch")) category = "Networking";
@@ -1267,7 +1260,7 @@ export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
     };
     updatedStockItems.push(newItem);
   }
-  
+
   // Create Stock Log
   const newLog = {
     id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -1279,9 +1272,9 @@ export const addStockItemAfterGrn = (itemTitle, receivedQty, poId, grnId) => {
     date: `${new Date().toISOString().split("T")[0]} ${new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}`,
     operator: "Marcus Vance (Mgr)"
   };
-  
+
   const updatedHistoryLogs = [newLog, ...historyLogs];
-  
+
   saveStoredStockItems(updatedStockItems);
   saveStoredStockHistory(updatedHistoryLogs);
   epsEventBus.publish({ type: "STOCK_UPDATED", data: updatedStockItems });

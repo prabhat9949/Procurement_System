@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Star, MessageSquare, ShieldCheck, Heart, AlertCircle, Eye, CheckCircle } from "lucide-react";
+import { Star, MessageSquare, ShieldCheck, Heart, AlertCircle, Eye, CheckCircle, X } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const csatDistributionData = [

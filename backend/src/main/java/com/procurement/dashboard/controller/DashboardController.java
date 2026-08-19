@@ -30,7 +30,7 @@ public class DashboardController {
     public DashboardResponse warehouse(DashboardFilter filter) { return dashboardService.warehouse(filter); }
 
     @GetMapping("/vendor") @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','VENDOR')")
-    public DashboardResponse vendor(DashboardFilter filter) { return dashboardService.vendor(filter); }
+    public DashboardResponse vendor(DashboardFilter filter, Authentication authentication) { return dashboardService.vendor(filter, authentication.getName()); }
 
     @GetMapping("/hr") @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','HR_MANAGER')")
     public DashboardResponse hr(DashboardFilter filter) { return dashboardService.hr(filter); }

@@ -110,6 +110,13 @@ public class SecurityConfig {
                                 "/api/employees/me"
                         ).authenticated()
 
+                        // ===========================
+                        // ROLE-BASED ACCESS USING PRIMARY ROLES
+                        // ===========================
+                        // All endpoint access is determined by the user's current primary role
+                        // and per-record permissions enforced in the service layer.
+
+                        // ADMIN/HR has full access to identity endpoints
                         .requestMatchers(
                                 "/api/employees/**",
                                 "/api/departments/**",
@@ -117,15 +124,16 @@ public class SecurityConfig {
                                 "/api/roles/**",
                                 "/api/permissions/**",
                                 "/api/role-permissions/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER")
 
                         .requestMatchers(
                                 "/api/users/**"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER")
 
                         // ===========================
-                        // MASTER DATA
+                        // MASTER DATA - scoped by role
                         // ===========================
+                        // Vendor self-service portal
                         .requestMatchers(
                                 "/api/vendor/my/**"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "VENDOR")
@@ -137,11 +145,12 @@ public class SecurityConfig {
                                 "/api/products/**",
                                 "/api/warehouses/**",
                                 "/api/inventory/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "WAREHOUSE_MANAGER", "EMPLOYEE")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER", "FINANCE_MANAGER", "AUDITOR", "SUPPORT_TEAM")
 
                         // ===========================
                         // PROCUREMENT WORKFLOW
                         // ===========================
+                        // Purchase requests and approval workflow
                         .requestMatchers(
                                 "/api/purchase-requests/**",
                                 "/api/purchase-request-lines/**",
@@ -149,7 +158,7 @@ public class SecurityConfig {
                                 "/api/approval-stages/**",
                                 "/api/approval-tasks/**",
                                 "/api/approval-histories/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM", "AUDITOR")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "AUDITOR", "FINANCE_MANAGER", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER")
 
                         // Central workflow assignment engine: queues and task actions are
                         // authorized per-assignment in the service layer (current assignee,
@@ -158,6 +167,7 @@ public class SecurityConfig {
                                 "/api/workflow/**"
                         ).authenticated()
 
+                        // RFQ, quotations, quotation comparison
                         .requestMatchers(
                                 "/api/rfqs/**",
                                 "/api/rfq-lines/**",
@@ -167,22 +177,25 @@ public class SecurityConfig {
                                 "/api/quotation-comparisons/**",
                                 "/api/quotation-comparison-lines/**",
                                 "/api/quotation-attachments/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "VENDOR")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "VENDOR", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD")
 
+                        // Purchase orders - scoped by role
                         .requestMatchers(
                                 "/api/purchase-orders/**",
                                 "/api/purchase-order-lines/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "WAREHOUSE_MANAGER", "VENDOR", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER", "FINANCE_MANAGER", "VENDOR", "AUDITOR")
 
+                        // Goods receipts
                         .requestMatchers(
                                 "/api/goods-receipts/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "AUDITOR")
 
+                        // Invoices, three-way matches, payments
                         .requestMatchers(
                                 "/api/invoices/**",
                                 "/api/three-way-matches/**",
                                 "/api/payments/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "PROCUREMENT_MANAGER", "AUDITOR")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "AUDITOR", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER")
 
                         // ===========================
                         // NOTIFICATIONS / REPORTING / AUDIT
@@ -191,36 +204,39 @@ public class SecurityConfig {
                                 "/api/notification-templates/**",
                                 "/api/audit-logs/**",
                                 "/api/audits/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR", "COMPLIANCE_OFFICER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR", "FINANCE_MANAGER")
 
                         .requestMatchers(
                                 "/api/notifications/**",
                                 "/api/notification-preferences/**"
                         ).authenticated()
 
+                        // ===========================
+                        // SUPPORT TICKETS
+                        // ===========================
+                        .requestMatchers(
+                                "/api/support-tickets/**"
+                        ).authenticated()
+
+                        // Admin dashboard - only SUPER_ADMIN and AUDITOR
                         .requestMatchers(
                                 "/api/dashboard/admin"
                         ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR")
 
-                        // Procurement workspace + the unified PR timeline. The timeline is
-                        // visible to every role that may view a purchase request; per-record
-                        // visibility (e.g. employees only seeing their own) is enforced in
-                        // the service layer.
+                        // Procurement workspace + the unified PR timeline.
+                        // Per-record visibility is enforced in the service layer.
                         .requestMatchers(
                                 "/api/dashboard/procurement",
                                 "/api/procurement/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "PROCUREMENT_MANAGER",
-                                "PROCUREMENT_OFFICER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER",
-                                "HEAD", "EQUIPMENT_ASSET_TEAM", "IT_SOFTWARE_TEAM", "FACILITIES_TEAM",
-                                "AUDITOR", "FINANCE_MANAGER", "WAREHOUSE_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "EMPLOYEE", "DEPARTMENT_MANAGER", "SENIOR_MANAGER", "HEAD", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "AUDITOR", "FINANCE_MANAGER", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER")
 
                         .requestMatchers(
                                 "/api/dashboard/finance"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "FINANCE_MANAGER", "AUDITOR", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER")
 
                         .requestMatchers(
                                 "/api/dashboard/warehouse"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "WAREHOUSE_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "AUDITOR")
 
                         .requestMatchers(
                                 "/api/dashboard/vendor"
@@ -241,7 +257,7 @@ public class SecurityConfig {
 
                         .requestMatchers(
                                 "/api/reports/**"
-                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "AUDITOR", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "WAREHOUSE_MANAGER")
+                        ).hasAnyRole("SUPER_ADMIN", "ADMIN", "HR_MANAGER", "AUDITOR", "PROCUREMENT_MANAGER", "PROCUREMENT_OFFICER", "FINANCE_MANAGER", "EQUIPMENT_ASSET_TEAM", "WAREHOUSE_MANAGER")
 
                         // ===========================
                         // PROTECTED ENDPOINTS

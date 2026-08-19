@@ -8,41 +8,33 @@ import {
   IndianRupee,
   Boxes,
   Truck,
-  Activity,
   Users,
-  BarChart2,
-  ShieldCheck,
-  AlertTriangle,
-  FolderKanban,
   Bell,
-  FileText,
   Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
   Server,
+  LifeBuoy,
+  Lock,
 } from "lucide-react";
 
 import OrgOverview from "./modules/OrgOverview";
-import OrgProcurementAnalytics from "./modules/OrgProcurementAnalytics";
-import OrgFinancialAnalytics from "./modules/OrgFinancialAnalytics";
-import OrgInventoryAnalytics from "./modules/OrgInventoryAnalytics";
-import OrgVendorAnalytics from "./modules/OrgVendorAnalytics";
-import OrgDeptAnalytics from "./modules/OrgDeptAnalytics";
-import OrgUserAnalytics from "./modules/OrgUserAnalytics";
-import BusinessIntelligence from "./modules/BusinessIntelligence";
-import OrgComplianceMonitoring from "./modules/OrgComplianceMonitoring";
-import OrgRiskAnalysis from "./modules/OrgRiskAnalysis";
-import OrgReports from "./modules/OrgReports";
 import OrgSystemHealth from "./modules/OrgSystemHealth";
 
 // Real admin control modules (shared with the Super Admin portal)
 import SuperUserManagement from "../super_admin/modules/SuperUserManagement";
 import SuperVendorMonitoring from "../super_admin/modules/SuperVendorMonitoring";
-import SuperAuditLogs from "../super_admin/modules/SuperAuditLogs";
 import SuperNotificationsCenter from "../super_admin/modules/SuperNotificationsCenter";
 import SuperSettings from "../super_admin/modules/SuperSettings";
+
+// New monitoring modules
+import ProcurementMonitoring from "./modules/ProcurementMonitoring";
+import InventoryMonitoring from "./modules/InventoryMonitoring";
+import FinancialMonitoring from "./modules/FinancialMonitoring";
+import AdminSupportHelp from "./modules/AdminSupportHelp";
+import AdminChangePassword from "./modules/AdminChangePassword";
 
 const OrgAdminDashboard = () => {
   const navigate = useNavigate();
@@ -57,16 +49,14 @@ const OrgAdminDashboard = () => {
     { id: "system-health", label: "System Health", icon: Server },
     { id: "user-management", label: "User Management", icon: Users },
     { id: "vendor-monitoring", label: "Vendors & KYC", icon: Truck },
-    { id: "audit-logs", label: "Audit Logs", icon: FileText },
     { id: "notifications", label: "Notifications", icon: Bell },
-    { id: "procurement-analytics", label: "Procurement Analytics", icon: ShoppingBag },
-    { id: "financial-analytics", label: "Financial Analytics", icon: IndianRupee },
-    { id: "inventory-analytics", label: "Inventory Analytics", icon: Boxes },
-    { id: "vendor-analytics", label: "Vendor Analytics", icon: Activity },
-    { id: "department-analytics", label: "Department Analytics", icon: BarChart2 },
-    { id: "organization-reports", label: "Reports", icon: FolderKanban },
-    { id: "compliance-monitoring", label: "Compliance Monitoring", icon: ShieldCheck },
-    { id: "risk-analysis", label: "Risk Analysis", icon: AlertTriangle },
+    
+    // Monitoring section
+    { id: "procurement-monitoring", label: "Procurement Monitoring", icon: ShoppingBag },
+    { id: "inventory-monitoring", label: "Inventory Monitoring", icon: Boxes },
+    { id: "financial-monitoring", label: "Financial Monitoring", icon: IndianRupee },
+    
+    { id: "support-help", label: "Support & Help", icon: LifeBuoy },
     { id: "settings", label: "Account & Security", icon: Settings },
     ];
 
@@ -92,33 +82,21 @@ const OrgAdminDashboard = () => {
         return <SuperUserManagement />;
       case "vendor-monitoring":
         return <SuperVendorMonitoring />;
-      case "audit-logs":
-        return <SuperAuditLogs />;
       case "notifications":
         return <SuperNotificationsCenter />;
-      case "procurement-analytics":
-        return <OrgProcurementAnalytics />;
-      case "financial-analytics":
-        return <OrgFinancialAnalytics />;
-      case "inventory-analytics":
-        return <OrgInventoryAnalytics />;
-      case "vendor-analytics":
-        return <OrgVendorAnalytics />;
-      case "department-analytics":
-        return <OrgDeptAnalytics />;
-      case "user-analytics":
-        return <OrgUserAnalytics />;
-      case "business-intelligence":
-        return <BusinessIntelligence />;
-      case "compliance-monitoring":
-        return <OrgComplianceMonitoring />;
-      case "risk-analysis":
-        return <OrgRiskAnalysis />;
-      case "organization-reports":
-        return <OrgReports />;
+      case "procurement-monitoring":
+        return <ProcurementMonitoring />;
+      case "inventory-monitoring":
+        return <InventoryMonitoring />;
+      case "financial-monitoring":
+        return <FinancialMonitoring />;
+      case "support-help":
+        return <AdminSupportHelp />;
       case "profile":
       case "settings":
         return <SuperSettings />;
+      case "change-password":
+        return <AdminChangePassword />;
       default:
         return <OrgOverview onNavigate={(tab) => setActiveTab(tab)} />;
     }
@@ -203,6 +181,18 @@ const OrgAdminDashboard = () => {
               title="Logout"
             >
               <LogOut size={18} />
+            </button>
+          )}
+          
+          {/* Change Password link */}
+          {!isSidebarCollapsed && (
+            <button
+              className="org-sidebar-logout-btn"
+              onClick={() => { setActiveTab("change-password"); setIsMobileOpen(false); }}
+              style={{ marginTop: '8px', background: 'transparent', color: '#f8b400', border: '1px solid #f8b400' }}
+            >
+              <Lock size={16} />
+              <span>Change Password</span>
             </button>
           )}
         </div>

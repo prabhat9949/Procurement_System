@@ -17,6 +17,7 @@ import {
   Bell,
   FolderKanban,
   Settings,
+  LifeBuoy,
   LogOut,
   Menu,
   ChevronLeft,
@@ -30,15 +31,12 @@ import SuperOrgManagement from "./modules/SuperOrgManagement";
 import SuperUserManagement from "./modules/SuperUserManagement";
 import SuperRoleManagement from "./modules/SuperRoleManagement";
 import SuperPermissionManagement from "./modules/SuperPermissionManagement";
-import SuperSystemAnalytics from "./modules/SuperSystemAnalytics";
 import SuperProcurementMonitoring from "./modules/SuperProcurementMonitoring";
 import SuperFinancialMonitoring from "./modules/SuperFinancialMonitoring";
 import SuperInventoryMonitoring from "./modules/SuperInventoryMonitoring";
 import SuperVendorMonitoring from "./modules/SuperVendorMonitoring";
-import SuperSecurityCenter from "./modules/SuperSecurityCenter";
-import SuperAuditLogs from "./modules/SuperAuditLogs";
 import SuperNotificationsCenter from "./modules/SuperNotificationsCenter";
-import SuperGlobalReports from "./modules/SuperGlobalReports";
+import AdminSupport from "./modules/AdminSupport";
 import OrgMasterDataPanel from "../org_admin/modules/OrgMasterDataPanel";
 import OrgSystemHealth from "../org_admin/modules/OrgSystemHealth";
 
@@ -59,16 +57,13 @@ const SuperAdminDashboard = () => {
     { id: "user-management", label: "User Management", icon: Users },
     { id: "role-management", label: "Role Management", icon: ShieldCheck },
     { id: "permission-management", label: "Permission Management", icon: Lock },
-    { id: "system-analytics", label: "System Analytics", icon: Activity },
     { id: "procurement-monitoring", label: "Procurement Monitoring", icon: ShoppingBag },
     { id: "financial-monitoring", label: "Financial Monitoring", icon: IndianRupee },
     { id: "inventory-monitoring", label: "Inventory Monitoring", icon: Boxes },
     { id: "vendor-monitoring", label: "Vendor Monitoring", icon: Truck },
-    { id: "security-center", label: "Security Center", icon: ShieldCheck },
-    { id: "audit-logs", label: "Audit Logs", icon: FileText },
     { id: "master-data", label: "Master Data Management", icon: Globe },
-    { id: "global-reports", label: "Global Reports", icon: FolderKanban },
     { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: LifeBuoy },
     { id: "settings", label: "Account & Security", icon: Settings },
     ];
 
@@ -97,8 +92,6 @@ const SuperAdminDashboard = () => {
         return <SuperRoleManagement />;
       case "permission-management":
         return <SuperPermissionManagement />;
-      case "system-analytics":
-        return <SuperSystemAnalytics />;
       case "procurement-monitoring":
         return <SuperProcurementMonitoring />;
       case "financial-monitoring":
@@ -107,12 +100,8 @@ const SuperAdminDashboard = () => {
         return <SuperInventoryMonitoring />;
       case "vendor-monitoring":
         return <SuperVendorMonitoring />;
-      case "security-center":
-        return <SuperSecurityCenter />;
-      case "audit-logs":
-        return <SuperAuditLogs />;
-      case "global-reports":
-        return <SuperGlobalReports />;
+      case "support":
+        return <AdminSupport />;
       case "notifications":
         return <SuperNotificationsCenter />;
       case "master-data":

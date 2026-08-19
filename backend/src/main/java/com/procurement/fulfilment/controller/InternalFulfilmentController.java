@@ -33,7 +33,7 @@ public class InternalFulfilmentController {
     }
 
     @PostMapping("/initiate/{prId}")
-    @PreAuthorize("hasAnyAuthority('CAN_MANAGE_PRODUCTS','SUPER_ADMIN','ADMIN','PROCUREMENT_MANAGER','PROCUREMENT_OFFICER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','PROCUREMENT_MANAGER','PROCUREMENT_OFFICER') or hasAuthority('CAN_MANAGE_PRODUCTS')")
     public ApiResponse<List<InternalFulfilmentResponse>> initiateFulfilment(
             @PathVariable Long prId,
             @Valid @RequestBody InitiateFulfilmentRequest request) {

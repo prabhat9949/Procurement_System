@@ -6,7 +6,6 @@ import {
   GitBranch,
   UserCog,
   BarChart3,
-  Bell,
   PlusCircle,
   Edit,
   Eye,
@@ -32,6 +31,8 @@ import {
   ClipboardList,
   History,
   Clock,
+  HelpCircle,
+  MessageSquare,
 } from "lucide-react";
 import { apiGet, apiPost, apiPut } from "../../../../services/apiClient";
 import { hasPermission } from "../../../../utils/permissions";
@@ -47,10 +48,9 @@ const moneyFormat = new Intl.NumberFormat("en-IN", {
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "directory", label: "Employee Directory", icon: Users },
-  { id: "structure", label: "Reporting Structure", icon: GitBranch },
   { id: "tracking", label: "Procurement Tracking", icon: ClipboardList },
   { id: "reports", label: "HR Reports", icon: BarChart3 },
-  { id: "notifications", label: "Notifications", icon: Bell },
+  { id: "support", label: "Help & Support", icon: HelpCircle },
 ];
 
 const ACCENT = "#f8b400";
@@ -171,14 +171,15 @@ export default function HrDashboard() {
       {activeTab === "directory" && (
         <DirectoryView departments={departments} roles={roles} costCenters={costCenters} onChanged={refreshAll} />
       )}
-      {activeTab === "structure" && <StructureView />}
       {activeTab === "tracking" && (
         <ProcurementTrackingView departments={departments} />
       )}
       {activeTab === "reports" && (
         <ReportsView departments={departments} costCenters={costCenters} dash={dash} />
       )}
-      {activeTab === "notifications" && <NotificationsView userId={me?.userId} />}
+      {activeTab === "support" && (
+        <HelpSupportView userId={me?.userId} />
+      )}
     </RoleShell>
   );
 }
@@ -249,7 +250,7 @@ function OverviewView({ dash, loading, onGoTo }) {
 
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(340px,1fr))", gap: 16, marginTop: 20 }}>
-        {[chartByCode("EMPLOYEES_BY_STATUS"), chartByCode("EMPLOYEES_BY_MANAGER")].filter(Boolean).map((chart) => (
+        {charts.filter((c) => c.code !== "EMPLOYEES_BY_STATUS" && c.code !== "EMPLOYEES_BY_MANAGER").map((chart) => (
           <section key={chart.code} style={{ background: "#fff", borderRadius: 12, padding: 20, border: "1px solid #e7ebf0" }}>
             <h3 style={{ margin: "0 0 14px", fontSize: 15, fontWeight: 800, color: "#111" }}>{chart.label}</h3>
             {chart.points?.length ? (
@@ -349,10 +350,7 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
   const [debouncedKeyword, setDebouncedKeyword] = useState("");
   const [filters, setFilters] = useState({ departmentId: "", roleId: "", managerId: "", costCenterId: "", active: "" });
   const [managers, setManagers] = useState([]);
-  const [formOpen, setFormOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
   const [profileEmployee, setProfileEmployee] = useState(null);
-  const [confirmTarget, setConfirmTarget] = useState(null);
   const [toast, setToast] = useState(null);
 
   const triggerToast = (msg, tone = "ok") => {
@@ -403,35 +401,6 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
 
   const resetPage = () => setPage(0);
 
-  const handleSaved = () => {
-    setFormOpen(false);
-    setEditing(null);
-    setPage(0);
-    onChanged();
-    triggerToast("Employee record saved to the database.");
-  };
-
-  const toggleActive = async (employee) => {
-    setConfirmTarget(null);
-    try {
-      await apiPut(`/api/employees/${employee.id}`, {
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        email: employee.email,
-        phone: employee.phone || null,
-        departmentId: employee.departmentId,
-        costCenterId: employee.costCenterId,
-        roleId: employee.roleId,
-        managerId: employee.managerId,
-        active: !employee.active,
-      });
-      triggerToast(employee.active ? "Employee deactivated (linked account disabled)." : "Employee activated (linked account enabled).", employee.active ? "warn" : "ok");
-      onChanged();
-    } catch (err) {
-      triggerToast(err.message || "Failed to update employee status.", "error");
-    }
-  };
-
   const totalPages = Math.max(1, Math.ceil(total / size));
 
   return (
@@ -467,12 +436,6 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
             <option value="true">Active</option>
             <option value="false">Inactive</option>
           </FilterSelect>
-          <button
-            onClick={() => { setEditing(null); setFormOpen(true); }}
-            style={{ border: 0, borderRadius: 9, background: ACCENT, color: "#111", padding: "10px 16px", cursor: "pointer", fontWeight: 800, fontSize: 13.5, display: "inline-flex", alignItems: "center", gap: 7, boxShadow: "0 4px 14px rgba(248,180,0,.3)" }}
-          >
-            <PlusCircle size={15} /> New Employee
-          </button>
         </div>
       </div>
 
@@ -519,9 +482,6 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
                       return (
                         <>
                           <IconBtn title="View profile" onClick={() => setProfileEmployee(employee)}><Eye size={15} /></IconBtn>
-                          <IconBtn title={employee.active ? "Deactivate" : "Activate"} onClick={() => (employee.active ? setConfirmTarget(employee) : toggleActive(employee))} danger={employee.active}>
-                            {employee.active ? <XCircle size={15} /> : <CheckCircle2 size={15} />}
-                          </IconBtn>
                         </>
                       );
                     })()}
@@ -548,36 +508,8 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
         </div>
       </div>
 
-      {formOpen && (
-        <EmployeeFormModal
-          departments={departments}
-          roles={roles}
-          employee={editing}
-          onClose={() => { setFormOpen(false); setEditing(null); }}
-          onSaved={handleSaved}
-        />
-      )}
-
       {profileEmployee && (
         <EmployeeProfileDrawer employee={profileEmployee} onClose={() => setProfileEmployee(null)} />
-      )}
-
-      {/* Deactivation confirmation dialog */}
-      {confirmTarget && (
-        <Modal title="Confirm Deactivation" onClose={() => setConfirmTarget(null)} width="440px">
-          <div style={{ textAlign: "center", padding: "6px 0 4px" }}>
-            <XCircle size={44} color="#dc2626" style={{ margin: "0 auto 12px" }} />
-            <p style={{ margin: 0, color: "#334155", fontSize: 14.5, lineHeight: 1.6 }}>
-              Deactivate <strong>{fullName(confirmTarget)}</strong> ({confirmTarget.employeeCode})?
-              <br />
-              <span style={{ color: "#64748b", fontSize: 13 }}>The linked user account will be disabled and the employee will lose login access. Historical records are preserved.</span>
-            </p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 20 }}>
-              <button onClick={() => setConfirmTarget(null)} style={{ padding: "10px 20px", border: "1px solid #d9d9d9", borderRadius: 9, cursor: "pointer", background: "#f8f9fb", color: "#111", fontWeight: 700, fontSize: 13.5 }}>Cancel</button>
-              <button onClick={() => toggleActive(confirmTarget)} style={{ padding: "10px 22px", border: 0, borderRadius: 9, cursor: "pointer", background: "#dc2626", color: "#fff", fontWeight: 800, fontSize: 13.5 }}>Yes, Deactivate</button>
-            </div>
-          </div>
-        </Modal>
       )}
 
       {toast && <Toast toast={toast} />}
@@ -586,7 +518,7 @@ function DirectoryView({ departments, roles, costCenters, onChanged }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Employee create/edit modal with dependent dropdowns                */
+/*  Legacy employee mutation form retained for Admin-only reuse         */
 /* ------------------------------------------------------------------ */
 function EmployeeFormModal({ departments, roles, employee, onClose, onSaved }) {
   const isEdit = Boolean(employee);
@@ -1239,11 +1171,17 @@ function ProcurementTrackingView({ departments }) {
                 {timeline.length === 0 ? (
                   <p style={{ color: "#68778a", fontSize: 13 }}>No timeline events recorded yet.</p>
                 ) : (
-                  timeline.map((event, index) => (
+                  timeline.map((event, index) => {
+                    const eventStatus = String(event.status || event.result || "").toUpperCase();
+                    const returned = eventStatus === "RETURNED" || event.type === "APPROVAL_RETURNED";
+                    const failed = ["CANCELLED", "REJECTED", "FAILED", "FAILURE"].includes(eventStatus) || /REJECTED|CANCELLED|FAILED/i.test(event.type || event.action || "");
+                    const completed = !returned && !failed;
+                    const tone = failed ? { bg: "#fee2e2", fg: "#b91c1c", mark: "✕" } : returned ? { bg: "#dbeafe", fg: "#1d4ed8", mark: "↩" } : completed ? { bg: "#dcfce7", fg: "#15803d", mark: "✓" } : { bg: "#f1f5f9", fg: "#64748b", mark: "○" };
+                    return (
                     <div key={index} style={{ display: "flex", gap: 12, position: "relative", paddingBottom: 16 }}>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", flexShrink: 0 }}>
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: index === timeline.length - 1 ? "#059669" : "#f8b4001a", color: index === timeline.length - 1 ? "#fff" : "#d97706", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 900 }}>
-                          <CheckCircle2 size={14} />
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", background: tone.bg, color: tone.fg, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 900 }}>
+                          {tone.mark}
                         </div>
                         {index < timeline.length - 1 && <div style={{ width: 2, flex: 1, background: "#e7ebf0" }} />}
                       </div>
@@ -1254,15 +1192,16 @@ function ProcurementTrackingView({ departments }) {
                         </div>
                         {event.person && (
                           <div style={{ fontSize: 12.5, color: "#475569", marginTop: 2 }}>
-                            {event.person}
+                            {event.performedByName || event.person}
                             {event.employeeCode ? ` (${event.employeeCode})` : ""}
-                            {event.role ? ` · ${event.role}` : ""}
+                            {event.performedByRole || event.role ? ` · ${event.performedByRole || event.role}` : ""}
                           </div>
                         )}
-                        {event.comment && <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 3 }}>{event.comment}</div>}
+                        {(event.description || event.comment) && <div style={{ fontSize: 12.5, color: "#64748b", marginTop: 3 }}>{event.description || event.comment}</div>}
                       </div>
                     </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -1693,7 +1632,7 @@ function ReportsView({ departments, costCenters, dash }) {
     downloadCsv(
       "employee-directory.csv",
       ["Employee Code", "First Name", "Last Name", "Email", "Phone", "Department", "Designation", "Manager", "Cost Center", "Status"],
-      allEmployees.map((e) => [e.employeeCode, e.firstName, e.lastName, e.email, e.phone, e.departmentName, e.roleName, e.managerName, e.costCenterName, e.active ? "Active" : "Inactive"])
+      allEmployees.map((e) => [e.employeeCode, e.firstName, e.lastName, e.email, e.phone || "—", e.departmentName || "—", e.roleName || "—", e.managerName || "—", e.costCenterName || "—", e.active ? "Active" : "Inactive"])
     );
 
   const exportDept = () =>
@@ -1705,9 +1644,6 @@ function ReportsView({ departments, costCenters, dash }) {
 
   const exportDesignation = () =>
     downloadCsv("designation-distribution.csv", ["Designation", "Employees"], chartPoints("EMPLOYEES_BY_DESIGNATION").map((p) => [p.label, Number(p.value)]));
-
-  const exportStatus = () =>
-    downloadCsv("active-inactive.csv", ["Status", "Employees"], chartPoints("EMPLOYEES_BY_STATUS").map((p) => [p.label, Number(p.value)]));
 
   const exportAccounts = () =>
     downloadCsv("account-status.csv", ["Account Status", "Employees"], chartPoints("EMPLOYEE_ACCOUNT_STATUS").map((p) => [p.label, Number(p.value)]));
@@ -1769,23 +1705,6 @@ function ReportsView({ departments, costCenters, dash }) {
           headers={["Designation", "Employees"]}
           rows={chartPoints("EMPLOYEES_BY_DESIGNATION").map((p) => [p.label, Number(p.value)])}
           onExport={exportDesignation}
-        />
-        <ReportCard
-          title="Active vs Inactive Employees"
-          subtitle="Employment status distribution"
-          headers={["Status", "Employees"]}
-          rows={chartPoints("EMPLOYEES_BY_STATUS").map((p) => [p.label, Number(p.value)])}
-          onExport={exportStatus}
-        />
-        <ReportCard
-          title="Manager-wise Employee Count"
-          subtitle="Direct reports per reporting manager"
-          headers={["Manager", "Direct Reports"]}
-          rows={chartPoints("EMPLOYEES_BY_MANAGER").map((p) => [p.label, Number(p.value)])}
-          onExport={() =>
-            downloadCsv("manager-wise-count.csv", ["Manager", "Direct Reports"],
-              chartPoints("EMPLOYEES_BY_MANAGER").map((p) => [p.label, Number(p.value)]))
-          }
         />
         <ReportCard
           title="Missing Organizational Assignment"
@@ -2154,3 +2073,312 @@ const pageBtn = (disabled) => ({
   alignItems: "center",
   gap: 6,
 });
+
+/* ------------------------------------------------------------------ */
+/*  Help & Support                                                     */
+/* ------------------------------------------------------------------ */
+function HelpSupportView({ userId }) {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [msgLoading, setMsgLoading] = useState(false);
+  const [newMsg, setNewMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [counts, setCounts] = useState({ open: 0, inProgress: 0, resolved: 0 });
+  const [toast, setToast] = useState(null);
+
+  const [form, setForm] = useState({ subject: "", description: "", priority: "MEDIUM", category: "General" });
+  const [creating, setCreating] = useState(false);
+
+  const triggerToast = (msg, tone = "ok") => {
+    setToast({ msg, tone });
+    setTimeout(() => setToast(null), 3500);
+  };
+
+  const loadTickets = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const data = await apiGet("/api/support-tickets/my");
+      setTickets(data?.content || []);
+    } catch (err) {
+      setError(err.message || "Failed to load support tickets.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadCounts = useCallback(async () => {
+    try {
+      const data = await apiGet("/api/support-tickets/counts");
+      setCounts(data || { open: 0, inProgress: 0, resolved: 0 });
+    } catch { /* ignore */ }
+  }, []);
+
+  useEffect(() => {
+    loadTickets();
+    loadCounts();
+  }, [loadTickets, loadCounts]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!form.subject.trim() || !form.description.trim()) return;
+    setCreating(true);
+    try {
+      await apiPost("/api/support-tickets", form);
+      triggerToast("Support ticket created successfully.");
+      setShowCreate(false);
+      setForm({ subject: "", description: "", priority: "MEDIUM", category: "General" });
+      loadTickets();
+      loadCounts();
+    } catch (err) {
+      triggerToast(err.message || "Could not create ticket.", "err");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const openTicket = async (ticket) => {
+    setSelectedTicket(ticket);
+    setMsgLoading(true);
+    try {
+      const msgs = await apiGet(`/api/support-tickets/${ticket.id}/messages`);
+      setMessages(msgs || []);
+    } catch {
+      setMessages([]);
+    } finally {
+      setMsgLoading(false);
+    }
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!newMsg.trim() || !selectedTicket) return;
+    setSending(true);
+    try {
+      const sent = await apiPost(`/api/support-tickets/${selectedTicket.id}/messages`, { messageText: newMsg });
+      setMessages([...messages, sent]);
+      setNewMsg("");
+    } catch (err) {
+      triggerToast(err.message || "Could not send message.", "err");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div style={{ padding: "20px" }}>
+      {toast && (
+        <div style={{ position: "fixed", bottom: "24px", right: "24px", background: toast.tone === "err" ? "#dc2626" : "#111", color: "#fff", padding: "12px 24px", borderRadius: "8px", boxShadow: "0 8px 24px rgba(0,0,0,0.2)", zIndex: 1200, fontWeight: "700", fontSize: "14px", borderLeft: `4px solid ${toast.tone === "err" ? "#fff" : "#f8b400"}` }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div style={{ marginBottom: "20px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+        <div>
+          <h1 style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "24px", fontWeight: "700", color: "#111", margin: 0 }}>
+            <HelpCircle color="#f8b400" size={28} /> Help & Support
+          </h1>
+          <p style={{ color: "#666", fontSize: "14px", marginTop: "4px" }}>
+            Create support requests, view ticket status, and communicate with the Support Team.
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: "10px" }}>
+          <button className="sadmin-btn-primary-sm" style={{ background: "#f8f9fb", color: "#111", border: "1px solid #d9d9d9" }} onClick={loadTickets} disabled={loading}>
+            <RefreshCw size={15} /> Refresh
+          </button>
+          <button className="sadmin-btn-primary-sm" onClick={() => setShowCreate(true)}>
+            <PlusCircle size={15} /> New Support Request
+          </button>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px", marginBottom: "20px" }}>
+        <div style={{ padding: "16px", background: "#f0f6ff", border: "1px solid rgba(37,99,235,0.25)", borderRadius: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Open Tickets</span>
+          <h3 style={{ fontSize: "22px", fontWeight: "800", color: "#2563eb", margin: "2px 0 0" }}>{counts.open}</h3>
+        </div>
+        <div style={{ padding: "16px", background: "#fcf8f2", border: "1px solid rgba(248,180,0,0.3)", borderRadius: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>In Progress</span>
+          <h3 style={{ fontSize: "22px", fontWeight: "800", color: "#d97706", margin: "2px 0 0" }}>{counts.inProgress}</h3>
+        </div>
+        <div style={{ padding: "16px", background: "#f6faf8", border: "1px solid rgba(5,150,105,0.3)", borderRadius: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#666", textTransform: "uppercase" }}>Resolved</span>
+          <h3 style={{ fontSize: "22px", fontWeight: "800", color: "#059669", margin: "2px 0 0" }}>{counts.resolved}</h3>
+        </div>
+      </div>
+
+      {/* Ticket List */}
+      <div className="sadmin-card" style={{ background: "#fff", border: "1px solid #ececec", borderRadius: "12px", overflow: "hidden" }}>
+        {loading ? (
+          <div style={{ display: "flex", justifyContent: "center", alignItems: "center", padding: "48px", gap: "10px", color: "#666" }}>
+            <Loader2 size={20} className="login-spin" /> Loading support tickets...
+          </div>
+        ) : tickets.length === 0 ? (
+          <div style={{ padding: "48px", textAlign: "center", color: "#888" }}>
+            No support tickets yet. Click "New Support Request" to create one.
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #ececec" }}>
+                  <th style={{ textAlign: "left", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Ticket</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Subject</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Priority</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Status</th>
+                  <th style={{ textAlign: "left", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Date</th>
+                  <th style={{ textAlign: "right", padding: "12px 16px", fontSize: "11px", fontWeight: "800", color: "#888", textTransform: "uppercase" }}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tickets.map((t) => {
+                  const sc = t.status === "OPEN" ? { bg: "rgba(37,99,235,.12)", color: "#2563eb" } : t.status === "IN_PROGRESS" ? { bg: "rgba(217,119,6,.12)", color: "#d97706" } : t.status === "RESOLVED" ? { bg: "rgba(5,150,105,.12)", color: "#059669" } : { bg: "#f1f3f5", color: "#6b7280" };
+                  const pc = t.priority === "URGENT" ? { bg: "rgba(220,38,38,.12)", color: "#dc2626" } : t.priority === "HIGH" ? { bg: "rgba(217,119,6,.12)", color: "#d97706" } : t.priority === "MEDIUM" ? { bg: "rgba(37,99,235,.12)", color: "#2563eb" } : { bg: "#f1f3f5", color: "#6b7280" };
+                  return (
+                    <tr key={t.id} style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }} onClick={() => openTicket(t)}>
+                      <td style={{ padding: "12px 16px", fontWeight: "700", color: "#2563eb", fontSize: "13px" }}>{t.ticketNumber}</td>
+                      <td style={{ padding: "12px 16px", fontWeight: "600", color: "#111", fontSize: "14px" }}>{t.subject}</td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "800", padding: "3px 10px", borderRadius: "999px", background: pc.bg, color: pc.color }}>{t.priority}</span>
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <span style={{ fontSize: "11px", fontWeight: "800", padding: "3px 10px", borderRadius: "999px", background: sc.bg, color: sc.color }}>{t.status.replace(/_/g, " ")}</span>
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: "12.5px", color: "#7a8999" }}>{formatDateIN(t.createdAt)}</td>
+                      <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                        <button style={{ width: "32px", height: "32px", display: "inline-flex", alignItems: "center", justifyContent: "center", border: "1px solid #d9d9d9", borderRadius: "6px", background: "#fff", cursor: "pointer" }} onClick={(e) => { e.stopPropagation(); openTicket(t); }}>
+                          <Eye size={14} />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Create Modal */}
+      {showCreate && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "16px" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "540px", boxShadow: "0 12px 36px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec", borderRadius: "16px 16px 0 0" }}>
+              <div>
+                <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "800" }}>NEW SUPPORT REQUEST</span>
+                <h3 style={{ fontSize: "18px", fontWeight: "700", color: "#111", margin: 0 }}>Create a Support Ticket</h3>
+              </div>
+              <button onClick={() => setShowCreate(false)} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+            <form onSubmit={handleCreate} style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#555", marginBottom: "4px", display: "block" }}>Subject *</label>
+                <input type="text" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="Brief description of the issue" style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "14px" }} required />
+              </div>
+              <div>
+                <label style={{ fontSize: "12px", fontWeight: "700", color: "#555", marginBottom: "4px", display: "block" }}>Description *</label>
+                <textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detailed description of your issue or request..." style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "14px", resize: "vertical" }} required />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: "700", color: "#555", marginBottom: "4px", display: "block" }}>Priority</label>
+                  <select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "14px", background: "#fff" }}>
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="URGENT">Urgent</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: "12px", fontWeight: "700", color: "#555", marginBottom: "4px", display: "block" }}>Category</label>
+                  <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "14px", background: "#fff" }}>
+                    <option value="General">General</option>
+                    <option value="Procurement">Procurement</option>
+                    <option value="Inventory">Inventory</option>
+                    <option value="Finance">Finance</option>
+                    <option value="Technical">Technical</option>
+                    <option value="Account Access">Account Access</option>
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "8px" }}>
+                <button type="button" style={{ padding: "10px 18px", borderRadius: "8px", border: "1px solid #d9d9d9", background: "#f8f9fb", color: "#111", fontWeight: "600", cursor: "pointer", fontSize: "14px" }} onClick={() => setShowCreate(false)}>Cancel</button>
+                <button type="submit" className="sadmin-btn-primary-sm" disabled={creating || !form.subject.trim() || !form.description.trim()}>
+                  {creating ? <><Loader2 size={15} className="login-spin" /> Creating...</> : <><MessageSquare size={15} /> Submit Request</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Ticket Detail + Chat Modal */}
+      {selectedTicket && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: "16px" }}>
+          <div style={{ background: "#fff", borderRadius: "16px", width: "100%", maxWidth: "640px", maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 12px 36px rgba(0,0,0,0.15)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "20px", background: "#f8f9fb", borderBottom: "1px solid #ececec", borderRadius: "16px 16px 0 0", flexShrink: 0 }}>
+              <div>
+                <span style={{ fontSize: "11px", color: "#2563eb", fontWeight: "800" }}>{selectedTicket.ticketNumber}</span>
+                <h3 style={{ fontSize: "17px", fontWeight: "700", color: "#111", margin: 0 }}>{selectedTicket.subject}</h3>
+                <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
+                  <span style={{ fontSize: "10px", fontWeight: "800", padding: "2px 8px", borderRadius: "12px", background: selectedTicket.status === "OPEN" ? "rgba(37,99,235,.12)" : selectedTicket.status === "IN_PROGRESS" ? "rgba(217,119,6,.12)" : selectedTicket.status === "RESOLVED" ? "rgba(5,150,105,.12)" : "#f1f3f5", color: selectedTicket.status === "OPEN" ? "#2563eb" : selectedTicket.status === "IN_PROGRESS" ? "#d97706" : selectedTicket.status === "RESOLVED" ? "#059669" : "#6b7280" }}>{selectedTicket.status.replace(/_/g, " ")}</span>
+                  <span style={{ fontSize: "10px", fontWeight: "800", padding: "2px 8px", borderRadius: "12px", background: selectedTicket.priority === "URGENT" ? "rgba(220,38,38,.12)" : selectedTicket.priority === "HIGH" ? "rgba(217,119,6,.12)" : selectedTicket.priority === "MEDIUM" ? "rgba(37,99,235,.12)" : "#f1f3f5", color: selectedTicket.priority === "URGENT" ? "#dc2626" : selectedTicket.priority === "HIGH" ? "#d97706" : selectedTicket.priority === "MEDIUM" ? "#2563eb" : "#6b7280" }}>{selectedTicket.priority}</span>
+                </div>
+              </div>
+              <button onClick={() => { setSelectedTicket(null); setMessages([]); }} style={{ background: "none", border: "none", color: "#666", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+
+            {/* Messages */}
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "300px", maxHeight: "50vh" }}>
+              {msgLoading ? (
+                <div style={{ display: "flex", justifyContent: "center", padding: "32px", color: "#666" }}>
+                  <Loader2 size={18} className="login-spin" /> Loading messages...
+                </div>
+              ) : messages.length === 0 ? (
+                <div style={{ textAlign: "center", color: "#888", padding: "32px" }}>No messages yet.</div>
+              ) : (
+                messages.map((m, idx) => {
+                  const isAdmin = m.senderRole === "SUPER_ADMIN" || m.senderRole === "ADMIN" || m.senderRole === "SUPPORT_TEAM";
+                  return (
+                    <div key={m.id || idx} style={{ display: "flex", flexDirection: "column", maxWidth: "80%", alignSelf: isAdmin ? "flex-end" : "flex-start" }}>
+                      <div style={{ fontSize: "11px", color: "#888", marginBottom: "2px", fontWeight: "600" }}>
+                        {m.senderName || m.senderUsername || "System"} {m.senderRole && <span style={{ color: "#aaa" }}>({m.senderRole})</span>}
+                      </div>
+                      <div style={{ padding: "10px 14px", borderRadius: "12px", fontSize: "13.5px", lineHeight: 1.5, background: isAdmin ? "#eff6ff" : "#f3f4f6", color: "#111", borderBottomLeftRadius: isAdmin ? "12px" : "4px", borderBottomRightRadius: isAdmin ? "4px" : "12px" }}>
+                        {m.messageText}
+                      </div>
+                      <div style={{ fontSize: "10px", color: "#aaa", marginTop: "2px" }}>{formatDateIN(m.createdAt)}</div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Input */}
+            {selectedTicket.status !== "CLOSED" && (
+              <form onSubmit={handleSendMessage} style={{ display: "flex", gap: "8px", padding: "16px 20px", borderTop: "1px solid #ececec", flexShrink: 0 }}>
+                <input
+                  type="text"
+                  value={newMsg}
+                  onChange={(e) => setNewMsg(e.target.value)}
+                  placeholder="Type a message..."
+                  style={{ flex: 1, padding: "10px 14px", borderRadius: "8px", border: "1px solid #d9d9d9", fontSize: "14px" }}
+                  disabled={sending}
+                />
+                <button type="submit" className="sadmin-btn-primary-sm" disabled={sending || !newMsg.trim()}>
+                  {sending ? <Loader2 size={15} className="login-spin" /> : <><Send size={15} /> Send</>}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -27,7 +27,7 @@ public class InventoryController {
     }
 
     @PostMapping("/adjust")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('CAN_UPDATE_INVENTORY','CAN_MANAGE_PRODUCTS','SUPER_ADMIN','ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('SUPER_ADMIN','ADMIN','PROCUREMENT_MANAGER','PROCUREMENT_OFFICER','WAREHOUSE_MANAGER') or hasAnyAuthority('CAN_UPDATE_INVENTORY','CAN_MANAGE_PRODUCTS')")
     public ApiResponse<com.procurement.inventory.dto.response.InventoryTransactionResponse> adjust(
             @Valid @RequestBody com.procurement.inventory.dto.request.InventoryAdjustmentRequest request) {
         return ApiResponse.success("Stock updated with transaction log", transactionService.adjustStock(request));
