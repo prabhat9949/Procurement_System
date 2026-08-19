@@ -7,8 +7,6 @@ import {
   FileCheck,
   FileText,
   Clock,
-  BarChart3,
-  FolderKanban,
   LogOut,
   Menu,
   ChevronLeft,
@@ -22,8 +20,6 @@ import ManagerOverview from "./modules/ManagerOverview";
 import ApprovalQueue from "./modules/ApprovalQueue";
 import TeamRequisitions from "./modules/TeamRequisitions";
 import TrackForms from "./modules/TrackForms";
-import BudgetAnalytics from "./modules/BudgetAnalytics";
-import DeptDocuments from "./modules/DeptDocuments";
 import ManagerProfile from "./modules/ManagerProfile";
 import ProfileDrawer from "../shared_ui/ProfileDrawer";
 import NotificationsModule from "../employee/modules/NotificationsModule";
@@ -40,12 +36,10 @@ const DeptManagerDashboard = () => {
   const [trackReqId, setTrackReqId] = useState(null);
 
   const navMenuItems = [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "approvals", label: "Approval Queue", icon: FileCheck },
     { id: "team-requests", label: "Team Requisitions", icon: FileText },
-    { id: "track-forms", label: "Track Forms", icon: Clock },
-    { id: "budget-analytics", label: "Budget & Analytics", icon: BarChart3 },
-    { id: "documents", label: "Documents", icon: FolderKanban },
+    { id: "track-forms", label: "PR Tracking", icon: Clock },
     { id: "notifications", label: "Notifications", icon: Bell },
     { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
@@ -85,10 +79,6 @@ const DeptManagerDashboard = () => {
         return <TeamRequisitions onTrackForm={handleNavigateToTrack} />;
       case "track-forms":
         return <TrackForms initialReqId={trackReqId} />;
-      case "budget-analytics":
-        return <BudgetAnalytics />;
-      case "documents":
-        return <DeptDocuments />;
       case "notifications":
         return <NotificationsModule />;
       case "support":

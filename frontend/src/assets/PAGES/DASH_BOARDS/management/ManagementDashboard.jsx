@@ -27,6 +27,8 @@ import {
   ChevronRight,
   Hourglass,
   AlertOctagon,
+  Bell,
+  HelpCircle,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -43,6 +45,8 @@ import { apiGet, apiPost } from "../../../../services/apiClient";
 import { formatINR, formatDateIN } from "../../../../utils/format";
 import { hasPermission } from "../../../../utils/permissions";
 import RoleShell from "../shared_ui/RoleShell";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const ROLE_META = {
   senior_manager: {
@@ -247,10 +251,11 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
   ];
 
   const navItems = [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
+    { id: "overview", label: "Dashboard", icon: LayoutDashboard },
     { id: "approvals", label: "Approval Queue", icon: ClipboardCheck },
-    { id: "history", label: "My History", icon: Scale },
-    { id: "analytics", label: "Analytics", icon: TrendingUp },
+    { id: "history", label: "PR Tracking", icon: Scale },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
   const openDetail = async (task) => {
@@ -869,6 +874,16 @@ const ManagementDashboard = ({ role = "senior_manager" }) => {
                 )}
               </div>
             </>
+          )}
+
+          {/* ============ NOTIFICATIONS ============ */}
+          {activeTab === "notifications" && (
+            <NotificationsModule />
+          )}
+
+          {/* ============ SUPPORT & HELP ============ */}
+          {activeTab === "support" && (
+            <SupportModule />
           )}
         </>
       )}
