@@ -10,16 +10,12 @@ import {
   Truck,
   Barcode,
   Clock,
-  BarChart3,
-  FolderKanban,
   Bell,
-  UserCheck,
-  Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 
 import InventoryOverview from "./modules/InventoryOverview";
@@ -32,9 +28,8 @@ import DeliveryMonitoring from "./modules/DeliveryMonitoring";
 import WarehouseManagement from "./modules/WarehouseManagement";
 import InventoryAnalytics from "./modules/InventoryAnalytics";
 import InventoryReports from "./modules/InventoryReports";
-import InventoryNotifications from "./modules/InventoryNotifications";
-import InventoryProfile from "./modules/InventoryProfile";
-import InventorySettings from "./modules/InventorySettings";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 
 const InventoryDashboard = () => {
   const navigate = useNavigate();
@@ -53,7 +48,9 @@ const InventoryDashboard = () => {
     { id: "inventory-tracking", label: "Inventory Tracking", icon: Barcode },
     { id: "delivery-monitoring", label: "Delivery Monitoring", icon: Clock },
     { id: "warehouse-management", label: "Warehouse Management", icon: Warehouse },
-    ];
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("eps_active_role");
@@ -79,6 +76,10 @@ const InventoryDashboard = () => {
         return <DeliveryMonitoring />;
       case "warehouse-management":
         return <WarehouseManagement />;
+      case "notifications":
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <InventoryProfile />;
       default:

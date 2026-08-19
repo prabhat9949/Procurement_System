@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   LifeBuoy,
   MessageSquare,
@@ -48,6 +48,14 @@ const AdminSupport = () => {
   // Create form
   const [form, setForm] = useState({ subject: "", description: "", priority: "MEDIUM", category: "General" });
   const [creating, setCreating] = useState(false);
+
+  // Live Chat state
+  const [showChat, setShowChat] = useState(false);
+  const [chatTicket, setChatTicket] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatMsg, setChatMsg] = useState("");
+  const [chatSending, setChatSending] = useState(false);
+  const chatEndRef = useRef(null);
 
   const triggerToast = (msg, tone = "ok") => {
     setToast({ msg, tone });
@@ -139,6 +147,49 @@ const AdminSupport = () => {
     }
   };
 
+  // Live Chat functions
+  const startLiveChat = async () => {
+    try {
+      const ticket = await apiPost("/api/support-tickets", {
+        subject: "Live Chat Session",
+        description: "Live chat initiated from Admin dashboard",
+        priority: "HIGH",
+        category: "LIVE_CHAT",
+      });
+      setChatTicket(ticket);
+      setShowChat(true);
+      const msgs = await apiGet(`/api/support-tickets/${ticket.id}/messages`);
+      setChatMessages(msgs || []);
+    } catch (err) {
+      triggerToast(err.message || "Could not start live chat.", "err");
+    }
+  };
+
+  const sendChatMsg = async (e) => {
+    e.preventDefault();
+    if (!chatMsg.trim() || !chatTicket) return;
+    setChatSending(true);
+    try {
+      const sent = await apiPost(`/api/support-tickets/${chatTicket.id}/messages`, { messageText: chatMsg });
+      setChatMessages([...chatMessages, sent]);
+      setChatMsg("");
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    } catch (err) {
+      triggerToast(err.message || "Could not send message.", "err");
+    } finally { setChatSending(false); }
+  };
+
+  useEffect(() => {
+    if (!showChat || !chatTicket) return;
+    const interval = setInterval(async () => {
+      try {
+        const msgs = await apiGet(`/api/support-tickets/${chatTicket.id}/messages`);
+        setChatMessages(msgs || []);
+      } catch { /* silent */ }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [showChat, chatTicket]);
+
   return (
     <div style={{ padding: "20px" }}>
       {toast && (
@@ -163,6 +214,9 @@ const AdminSupport = () => {
           </button>
           <button className="sadmin-btn-primary-sm" onClick={() => setShowCreate(true)}>
             <Plus size={15} /> New Support Request
+          </button>
+          <button className="sadmin-btn-primary-sm" style={{ background: "#3b82f6", color: "#fff" }} onClick={startLiveChat}>
+            <MessageSquare size={15} /> Live Chat
           </button>
         </div>
       </div>
@@ -373,6 +427,39 @@ const AdminSupport = () => {
               </form>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Live Chat Floating Panel */}
+      {showChat && chatTicket && (
+        <div style={{ position: "fixed", bottom: 80, right: 24, width: 380, height: 480, background: "#fff", borderRadius: 16, boxShadow: "0 12px 40px rgba(0,0,0,.2)", zIndex: 1100, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+          <div style={{ padding: "14px 16px", background: "#2563eb", color: "#fff", display: "flex", justifyContent: "space-between", alignItems: "center", flexShrink: 0 }}>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 14 }}>Live Support Chat</div>
+              <div style={{ fontSize: 11, opacity: 0.8 }}>Ticket {chatTicket.ticketNumber || "creating..."}</div>
+            </div>
+            <button onClick={() => { setShowChat(false); setChatTicket(null); }} style={{ background: "none", border: "none", color: "#fff", cursor: "pointer" }}><X size={18} /></button>
+          </div>
+          <div style={{ flex: 1, overflowY: "auto", padding: 12 }}>
+            {chatMessages.length === 0 && (
+              <div style={{ padding: 24, textAlign: "center", color: "#888", fontSize: 13 }}>Send a message to start the conversation with the Support Team.</div>
+            )}
+            {chatMessages.map((m, i) => (
+              <div key={i} style={{ marginBottom: 8, display: "flex", justifyContent: (m.senderRole === "SUPPORT_TEAM" || m.senderRole === "ADMIN" || m.senderRole === "SUPER_ADMIN") ? "flex-start" : "flex-end" }}>
+                <div style={{ maxWidth: "80%", padding: "8px 12px", borderRadius: 12, background: (m.senderRole === "SUPPORT_TEAM" || m.senderRole === "ADMIN" || m.senderRole === "SUPER_ADMIN") ? "#f0f6ff" : "#2563eb", color: (m.senderRole === "SUPPORT_TEAM" || m.senderRole === "ADMIN" || m.senderRole === "SUPER_ADMIN") ? "#111" : "#fff", fontSize: 13, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, marginBottom: 2, opacity: 0.7 }}>{m.senderName || "You"}</div>
+                  {m.messageText}
+                </div>
+              </div>
+            ))}
+            <div ref={chatEndRef} />
+          </div>
+          <form onSubmit={sendChatMsg} style={{ display: "flex", gap: 6, padding: "10px 12px", borderTop: "1px solid #ececec", flexShrink: 0 }}>
+            <input value={chatMsg} onChange={(e) => setChatMsg(e.target.value)} placeholder="Type a message..." style={{ flex: 1, padding: "8px 12px", border: "1px solid #d9d9d9", borderRadius: 8, fontSize: 13 }} />
+            <button type="submit" disabled={chatSending || !chatMsg.trim()} style={{ padding: "8px 14px", border: 0, borderRadius: 8, background: "#2563eb", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: 13, opacity: chatSending || !chatMsg.trim() ? 0.5 : 1 }}>
+              <Send size={14} />
+            </button>
+          </form>
         </div>
       )}
     </div>
