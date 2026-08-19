@@ -10,15 +10,12 @@ import {
   Truck,
   FileText,
   IndianRupee,
-  FolderKanban,
   Bell,
-  UserCheck,
-  Settings,
   LogOut,
   Menu,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
+  HelpCircle,
 } from "lucide-react";
 
 import VendorOverview from "./modules/VendorOverview";
@@ -26,11 +23,8 @@ import VendorProcRequests from "./modules/VendorProcRequests";
 import VendorRfqs from "./modules/VendorRfqs";
 import VendorQuotations from "./modules/VendorQuotations";
 import VendorPurchaseOrders from "./modules/VendorPurchaseOrders";
-import VendorDeliveryTracking from "./modules/VendorDeliveryTracking";
-import VendorInvoices from "./modules/VendorInvoices";
-import VendorPayments from "./modules/VendorPayments";
-import VendorReports from "./modules/VendorReports";
-import VendorNotifications from "./modules/VendorNotifications";
+import NotificationsModule from "../employee/modules/NotificationsModule";
+import SupportModule from "../employee/modules/SupportModule";
 import VendorProfile from "./modules/VendorProfile";
 import VendorSettings from "./modules/VendorSettings";
 
@@ -44,15 +38,12 @@ const VendorDashboard = () => {
 
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "procurement-requests", label: "Procurement Requests", icon: ShoppingBag },
-    { id: "rfqs", label: "RFQs", icon: Send },
-    { id: "quotations", label: "Submitted Quotations", icon: FileCheck2 },
-    { id: "purchase-orders", label: "Purchase Orders", icon: ShoppingBag },
-    { id: "delivery-tracking", label: "Delivery Tracking", icon: Truck },
-    { id: "invoices", label: "Invoices", icon: FileText },
-    { id: "payments", label: "Payments", icon: IndianRupee },
-    { id: "reports", label: "Reports", icon: FolderKanban },
-    ];
+    { id: "rfqs", label: "My RFQs", icon: Send },
+    { id: "quotations", label: "My Quotations", icon: FileCheck2 },
+    { id: "purchase-orders", label: "My Purchase Orders", icon: ShoppingBag },
+    { id: "notifications", label: "Notifications", icon: Bell },
+    { id: "support", label: "Support & Help", icon: HelpCircle },
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("eps_active_role");
@@ -72,16 +63,10 @@ const VendorDashboard = () => {
         return <VendorQuotations />;
       case "purchase-orders":
         return <VendorPurchaseOrders onNavigate={(tab) => setActiveTab(tab)} />;
-      case "delivery-tracking":
-        return <VendorDeliveryTracking />;
-      case "invoices":
-        return <VendorInvoices />;
-      case "payments":
-        return <VendorPayments />;
-      case "reports":
-        return <VendorReports />;
       case "notifications":
-        return <VendorNotifications />;
+        return <NotificationsModule />;
+      case "support":
+        return <SupportModule />;
       case "profile":
         return <VendorProfile />;
       case "settings":
