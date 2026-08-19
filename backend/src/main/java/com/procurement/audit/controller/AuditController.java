@@ -34,14 +34,14 @@ public class AuditController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAuthority('CREATE_AUDIT_CASE')")
+    @PreAuthorize("hasAuthority('CAN_CREATE_AUDIT_CASE')")
     public ResponseEntity<ApiResponse<AuditCaseResponse>> create(@Valid @RequestBody AuditCaseRequest request, Authentication auth) {
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Audit case created", service.createCase(request, auth.getName())));
     }
 
     @GetMapping("/my-queue")
-    @PreAuthorize("hasAuthority('VIEW_AUDIT_CASES')")
+    @PreAuthorize("hasAuthority('CAN_VIEW_AUDIT_CASES')")
     public ApiResponse<Page<AuditCaseResponse>> myQueue(
             @RequestParam(required = false) AuditStatus status,
             @RequestParam(defaultValue = "0") int page,
@@ -53,7 +53,7 @@ public class AuditController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('VIEW_AUDIT_TEAM_QUEUE')")
+    @PreAuthorize("hasAuthority('CAN_VIEW_AUDIT_TEAM_QUEUE')")
     public ApiResponse<Page<AuditCaseResponse>> search(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) AuditStatus status,
@@ -65,19 +65,19 @@ public class AuditController {
     }
 
     @GetMapping("/pending-count")
-    @PreAuthorize("hasAuthority('VIEW_AUDIT_CASES')")
+    @PreAuthorize("hasAuthority('CAN_VIEW_AUDIT_CASES')")
     public ApiResponse<Long> pendingCount(Authentication auth) {
         return ApiResponse.success(service.pendingCount(auth.getName()));
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('VIEW_AUDIT_CASES')")
+    @PreAuthorize("hasAuthority('CAN_VIEW_AUDIT_CASES')")
     public ApiResponse<AuditCaseResponse> get(@PathVariable Long id, Authentication auth) {
         return ApiResponse.success(service.getCase(id, auth.getName()));
     }
 
     @GetMapping("/{id}/findings")
-    @PreAuthorize("hasAuthority('VIEW_AUDIT_CASES')")
+    @PreAuthorize("hasAuthority('CAN_VIEW_AUDIT_CASES')")
     public ApiResponse<Page<AuditFindingResponse>> findings(
             @PathVariable Long id,
             @RequestParam(defaultValue = "0") int page,
@@ -86,7 +86,7 @@ public class AuditController {
     }
 
     @PostMapping("/{id}/findings")
-    @PreAuthorize("hasAuthority('CREATE_AUDIT_FINDING')")
+    @PreAuthorize("hasAuthority('CAN_CREATE_AUDIT_FINDING')")
     public ResponseEntity<ApiResponse<AuditFindingResponse>> addFinding(
             @PathVariable Long id, @Valid @RequestBody AuditFindingRequest request, Authentication auth) {
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -94,7 +94,7 @@ public class AuditController {
     }
 
     @PostMapping("/{id}/findings/{findingId}/status")
-    @PreAuthorize("hasAuthority('CLOSE_FINDING')")
+    @PreAuthorize("hasAuthority('CAN_CLOSE_FINDING')")
     public ApiResponse<AuditFindingResponse> updateFindingStatus(
             @PathVariable Long id, @PathVariable Long findingId,
             @Valid @RequestBody AuditFindingStatusRequest request, Authentication auth) {
@@ -102,7 +102,7 @@ public class AuditController {
     }
 
     @PostMapping("/{id}/conclude")
-    @PreAuthorize("hasAuthority('CONCLUDE_AUDIT')")
+    @PreAuthorize("hasAuthority('CAN_CONCLUDE_AUDIT')")
     public ApiResponse<AuditCaseResponse> conclude(
             @PathVariable Long id, @Valid @RequestBody AuditConclusionRequest request, Authentication auth) {
         return ApiResponse.success("Audit concluded", service.conclude(id, request, auth.getName()));
