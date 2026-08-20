@@ -5,18 +5,8 @@ import "./SupportDashboard.css";
 import {
   LayoutDashboard,
   Ticket,
-  LifeBuoy,
-  ShoppingBag,
-  Users,
-  IndianRupee,
-  Boxes,
-  ArrowUpRight,
-  Star,
   Zap,
-  FolderKanban,
   Bell,
-  UserCheck,
-  Settings,
   LogOut,
   Menu,
   ChevronLeft,
@@ -26,16 +16,8 @@ import {
 
 import SupportOverview from "./modules/SupportOverview";
 import SupportTickets from "./modules/SupportTickets";
-import HelpDesk from "./modules/HelpDesk";
-import ProcurementSupport from "./modules/ProcurementSupport";
-import VendorSupport from "./modules/VendorSupport";
-import FinancialSupport from "./modules/FinancialSupport";
-import InventorySupport from "./modules/InventorySupport";
-import IssueEscalations from "./modules/IssueEscalations";
-import FeedbackManagement from "./modules/FeedbackManagement";
 import LiveSupportRequests from "./modules/LiveSupportRequests";
-import SupportReports from "./modules/SupportReports";
-import SupportNotifications from "./modules/SupportNotifications";
+import NotificationsModule from "../employee/modules/NotificationsModule";
 import SupportProfile from "./modules/SupportProfile";
 import SupportSettings from "./modules/SupportSettings";
 
@@ -50,16 +32,9 @@ const SupportDashboard = () => {
   const navMenuItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "support-tickets", label: "Support Tickets", icon: Ticket },
-    { id: "help-desk", label: "Help Desk", icon: LifeBuoy },
-    { id: "procurement-support", label: "Procurement Support", icon: ShoppingBag },
-    { id: "vendor-support", label: "Vendor Support", icon: Users },
-    { id: "financial-support", label: "Financial Support", icon: IndianRupee },
-    { id: "inventory-support", label: "Inventory Support", icon: Boxes },
-    { id: "issue-escalations", label: "Issue Escalations", icon: ArrowUpRight },
-    { id: "feedback-management", label: "Feedback Management", icon: Star },
-    { id: "live-support-requests", label: "Live Support Requests", icon: Zap },
-    { id: "reports", label: "Reports", icon: FolderKanban },
-    ];
+    { id: "live-support-requests", label: "Live Chat", icon: Zap },
+    { id: "notifications", label: "Notifications", icon: Bell },
+  ];
 
   const handleLogout = () => {
     localStorage.removeItem("eps_active_role");
@@ -73,24 +48,10 @@ const SupportDashboard = () => {
         return <SupportOverview onNavigate={(tab) => setActiveTab(tab)} />;
       case "support-tickets":
         return <SupportTickets />;
-      case "help-desk":
-        return <HelpDesk />;
-      case "procurement-support":
-        return <ProcurementSupport />;
-      case "vendor-support":
-        return <VendorSupport />;
-      case "financial-support":
-        return <FinancialSupport />;
-      case "inventory-support":
-        return <InventorySupport />;
-      case "issue-escalations":
-        return <IssueEscalations />;
-      case "feedback-management":
-        return <FeedbackManagement />;
       case "live-support-requests":
         return <LiveSupportRequests />;
-      case "reports":
-        return <SupportReports />;
+      case "notifications":
+        return <NotificationsModule />;
       case "profile":
         return <SupportProfile />;
       default:
