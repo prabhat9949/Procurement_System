@@ -1,0 +1,2 @@
+package com.procurement.approvalrule.validator; import com.procurement.approvalrule.dto.request.ApprovalRuleRequest; import com.procurement.common.exception.BadRequestException; import org.springframework.stereotype.Component;
+@Component public class ApprovalRuleValidator { public void validate(ApprovalRuleRequest r){if(r.maximumAmount()!=null&&r.maximumAmount().compareTo(r.minimumAmount())<0)throw new BadRequestException("Maximum amount must be greater than or equal to minimum amount");} }

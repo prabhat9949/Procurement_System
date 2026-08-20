@@ -1,0 +1,1 @@
+package com.procurement.quotationcomparison.dto.response;import com.procurement.quotationcomparison.entity.*;import java.time.*;public record QuotationComparisonResponse(Long id,String comparisonNumber,Long rfqId,String rfqNumber,ComparisonMethod comparisonMethod,LocalDate comparisonDate,String preparedBy,String approvedBy,ComparisonStatus status,String remarks){}

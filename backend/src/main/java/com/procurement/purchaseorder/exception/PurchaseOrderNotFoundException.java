@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.exception;import com.procurement.common.exception.ResourceNotFoundException;public class PurchaseOrderNotFoundException extends ResourceNotFoundException{public PurchaseOrderNotFoundException(Long id){super("Purchase order not found: "+id);}}

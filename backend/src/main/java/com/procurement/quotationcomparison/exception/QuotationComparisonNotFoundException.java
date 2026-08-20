@@ -1,0 +1,1 @@
+package com.procurement.quotationcomparison.exception;import com.procurement.common.exception.ResourceNotFoundException;public class QuotationComparisonNotFoundException extends ResourceNotFoundException{public QuotationComparisonNotFoundException(Long id){super("Quotation comparison not found: "+id);}}

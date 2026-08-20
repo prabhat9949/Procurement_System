@@ -1,0 +1,1 @@
+package com.procurement.purchaseorder.dto.response;import java.math.BigDecimal;public record PurchaseOrderLineResponse(Long id,Long purchaseOrderId,Long productId,String productName,BigDecimal quantityOrdered,BigDecimal quantityReceived,BigDecimal unitPrice,BigDecimal discountPercentage,BigDecimal taxPercentage,BigDecimal lineAmount,String remarks){}

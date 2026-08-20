@@ -1,0 +1,8 @@
+package com.procurement.notification.entity;
+
+public enum NotificationPriority {
+    LOW,
+    MEDIUM,
+    HIGH,
+    CRITICAL
+}

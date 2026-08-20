@@ -1,0 +1,46 @@
+package com.procurement.fulfilment.dto.response;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+public record InternalFulfilmentResponse(
+        Long id,
+        String fulfilmentNumber,
+        Long purchaseRequestId,
+        String requestNumber,
+        Long purchaseRequestLineId,
+        Long productId,
+        String productCode,
+        String productName,
+        String sku,
+        Boolean isDigital,
+        Long requesterId,
+        String requesterName,
+        String requesterDepartment,
+        Long departmentId,
+        String departmentName,
+        String specializedTeam,
+        Long warehouseId,
+        String warehouseName,
+        Long assignedEmployeeId,
+        String assignedEmployeeName,
+        Long assignedById,
+        String assignedByName,
+        String fulfilmentType,
+        String status,
+        BigDecimal requestedQuantity,
+        BigDecimal availableQuantity,
+        BigDecimal allocatedQuantity,
+        BigDecimal deliveredQuantity,
+        BigDecimal shortageQuantity,
+        String licenseKeyAssigned,
+        String assetTag,
+        String deliveryLocation,
+        String remarks,
+        LocalDateTime allocatedAt,
+        LocalDateTime dispatchedAt,
+        LocalDateTime deliveredAt,
+        LocalDateTime completedAt,
+        LocalDateTime createdAt,
+        LocalDateTime updatedAt
+) {}

@@ -1,0 +1,1 @@
+package com.procurement.approvaltask.exception; import com.procurement.common.exception.ResourceNotFoundException; public class ApprovalTaskNotFoundException extends ResourceNotFoundException{public ApprovalTaskNotFoundException(Long id){super("Approval task not found: "+id);}}

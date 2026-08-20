@@ -1,0 +1,1 @@
+package com.procurement.rfq.repository; import com.procurement.rfq.entity.*; import org.springframework.data.jpa.repository.*; import org.springframework.stereotype.Repository; import java.util.*; @Repository public interface RfqLineRepository extends JpaRepository<RfqLine,Long>,JpaSpecificationExecutor<RfqLine>{List<RfqLine> findByRfqId(Long id);}

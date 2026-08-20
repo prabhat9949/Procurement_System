@@ -1,0 +1,17 @@
+package com.procurement.purchaserequest.entity;
+
+public enum PurchaseRequestStatus {
+    DRAFT,
+    SUBMITTED,
+    UNDER_REVIEW,
+    APPROVED,
+    INTERNAL_AVAILABILITY_CHECK,
+    INTERNALLY_FULFILLABLE,
+    INTERNAL_FULFILMENT_IN_PROGRESS,
+    PARTIAL_FULFILMENT_PENDING,
+    EXTERNAL_PROCUREMENT_REQUIRED,
+    RFQ_CREATED,
+    COMPLETED,
+    REJECTED,
+    CANCELLED
+}

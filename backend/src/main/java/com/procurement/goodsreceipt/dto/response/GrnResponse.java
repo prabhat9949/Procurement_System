@@ -1,0 +1,1 @@
+package com.procurement.goodsreceipt.dto.response;import com.procurement.goodsreceipt.entity.GrnStatus;import java.time.*;public record GrnResponse(Long id,String grnNumber,Long purchaseOrderId,String poNumber,Long vendorId,String vendorName,Long warehouseId,String warehouseName,LocalDate receiptDate,GrnStatus status,String remarks){}

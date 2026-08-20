@@ -1,0 +1,1 @@
+package com.procurement.approvalrule.exception; import com.procurement.common.exception.ResourceNotFoundException; public class ApprovalRuleNotFoundException extends ResourceNotFoundException { public ApprovalRuleNotFoundException(Long id){super("Approval rule not found: "+id);} }

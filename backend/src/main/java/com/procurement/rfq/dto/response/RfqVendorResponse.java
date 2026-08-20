@@ -1,0 +1,1 @@
+package com.procurement.rfq.dto.response; import com.procurement.rfq.entity.RfqVendorStatus; import java.time.*; public record RfqVendorResponse(Long id,Long rfqId,Long vendorId,String vendorCode,String vendorName,LocalDateTime invitationDate,RfqVendorStatus responseStatus,LocalDateTime responseDate,String remarks){}

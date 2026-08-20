@@ -1,0 +1,1 @@
+package com.procurement.vendorquotation.exception;import com.procurement.common.exception.ResourceNotFoundException;public class VendorQuotationNotFoundException extends ResourceNotFoundException{public VendorQuotationNotFoundException(Long id){super("Vendor quotation not found: "+id);}}

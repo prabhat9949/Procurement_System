@@ -1,0 +1,1 @@
+package com.procurement.approvalstage.exception; import com.procurement.common.exception.ResourceNotFoundException; public class ApprovalStageNotFoundException extends ResourceNotFoundException{public ApprovalStageNotFoundException(Long id){super("Approval stage not found: "+id);}}
