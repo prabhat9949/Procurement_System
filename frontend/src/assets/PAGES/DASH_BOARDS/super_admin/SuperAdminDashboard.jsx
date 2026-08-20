@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createLogoutHandler } from "../../../../services/logout";
 import "./SuperAdminDashboard.css";
 
 import {
@@ -55,16 +56,7 @@ const SuperAdminDashboard = () => {
     { id: "settings", label: "Profile", icon: Settings },
     ];
 
-  const handleLogout = () => {
-    // Clear the complete EPS session so the Back button can never look like a logout.
-    localStorage.removeItem("eps_access_token");
-    localStorage.removeItem("eps_active_role");
-    localStorage.removeItem("eps_role_code");
-    localStorage.removeItem("eps_username");
-    localStorage.removeItem("eps_display_name");
-    localStorage.removeItem("eps_user_id");
-    navigate("/login", { replace: true });
-  };
+  const handleLogout = createLogoutHandler(navigate);
 
   const renderActiveModule = () => {
     switch (activeTab) {

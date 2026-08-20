@@ -425,26 +425,28 @@ const InternalFulfilment = () => {
             {/* Action buttons */}
             {availability && (
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginBottom: "20px" }}>
-                {availability.recommendedAction === "INTERNAL_FULFILMENT" && (
+                {/* Internal Fulfilment button — GREEN when available, GREY when not */}
+                {availability.recommendedAction === "INTERNAL_FULFILMENT" ? (
                   <button className="pman-btn-primary-sm" style={{ background: "#059669" }} disabled={acting} onClick={() => initiateAction("FULL_INTERNAL")}>
-                    {acting ? <Loader2 size={15} className="login-spin" /> : <Truck size={15} />} Fulfil Internally (Allocated {availability.totalAvailableQuantity})
+                    {acting ? <Loader2 size={15} className="login-spin" /> : <Truck size={15} />} Fulfil Internally ({availability.totalAvailableQuantity} units)
+                  </button>
+                ) : (
+                  <button className="pman-btn-primary-sm" style={{ background: "#94a3b8", cursor: "not-allowed", opacity: 0.6 }} disabled title="No stock available for internal fulfilment">
+                    <Truck size={15} /> Internal Fulfilment (0 available)
                   </button>
                 )}
+
+                {/* Partial fulfilment */}
                 {availability.recommendedAction === "PARTIAL_FULFILMENT_AND_EXTERNAL_PROCUREMENT" && (
-                  <>
-                    <button className="pman-btn-primary-sm" style={{ background: "#7c3aed" }} disabled={acting} onClick={() => initiateAction("PARTIAL_FULFILMENT")}>
-                      {acting ? <Loader2 size={15} className="login-spin" /> : <FileCheck2 size={15} />} Partial — Internal {availability.totalAvailableQuantity} + External {availability.totalShortageQuantity}
-                    </button>
-                  </>
-                )}
-                {availability.recommendedAction === "EXTERNAL_PROCUREMENT_REQUIRED" && (
-                  <button className="pman-btn-primary-sm" style={{ background: "#2563eb" }} disabled={acting} onClick={() => initiateAction("EXTERNAL_PROCUREMENT")}>
-                    {acting ? <Loader2 size={15} className="login-spin" /> : <Send size={15} />} Start External Procurement (RFQ Auto-Created)
+                  <button className="pman-btn-primary-sm" style={{ background: "#7c3aed" }} disabled={acting} onClick={() => initiateAction("PARTIAL_FULFILMENT")}>
+                    {acting ? <Loader2 size={15} className="login-spin" /> : <FileCheck2 size={15} />} Partial — Internal {availability.totalAvailableQuantity} + External {availability.totalShortageQuantity}
                   </button>
                 )}
-                {availability.recommendedAction === "PARTIAL_FULFILMENT_AND_EXTERNAL_PROCUREMENT" && (
-                  <button className="pman-btn-primary-sm" style={{ background: "#2563eb" }} disabled={acting} onClick={() => initiateAction("EXTERNAL_PROCUREMENT")}>
-                    {acting ? <Loader2 size={15} className="login-spin" /> : <Send size={15} />} External Only ({availability.totalShortageQuantity})
+
+                {/* External procurement — always available when shortage > 0 */}
+                {availability.totalShortageQuantity > 0 && (
+                  <button className="pman-btn-primary-sm" style={{ background: "#2563eb" }} disabled={acting} onClick={() => initiateAction(availability.recommendedAction === "PARTIAL_FULFILMENT_AND_EXTERNAL_PROCUREMENT" ? "PARTIAL_FULFILMENT" : "EXTERNAL_PROCUREMENT")}>
+                    {acting ? <Loader2 size={15} className="login-spin" /> : <Send size={15} />} External Procurement ({availability.totalShortageQuantity} units)
                   </button>
                 )}
               </div>

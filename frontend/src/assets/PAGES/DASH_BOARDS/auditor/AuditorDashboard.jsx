@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { createLogoutHandler } from "../../../../services/logout";
 import "./AuditorDashboard.css";
 
 import {
@@ -36,11 +37,7 @@ const AuditorDashboard = () => {
     { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
-  const handleLogout = () => {
-    localStorage.removeItem("eps_active_role");
-    localStorage.removeItem("eps_access_token");
-    navigate("/login");
-  };
+  const handleLogout = createLogoutHandler(navigate);
 
   const renderActiveModule = () => {
     switch (activeTab) {

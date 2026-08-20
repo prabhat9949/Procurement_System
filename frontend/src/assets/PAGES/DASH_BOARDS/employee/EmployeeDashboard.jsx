@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { createLogoutHandler } from "../../../../services/logout";
 import "./EmployeeDashboard.css";
 
 import {
@@ -110,18 +111,7 @@ const EmployeeDashboard = () => {
     { id: "support", label: "Support & Help", icon: HelpCircle },
   ];
 
-  const handleLogout = async () => {
-    try {
-      await apiPost("/api/auth/logout");
-    } catch {
-      /* backend logout is best-effort */
-    }
-    localStorage.removeItem("eps_active_role");
-    localStorage.removeItem("eps_access_token");
-    localStorage.removeItem("eps_display_name");
-    localStorage.removeItem("eps_username");
-    navigate("/login");
-  };
+  const handleLogout = createLogoutHandler(navigate);
 
   const renderActiveModule = () => {
     switch (activeTab) {
